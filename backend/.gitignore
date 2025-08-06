@@ -1,0 +1,26 @@
+# 🔒 ป้องกันไม่ให้ .env ถูก push ขึ้น Git
+.env
+
+# 📦 node_modules ใหญ่ ไม่จำเป็นต้อง push
+node_modules/
+
+# 🧱 ไฟล์ build เช่นของ TypeScript หรือ bundler
+dist/
+build/
+
+# 🐞 ไฟล์ log ต่าง ๆ
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 📁 ระบบเฉพาะบาง editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 🔄 ไฟล์ชั่วคราว หรือ lock files
+*.tgz
+*.lock
