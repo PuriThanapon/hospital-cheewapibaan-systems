@@ -30,7 +30,7 @@ export default function RootLayout({
           <img className="rounded-full" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTu7nMhqiZLkgWSeS8Y1-Mbs0ILsrgt1S0HRA&s" width={32} height={32} alt="logo" />
           {!isCollapsed && (
             <div className="leading-4">
-              <span className="font-bold text-lg">แผนกชีวาภิบาล</span>
+              <span className="font-bold text-lg text-black">แผนกชีวาภิบาล</span>
             </div>
           )}
         </div>

@@ -7,20 +7,20 @@ const menuItems = [
       {
         icon: "/home.png",
         label: "หน้าแรก",
-        href: "/",
+        href: "/admin",
         // visible: ["admin", "teacher", "student", "parent"],
       },
       {
         icon: "/student.png",
         label: "รายชื่อผู้ป่วย",
-        href: "/list/students",
+        href: "/admin/patients",
         // visible: ["admin", "teacher"],
       },
 
       {
         icon: "/lesson.png",
         label: "ข้อมูลการรักษา",
-        href: "/list/lessons",
+        href: "/treatment",
         // visible: ["admin", "teacher"],
       },
       {
@@ -32,13 +32,13 @@ const menuItems = [
       {
         icon: "/calendar.png",
         label: "การนัดหมาย",
-        href: "/list/events",
+        href: "/appointment",
         // visible: ["admin", "teacher", "student", "parent"],
       },
       {
         icon: "/message.png",
         label: "ข้อมูลการเสียชีวิต",
-        href: "/list/messages",
+        href: "/death",
         // visible: ["admin", "teacher", "student", "parent"],
       },
     ],

@@ -2,7 +2,7 @@ import React from 'react'
 
 const Navbar = () => {
   return (
-    <div  style={{ backgroundColor: '#01453f' }} className='flex items-center justify-between p-4 gap-4 shadow-md'>
+    <div  style={{ backgroundColor: '#005a50ff' }} className='flex items-center justify-between p-4 gap-4 shadow-md'>
 
       {/* CENTER - SEARCH BAR */}
       <div className='hidden md:flex items-center gap-4 bg-white text-xs rounded-full px-2 shadow-md ring-[1.5px] ring-gray-300 max-w-[700px] w-full mx-auto'>
