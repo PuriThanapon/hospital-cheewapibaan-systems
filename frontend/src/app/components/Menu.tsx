@@ -7,13 +7,13 @@ const menuItems = [
       {
         icon: "/home.png",
         label: "หน้าแรก",
-        href: "/admin",
+        href: "/",
         // visible: ["admin", "teacher", "student", "parent"],
       },
       {
         icon: "/student.png",
         label: "รายชื่อผู้ป่วย",
-        href: "/admin/patients",
+        href: "/patients",
         // visible: ["admin", "teacher"],
       },
 
@@ -32,7 +32,7 @@ const menuItems = [
       {
         icon: "/calendar.png",
         label: "การนัดหมาย",
-        href: "/appointment",
+        href: "/appointments",
         // visible: ["admin", "teacher", "student", "parent"],
       },
       {
