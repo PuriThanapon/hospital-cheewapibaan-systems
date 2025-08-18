@@ -7,13 +7,13 @@ const menuItems = [
       {
         icon: "/home.png",
         label: "หน้าแรก",
-        href: "/admin",
+        href: "/",
         // visible: ["admin", "teacher", "student", "parent"],
       },
       {
         icon: "/student.png",
         label: "รายชื่อผู้ป่วย",
-        href: "/admin/patients",
+        href: "/patient",
         // visible: ["admin", "teacher"],
       },
 
@@ -32,13 +32,7 @@ const menuItems = [
       {
         icon: "/calendar.png",
         label: "การนัดหมาย",
-        href: "/appointment",
-        // visible: ["admin", "teacher", "student", "parent"],
-      },
-      {
-        icon: "/message.png",
-        label: "ข้อมูลการเสียชีวิต",
-        href: "/death",
+        href: "/appointments",
         // visible: ["admin", "teacher", "student", "parent"],
       },
     ],
@@ -71,7 +65,7 @@ import React from 'react'
 
 const Menu = ({ isCollapsed }: { isCollapsed: boolean }) => {
   return (
-    <div className='text-sm'>
+    <div className='text-sm' >
       {menuItems.map(i => (
         <div className='flex flex-col gap-2' key={i.title}>
           {!isCollapsed && (

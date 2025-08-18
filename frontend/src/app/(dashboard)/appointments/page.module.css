@@ -1,0 +1,583 @@
+/* ─────────────────────────────────────────────────────────
+  VARIABLES
+────────────────────────────────────────────────────────── */
+:root {
+  --bg: #f7f7fb;
+  --card: #ffffff;
+  --text: #1f2430;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+
+  --primary: #2563eb;
+  --primary-600: #1e40af;
+
+  --pending: #f59e0b;
+  --checked: #06b6d4;
+  --done: #10b981;
+  --cancelled: #ef4444;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.06);
+}
+
+/* ─────────────────────────────────────────────────────────
+  LAYOUT & HEADER
+────────────────────────────────────────────────────────── */
+.page {
+  padding: 24px;
+  background: var(--bg);
+  min-height: 100%;
+  color: var(--text);
+  display: grid;
+  gap: 16px;
+  align-content: start; /* อย่ายืดแถวเมื่อพื้นที่เหลือ */
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.header h1 { font-size: 22px; font-weight: 700; }
+
+.actions { display: flex; gap: 12px; align-items: center; }
+
+/* ─────────────────────────────────────────────────────────
+  BUTTONS
+────────────────────────────────────────────────────────── */
+.primary {
+  background: #00544a;
+  color: #fff;
+  border: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.primary:hover { background: var(--primary-600); }
+
+.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ghost:hover { background: #fff; box-shadow: var(--shadow); }
+
+.danger {
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.dangerSolid {
+  background: #dc2626;
+  color: #fff;
+  border: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* ─────────────────────────────────────────────────────────
+  SEGMENTED CONTROL — อ่านง่ายขึ้น (แทนที่ของเดิม)
+────────────────────────────────────────────────────────── */
+
+/* ตัวแปรเฉพาะปุ่มสลับ */
+:root{
+  --seg-fg: #111827;                 /* สีข้อความปกติ */
+  --seg-muted: #334155;              /* สีข้อความตอน hover (ยังไม่ถูกเลือก) */
+  --seg-hover-bg: #f1f5f9;           /* พื้นหลังตอน hover (ยังไม่ถูกเลือก) */
+
+  /* โหมดถูกเลือก: พื้นฟ้าอ่อน + ข้อความน้ำเงินเข้ม */
+  --seg-active-bg: #EEF2FF;
+  --seg-active-fg: #00544a;
+  --seg-indicator: #00544a /* เส้นเน้นด้านล่าง */
+}
+
+.segment{
+  display: inline-flex;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.segment button{
+  position: relative;                 /* ให้ ::after วางได้ */
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.15px;
+  line-height: 1;
+  color: var(--seg-fg);
+
+  padding: 12px 16px;
+  min-width: 128px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  -webkit-tap-highlight-color: transparent;
+  transition: color .15s ease, background-color .15s ease, transform .12s ease;
+}
+
+/* hover เฉพาะปุ่มที่ "ยังไม่ถูกเลือก" */
+.segment button:not(.segmentActive):hover{
+  background: var(--seg-hover-bg);
+  color: var(--seg-muted);
+}
+
+/* โฟกัสด้วยคีย์บอร์ด */
+.segment button:focus-visible{
+  outline: none;
+  box-shadow: inset 0 0 0 2px #00544a;
+}
+
+/* ปุ่มที่ถูกเลือก: พื้นฟ้าอ่อน + ตัวหนังสือน้ำเงินเข้ม (อ่านง่าย) */
+.segmentActive,
+.segmentActive:hover,
+.segmentActive:focus-visible{
+  background: var(--seg-active-bg);
+  color: var(--seg-active-fg) !important;
+  text-shadow: none;
+  transform: none;                    /* ไม่เด้งขึ้น */
+  box-shadow: inset 0 -3px 0 var(--seg-indicator); /* เส้นเน้นด้านล่าง */
+}
+
+/* แถบเน้นด้านล่างของปุ่มที่ถูกเลือก */
+/* .segmentActive::after{
+  content: '';
+  position: absolute;
+  left: 16px; right: 16px; bottom: 6px;
+  height: 3px; border-radius: 3px;
+  background: var(--seg-indicator);
+  opacity: .9;
+} */
+
+/* จอเล็กยังอ่านชัด */
+@media (max-width: 480px){
+  .segment button{
+    font-size: 15.5px;
+    min-width: 120px;
+    padding: 11px 14px;
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────
+  VIEW TRANSITION — ให้รู้สึกว่าสลับมุมมองจริง
+────────────────────────────────────────────────────────── */
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* เมื่อสลับมุมมอง คอนเทนต์ที่แสดงจะเฟด–สไลด์เข้า */
+.tableWrap,
+.cards {
+  animation: viewIn .22s ease;
+  will-change: opacity, transform;
+}
+
+
+/* ─────────────────────────────────────────────────────────
+  KPIs
+────────────────────────────────────────────────────────── */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: start; /* กล่องไม่ยืดสูง */
+}
+.kpi {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+  align-self: start;
+}
+.kpiLabel { font-size: 12px; color: var(--muted); }
+.kpiValue { font-size: 22px; font-weight: 800; margin-top: 4px; }
+
+/* ─────────────────────────────────────────────────────────
+  FILTERS & FORM CONTROLS
+────────────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  align-self: start;
+}
+.filters > * { flex: 0 0 auto; }          /* ลูก ๆ อย่ายืดเต็มแถว */
+.search { width: 260px; flex: 0 0 260px; } /* ช่องค้นหาคงที่ */
+
+.input,
+.select {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  height: 36px;       /* ล็อกความสูง ไม่ให้ขยายตอนพิมพ์ */
+  padding: 0 10px;    /* ไม่มี padding แนวตั้ง */
+  font-size: 14px;
+  line-height: 1.2;
+  box-sizing: border-box;
+  display: inline-block;
+  vertical-align: middle;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ให้ตัวอักษรกึ่งกลางแนวตั้งสำหรับ text-like */
+input[type="text"].input,
+input[type="search"].input,
+input[type="tel"].input,
+input[type="number"].input,
+input:not([type]).input { line-height: 36px; }
+
+/* date/time ใช้ line-height ระบบ */
+input[type="date"].input,
+input[type="time"].input,
+input[type="datetime-local"].input {
+  line-height: normal;
+  height: 36px;
+  padding: 0 10px;
+}
+
+/* textarea มาตรฐานเดียวกัน */
+.textarea {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  min-height: 80px;
+  resize: vertical;
+}
+
+.inline  { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+.invalid { border-color: #ef4444; background: #fff5f5; }
+.err     { color: #b91c1c; font-size: 12px; margin-top: 4px; }
+
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+/* ─────────────────────────────────────────────────────────
+  TABLE
+────────────────────────────────────────────────────────── */
+.tableWrap {
+  overflow-x: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+.table th,
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  background: #fff;
+}
+.table thead th {
+  font-size: 12px;
+  color: var(--muted);
+  background: #fafafa;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.actionsCell { text-align: right; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* แถวว่างตอนไม่มีข้อมูล */
+.emptyCell {
+  text-align: center;
+  color: var(--muted);
+  padding: 20px 16px !important;
+  background: #fff;
+}
+
+/* ─────────────────────────────────────────────────────────
+  TEXT HELPERS
+────────────────────────────────────────────────────────── */
+.patient { display: grid; }
+.name    { font-weight: 600; }
+.sub     { font-size: 12px; color: var(--muted); }
+.mono    { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; }
+
+/* ─────────────────────────────────────────────────────────
+  STATUS BADGES
+────────────────────────────────────────────────────────── */
+.badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+.badgePending   { background: #fff7ed; color: #b45309; border-color: #fed7aa; }
+.badgeChecked   { background: #ecfeff; color: #0e7490; border-color: #a5f3fc; }
+.badgeDone      { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.badgeCancelled { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
+/* ─────────────────────────────────────────────────────────
+  CARDS
+────────────────────────────────────────────────────────── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+.cardHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cardRow    { display: flex; gap: 8px; align-items: baseline; margin: 4px 0; }
+.cardActions{ margin-top: 10px; display: flex; gap: 8px; justify-content: flex-start; flex-wrap: wrap; }
+.cardDetail { border-top: 1px dashed var(--line); margin-top: 6px; padding-top: 8px; display: grid; gap: 6px; }
+.cardDetailRow { display: flex; gap: 8px; align-items: flex-start; }
+.cardNote   { background: #f9fafb; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+
+/* ─────────────────────────────────────────────────────────
+  MODALS (Create/Edit, Delete, History)
+────────────────────────────────────────────────────────── */
+.modalBackdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.35);
+  display: grid; place-items: center;
+  padding: 16px; z-index: 40;
+}
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 880px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.modalSmall { max-width: 520px; }
+.modalWide  { max-width: 960px; }
+
+.modalHeader {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.iconBtn { border: 0; background: transparent; font-size: 22px; cursor: pointer; line-height: 1; }
+
+.formGrid {
+  display: grid; gap: 12px; padding: 14px 16px;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+.formGrid label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.span2 { grid-column: 1 / -1; }
+
+.modalActions {
+  display: flex; justify-content: flex-end; gap: 12px;
+  padding: 12px 16px; border-top: 1px solid var(--line);
+}
+
+/* ─────────────────────────────────────────────────────────
+  TABLE ROW DETAILS
+────────────────────────────────────────────────────────── */
+.detailRow > td {
+  background: #f9fafb;
+  padding: 12px 16px;
+  border-top: 0;
+}
+.detailWrap { display: grid; gap: 12px; }
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+.detailLabel { font-size: 12px; color: #6b7280; }
+.detailValue { font-weight: 600; }
+.detailNote  { border-top: 1px dashed #e5e7eb; padding-top: 8px; color: #111827; }
+.detailActions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ─────────────────────────────────────────────────────────
+  CONFIRM DELETE
+────────────────────────────────────────────────────────── */
+.confirmBody { padding: 16px; display: grid; gap: 8px; }
+.confirmLine { font-weight: 600; }
+.warn        { color: #b91c1c; }
+
+/* ─────────────────────────────────────────────────────────
+  HISTORY MODAL
+────────────────────────────────────────────────────────── */
+.historyBody { padding: 16px; }
+.historyList { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.historyItem { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px; }
+.historyTop  { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.historyWhen { font-weight: 700; }
+.historyLine { color: #111827; }
+.historyNote { background: #f9fafb; border: 1px dashed #e5e7eb; border-radius: 10px; padding: 8px; }
+
+/* ─────────────────────────────────────────────────────────
+  TYPEAHEAD (ผู้ป่วย) — อ่านง่าย
+────────────────────────────────────────────────────────── */
+.comboWrap { position: relative; }
+
+.suggestList{
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  max-height: 280px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.12);
+  z-index: 60;
+  overscroll-behavior: contain;
+}
+
+.suggestItem{
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.suggestItem:hover { background: #f3f4ff; }
+.active {
+  background: #eef2ff !important;
+  box-shadow: inset 3px 0 0 var(--primary);
+  outline: 1px solid #e0e7ff;
+}
+
+.suggestName { font-weight: 700; color: #111827; font-size: 15.5px; line-height: 1.25; }
+.suggestSub  { color: var(--muted); font-size: 12.5px; line-height: 1.2; }
+
+.suggestEmpty {
+  padding: 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.suggestList mark {
+  background: #fff3b0;
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+/* สกอลล์บาร์ */
+.suggestList::-webkit-scrollbar{ width: 10px; }
+.suggestList::-webkit-scrollbar-track{ background: #fafafa; border-radius: 10px; }
+.suggestList::-webkit-scrollbar-thumb{ background: #d1d5db; border-radius: 10px; }
+.suggestList::-webkit-scrollbar-thumb:hover{ background: #9ca3af; }
+
+/* ─────────────────────────────────────────────────────────
+  RESPONSIVE
+────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .detailGrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .kpis { grid-template-columns: 1fr; }
+  .formGrid { grid-template-columns: 1fr; }
+  .table { min-width: 720px; } /* ตารางเลื่อนแนวนอนได้บนจอเล็ก */
+}
+
+/* ===== Additions: Sticky toolbar, Pagination, Compact, Ellipsis ===== */
+
+/* ทำ toolbar (ฟิลเตอร์) ลอยค้างด้านบนของคอนเทนต์ */
+.stickyToolbar {
+  position: sticky;
+  top: 0;               /* ถ้ามี navbar คงที่ด้านบน ให้ปรับค่านี้ */
+  z-index: 12;
+  background: var(--card);
+}
+
+/* แถบควบคุม: ต่อหน้า / โหมดแสดงผล + เพจจิ้ง */
+.listToolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 4px;
+}
+.grow { flex: 1; }
+
+/* เพจจิ้ง */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.pagerNums { display: flex; gap: 4px; }
+.pageBtn {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+.pageActive {
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+}
+.pagerInfo { margin-left: 8px; color: var(--muted); }
+
+/* โหมดกระชับ (ลด padding/ระยะห่าง) */
+.compact .table th,
+.compact .table td { padding: 6px 8px; }
+.compact .card { padding: 10px; }
+.compact .kpi { padding: 8px; }
+.compact .input,
+.compact .select { height: 34px; }
+
+/* ตัดคำยาวด้วย ... */
+.cellEllipsis {
+  max-width: 220px; /* ปรับได้ตามใจ */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ให้ตารางเลื่อนในแนวตั้งได้ พร้อมหัวตาราง sticky ที่ top:0 (คุณมีแล้ว เพิ่ม max-height) */
+.tableWrap {
+  max-height: 62vh;   /* ปรับให้พอดีกับหน้าคุณ */
+  overflow: auto;     /* ให้เลื่อนภายในกล่อง */
+}
