@@ -21,6 +21,7 @@ import AppointmentForm from '@/app/components/forms/AppointmentForm';
 import DeceasedForm from '@/app/components/forms/DeceasedForm';
 import DatePickerField from '@/app/components/DatePicker';
 import type { AppointmentFormValue } from '@/app/components/forms/AppointmentForm';
+import Link from 'next/link';
 
 type Status = 'pending' | 'done' | 'cancelled';
 // react-select (SSR safe)
@@ -107,10 +108,10 @@ type FileField =
 
 // ถ้า fields ยังไม่กำหนด type ให้ใส่ด้วย
 const fields: Array<{ key: FileField; label: string }> = [
-  { key: 'patient_id_card',    label: 'สำเนาบัตรประชาชนผู้ป่วย' },
+  { key: 'patient_id_card', label: 'สำเนาบัตรประชาชนผู้ป่วย' },
   { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ' },
-  { key: 'patient_photo',      label: 'รูปถ่ายผู้ป่วย' },
-  { key: 'relative_id_card',   label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอฯ' },
+  { key: 'patient_photo', label: 'รูปถ่ายผู้ป่วย' },
+  { key: 'relative_id_card', label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอฯ' },
 ];
 
 // HTTP helper
@@ -135,7 +136,7 @@ async function http(url, options: any = {}) {
 
   if (!res.ok) {
     let msg = 'Request failed';
-    try { const j = await res.json(); msg = j.message || j.error || msg; } catch {}
+    try { const j = await res.json(); msg = j.message || j.error || msg; } catch { }
     const err: any = new Error(msg);
     err.status = res.status;
     throw err;
@@ -153,7 +154,7 @@ function buildPatientFormData(values: Record<string, any>) {
     if (val == null) return '';
     if (val instanceof Date) return toISODateLocal(val);
     if (typeof val === 'object' && 'toISOString' in val) {
-      try { return (val as any).toISOString().slice(0,10); } catch { return String(val); }
+      try { return (val as any).toISOString().slice(0, 10); } catch { return String(val); }
     }
     return String(val);
   };
@@ -172,10 +173,10 @@ function buildPatientFormData(values: Record<string, any>) {
   }
 
   // ใส่ไฟล์ถ้ามี
-  if (values.patient_id_card)    fd.append('patient_id_card', values.patient_id_card);
+  if (values.patient_id_card) fd.append('patient_id_card', values.patient_id_card);
   if (values.house_registration) fd.append('house_registration', values.house_registration);
-  if (values.patient_photo)      fd.append('patient_photo', values.patient_photo);
-  if (values.relative_id_card)   fd.append('relative_id_card', values.relative_id_card);
+  if (values.patient_photo) fd.append('patient_photo', values.patient_photo);
+  if (values.relative_id_card) fd.append('relative_id_card', values.relative_id_card);
 
   return fd;
 }
@@ -265,16 +266,16 @@ function safeFilename(s: string) {
   return s.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim();
 }
 const FILE_LABELS: Record<string, string> = {
-  patient_id_card:   'สำเนาบัตรประชาชน',
-  house_registration:'สำเนาทะเบียนบ้าน',
-  patient_photo:     'รูปถ่ายผู้ป่วย',
-  relative_id_card:  'บัตรประชาชนญาติ',
+  patient_id_card: 'สำเนาบัตรประชาชน',
+  house_registration: 'สำเนาทะเบียนบ้าน',
+  patient_photo: 'รูปถ่ายผู้ป่วย',
+  relative_id_card: 'บัตรประชาชนญาติ',
 };
 
 /** ดาวน์โหลดไฟล์แนบของผู้ป่วย */
 async function downloadPatientAttachment(
   patient: { patients_id: string; pname?: string; first_name?: string; last_name?: string },
-  field: 'patient_id_card'|'house_registration'|'patient_photo'|'relative_id_card'
+  field: 'patient_id_card' | 'house_registration' | 'patient_photo' | 'relative_id_card'
 ) {
   const patientsId = patient.patients_id;
   const fullName = `${patient.pname ?? ''}${patient.first_name ?? ''} ${patient.last_name ?? ''}`
@@ -296,7 +297,7 @@ async function downloadPatientAttachment(
     const res = await fetch(url, { method: 'GET' });
     if (!res.ok) {
       let msg = 'ดาวน์โหลดไม่สำเร็จ';
-      try { const j = await res.json(); msg = j.message || msg; } catch {}
+      try { const j = await res.json(); msg = j.message || msg; } catch { }
       throw new Error(msg);
     }
 
@@ -330,7 +331,7 @@ export default function PatientsPage() {
   // state: query + filters + pagination
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState({
-    gender:'', status:'', blood_group:'', bloodgroup_rh:'', patients_type:'', admit_from:'', admit_to:''
+    gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: ''
   });
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -351,7 +352,7 @@ export default function PatientsPage() {
   const [verifyData, setVerifyData] = useState(null);
 
   // drafts
-  const [addDraft, setAddDraft] = useState({ status:'มีชีวิต' });
+  const [addDraft, setAddDraft] = useState({ status: 'มีชีวิต' });
   const [editDraft, setEditDraft] = useState({});
   const [deadDraft, setDeadDraft] = useState({});
   const [deadErrors, setDeadErrors] = useState({});
@@ -386,9 +387,9 @@ export default function PatientsPage() {
         if (!alive) return;
         if (e.name !== 'AbortError') {
           setErrMsg(e.message || 'โหลดข้อมูลไม่สำเร็จ');
-          $swal.fire({ icon:'error', title:'โหลดข้อมูลไม่สำเร็จ', text:e.message || '' });
+          $swal.fire({ icon: 'error', title: 'โหลดข้อมูลไม่สำเร็จ', text: e.message || '' });
         }
-        } finally {
+      } finally {
         if (alive) setLoading(false);
       }
     }, 350);
@@ -396,11 +397,11 @@ export default function PatientsPage() {
   }, [qs]);
 
   const clearFilters = () => {
-    setFilters({ gender:'', status:'', blood_group:'', bloodgroup_rh:'', patients_type:'', admit_from:'', admit_to:'' });
+    setFilters({ gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: '' });
     setPage(1); setTick(t => t + 1);
   };
-  const activeFilterEntries = useMemo(() => Object.entries(filters).filter(([,v]) => !!v), [filters]);
-  const filterLabels = { status:'สถานะผู้ป่วย', gender:'เพศ', blood_group:'กรุ๊ปเลือด', bloodgroup_rh:'Rh', patients_type:'ประเภทผู้ป่วย', admit_from:'รับเข้าตั้งแต่', admit_to:'รับเข้าถึง' };
+  const activeFilterEntries = useMemo(() => Object.entries(filters).filter(([, v]) => !!v), [filters]);
+  const filterLabels = { status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
 
   // actions
   const refresh = () => setTick(t => t + 1);
@@ -409,10 +410,10 @@ export default function PatientsPage() {
     setErrMsg('');
     try {
       const { nextId } = await http('/api/patients/next-id');
-      setAddDraft({ patients_id: nextId, status:'มีชีวิต' });
+      setAddDraft({ patients_id: nextId, status: 'มีชีวิต' });
       setOpenAdd(true);
     } catch (e) {
-      $swal.fire({ icon:'error', title:'ดึง HN ถัดไปไม่สำเร็จ', text: e.message || '' });
+      $swal.fire({ icon: 'error', title: 'ดึง HN ถัดไปไม่สำเร็จ', text: e.message || '' });
     }
   };
 
@@ -420,7 +421,7 @@ export default function PatientsPage() {
     if (addFormRef.current?.validate && !addFormRef.current.validate()) return;
 
     const { isConfirmed } = await $swal.fire({
-      icon:'question', title:'ยืนยันบันทึกผู้ป่วยใหม่?', showCancelButton:true,
+      icon: 'question', title: 'ยืนยันบันทึกผู้ป่วยใหม่?', showCancelButton: true,
     });
     if (!isConfirmed) return;
 
@@ -431,9 +432,9 @@ export default function PatientsPage() {
       await http('/api/patients', { method: 'POST', body: formData });  // ✅ ใช้ http()
       setOpenAdd(false);
       refresh();
-      toast.fire({ icon:'success', title:'บันทึกผู้ป่วยเรียบร้อย' });
+      toast.fire({ icon: 'success', title: 'บันทึกผู้ป่วยเรียบร้อย' });
     } catch (e: any) {
-      $swal.fire({ icon:'error', title:'บันทึกข้อมูลไม่สำเร็จ', text:e.message || '' });
+      $swal.fire({ icon: 'error', title: 'บันทึกข้อมูลไม่สำเร็จ', text: e.message || '' });
     }
   };
 
@@ -444,7 +445,7 @@ export default function PatientsPage() {
       const d = await http(`/api/patients/${encodeURIComponent(patients_id)}`);
       setEditDraft({ ...d, phone: d.phone ?? d.phone_number ?? '' });
     } catch (e) {
-      $swal.fire({ icon:'error', title:'ดึงข้อมูลผู้ป่วยไม่สำเร็จ', text:e.message || '' });
+      $swal.fire({ icon: 'error', title: 'ดึงข้อมูลผู้ป่วยไม่สำเร็จ', text: e.message || '' });
       setOpenEdit(null);
     }
   };
@@ -453,7 +454,7 @@ export default function PatientsPage() {
     if (editFormRef.current?.validate && !editFormRef.current.validate()) return;
 
     const { isConfirmed } = await $swal.fire({
-      icon:'question', title:'ยืนยันบันทึกการแก้ไข?', showCancelButton:true,
+      icon: 'question', title: 'ยืนยันบันทึกการแก้ไข?', showCancelButton: true,
     });
     if (!isConfirmed) return;
 
@@ -468,15 +469,15 @@ export default function PatientsPage() {
 
       setOpenEdit(null);
       refresh();
-      toast.fire({ icon:'success', title:'อัปเดตข้อมูลเรียบร้อย' });
+      toast.fire({ icon: 'success', title: 'อัปเดตข้อมูลเรียบร้อย' });
     } catch (e: any) {
-      $swal.fire({ icon:'error', title:'อัปเดตข้อมูลไม่สำเร็จ', text:e.message || '' });
+      $swal.fire({ icon: 'error', title: 'อัปเดตข้อมูลไม่สำเร็จ', text: e.message || '' });
     }
   };
 
 
-  const TYPE_OPTIONS = ['ตรวจติดตาม','ทำแผล','เยี่ยมบ้าน','กายภาพบำบัด','ติดตามอาการ'];
-  const PLACE_OPTIONS = ['OPD ชีวาภิบาล','ห้องทำแผล 1','ห้องทำแผล 2','PT Room A','บ้านผู้ป่วย'];
+  const TYPE_OPTIONS = ['ตรวจติดตาม', 'ทำแผล', 'เยี่ยมบ้าน', 'กายภาพบำบัด', 'ติดตามอาการ'];
+  const PLACE_OPTIONS = ['OPD ชีวาภิบาล', 'ห้องทำแผล 1', 'ห้องทำแผล 2', 'PT Room A', 'บ้านผู้ป่วย'];
 
   const TODAY_TH = () =>
     new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
@@ -501,25 +502,25 @@ export default function PatientsPage() {
   const handleOpenAppt = async (patients_id: string) => {
     setOpenAppt(patients_id);
     setApptErrors({});
-      try {
-        const p = await http(`/api/patients/${encodeURIComponent(patients_id)}`);
-        const full = `${p.pname ?? ''}${p.first_name ?? ''} ${p.last_name ?? ''}`.replace(/\s+/g,' ').trim();
-        setApptForm({
-          ...resetApptForm(),
-          hn: p.patients_id || patients_id,
-          patient: full || patients_id,
-          phone: p.phone_number || '',
-        });
-      } catch {
-        // ถ้าดึงรายละเอียดผู้ป่วยไม่ได้ ให้เปิดฟอร์มพร้อม HN อย่างน้อย
-        setApptForm({ ...resetApptForm(), hn: patients_id });
-      }
-    };
+    try {
+      const p = await http(`/api/patients/${encodeURIComponent(patients_id)}`);
+      const full = `${p.pname ?? ''}${p.first_name ?? ''} ${p.last_name ?? ''}`.replace(/\s+/g, ' ').trim();
+      setApptForm({
+        ...resetApptForm(),
+        hn: p.patients_id || patients_id,
+        patient: full || patients_id,
+        phone: p.phone_number || '',
+      });
+    } catch {
+      // ถ้าดึงรายละเอียดผู้ป่วยไม่ได้ ให้เปิดฟอร์มพร้อม HN อย่างน้อย
+      setApptForm({ ...resetApptForm(), hn: patients_id });
+    }
+  };
 
-    function validateAppt(f: AppointmentFormValue) {
+  function validateAppt(f: AppointmentFormValue) {
     const e: Partial<Record<keyof AppointmentFormValue, string>> = {};
     const get = (k: keyof AppointmentFormValue) => (f[k]?.toString().trim() ?? '');
-    const req: (keyof AppointmentFormValue)[] = ['hn','date','start','end','type'];
+    const req: (keyof AppointmentFormValue)[] = ['hn', 'date', 'start', 'end', 'type'];
     req.forEach(k => { if (!get(k)) e[k] = 'จำเป็น'; });
 
     const s = get('start'), ed = get('end');
@@ -590,7 +591,7 @@ export default function PatientsPage() {
       const d = await http(`/api/patients/${encodeURIComponent(patients_id)}`);
       setDeceasedPatient(d);
     } catch (e) {
-      $swal.fire({ icon:'error', title:'ดึงข้อมูลผู้ป่วยไม่สำเร็จ', text:e.message || '' });
+      $swal.fire({ icon: 'error', title: 'ดึงข้อมูลผู้ป่วยไม่สำเร็จ', text: e.message || '' });
       setDeceasedPatient(null);
     }
   };
@@ -603,22 +604,22 @@ export default function PatientsPage() {
     setDeadErrors(e);
     if (Object.keys(e).length) {
       await $swal.fire({
-        icon:'warning', title:'กรอกข้อมูลไม่ครบ',
+        icon: 'warning', title: 'กรอกข้อมูลไม่ครบ',
         html: Object.values(e).map(s => `• ${s}`).join('<br/>')
       });
       return;
     }
     const { isConfirmed } = await $swal.fire({
-      icon:'warning',
-      title:'ยืนยันเปลี่ยนสถานะเป็น “เสียชีวิต”?',
-      text:'เมื่อยืนยันแล้ว สถานะผู้ป่วยจะเปลี่ยนเป็นเสียชีวิต',
-      showCancelButton:true,
+      icon: 'warning',
+      title: 'ยืนยันเปลี่ยนสถานะเป็น “เสียชีวิต”?',
+      text: 'เมื่อยืนยันแล้ว สถานะผู้ป่วยจะเปลี่ยนเป็นเสียชีวิต',
+      showCancelButton: true,
     });
     if (!isConfirmed) return;
     try {
-      $swal.fire({ title:'กำลังอัปเดต...', allowOutsideClick:false, didOpen: () => Swal.showLoading() });
-      await http(`/api/patients/${encodeURIComponent(openDeceased)}/deceased`, {  
-      method:'PATCH',
+      $swal.fire({ title: 'กำลังอัปเดต...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      await http(`/api/patients/${encodeURIComponent(openDeceased)}/deceased`, {
+        method: 'PATCH',
         body: JSON.stringify({
           death_date: deadDraft.death_date,
           death_time: deadDraft.death_time || '00:00',
@@ -629,10 +630,10 @@ export default function PatientsPage() {
       Swal.close();
       setOpenDeceased(null); setDeadDraft({});
       refresh();
-      $swal.fire({ icon:'success', title:'เปลี่ยนสถานะเป็นเสียชีวิตแล้ว' });
+      $swal.fire({ icon: 'success', title: 'เปลี่ยนสถานะเป็นเสียชีวิตแล้ว' });
     } catch (err) {
       Swal.close();
-      $swal.fire({ icon:'error', title:'บันทึกการเสียชีวิตไม่สำเร็จ', text: err?.message || '' });
+      $swal.fire({ icon: 'error', title: 'บันทึกการเสียชีวิตไม่สำเร็จ', text: err?.message || '' });
     }
   };
 
@@ -642,7 +643,7 @@ export default function PatientsPage() {
       setVerifyData(d);
       setOpenVerify(true);
     } catch (e) {
-      $swal.fire({ icon:'error', title:'ดึงข้อมูลไม่สำเร็จ', text:e.message || '' });
+      $swal.fire({ icon: 'error', title: 'ดึงข้อมูลไม่สำเร็จ', text: e.message || '' });
     }
   };
 
@@ -652,8 +653,8 @@ export default function PatientsPage() {
   const orderedRows = useMemo(() => {
     const statusRank = (s?: string) =>
       s === 'มีชีวิต' ? 0 :
-      s === 'จำหน่าย' ? 1 :
-      s === 'เสียชีวิต' ? 2 : 3;
+        s === 'จำหน่าย' ? 1 :
+          s === 'เสียชีวิต' ? 2 : 3;
 
     const time = (d?: string) => {
       if (!d) return -Infinity;
@@ -678,12 +679,12 @@ export default function PatientsPage() {
           <div className={styles.title}>จัดการข้อมูลผู้ป่วย</div>
           <div className={styles.subtitle}>เพิ่ม • ตรวจสอบ • แก้ไข • นัดหมาย • เปลี่ยนสถานะเป็นเสียชีวิต</div>
         </div>
-        <div style={{ display:'flex', gap:8 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <button className={styles.btn} onClick={() => { setQuery(''); clearFilters(); }}>
-            <RefreshCw size={16}/> เคลียร์
+            <RefreshCw size={16} /> เคลียร์
           </button>
           <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleOpenAdd}>
-            <Plus size={16}/> เพิ่มผู้ป่วย
+            <Plus size={16} /> เพิ่มผู้ป่วย
           </button>
         </div>
       </div>
@@ -693,7 +694,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.sectionTitle}>ค้นหา</div>
           <div className={styles.label}>ค้นหา (ชื่อ, HN, เพศ, กรุ๊ปเลือด, โรค, โทร)</div>
-          <div style={{ display:'flex', gap:8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <input
               className={styles.input}
               placeholder="เช่น HN-00000001 หรือ 1 / สมชาย / เบาหวาน"
@@ -701,7 +702,7 @@ export default function PatientsPage() {
               onChange={e => { setQuery(e.target.value); setPage(1); }}
             />
             <button className={styles.btn} onClick={() => { setPage(1); refresh(); }}>
-              <Search size={16}/> ค้นหา
+              <Search size={16} /> ค้นหา
             </button>
           </div>
         </div>
@@ -799,7 +800,7 @@ export default function PatientsPage() {
         {/* ปุ่มล้างตัวกรอง (ขวาสุดของแถวเดียวกัน) */}
         <div className={styles.clearWrap}>
           <button className={`${styles.btn} ${styles.btnClearfilter}`} onClick={clearFilters}>
-            <X size={16}/> ล้างตัวกรองทั้งหมด
+            <X size={16} /> ล้างตัวกรองทั้งหมด
           </button>
         </div>
       </div>
@@ -853,21 +854,29 @@ export default function PatientsPage() {
                 <td className={styles.td}>{r.disease || '-'}</td>
                 <td className={styles.td}><Pill alive={r.status !== 'เสียชีวิต'} /></td>
                 <td className={styles.td}>
-                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleVerify(r.patients_id)}>
-                      <Eye size={14}/> ตรวจสอบ
+                      <Eye size={14} /> ตรวจสอบ
                     </button>
                     <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenEdit(r.patients_id)}>
-                      <Pencil size={14}/> แก้ไข
+                      <Pencil size={14} /> แก้ไข
                     </button>
                     {r.status !== 'เสียชีวิต' && (
-                    <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenAppt(r.patients_id)}>
-                      <CalendarPlus size={14}/> เพิ่มนัด
-                    </button>
+                      <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenAppt(r.patients_id)}>
+                        <CalendarPlus size={14} /> เพิ่มนัด
+                      </button>
                     )}
+
+                    {/* ✅ ปุ่มไปหน้าวินิจฉัย */}
+                    <Link
+                      href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
+                      className={`${styles.btn} ${styles.btnSm}`}
+                    >
+                      <FileText size={14} /> วินิจฉัย
+                    </Link>
                     {r.status !== 'เสียชีวิต' && (
                       <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenDeceased(r.patients_id)}>
-                        <Skull size={14}/> เสียชีวิต
+                        <Skull size={14} /> เสียชีวิต
                       </button>
                     )}
                   </div>
@@ -892,7 +901,7 @@ export default function PatientsPage() {
       {/* Add Patient */}
       <Modal
         open={openAdd}
-        title={<div className="flex items-center gap-2"><Plus size={20} className="text-blue-600"/> เพิ่มผู้ป่วยใหม่</div>}
+        title={<div className="flex items-center gap-2"><Plus size={20} className="text-blue-600" /> เพิ่มผู้ป่วยใหม่</div>}
         size="xl"
         bodyClassName="max-h-[70vh] overflow-y-auto"
         initialFocusSelector="input,select,textarea"
@@ -911,13 +920,13 @@ export default function PatientsPage() {
                 className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
                 onClick={() => setOpenAdd(false)}
               >
-                <X size={16}/> ยกเลิก
+                <X size={16} /> ยกเลิก
               </button>
               <button
                 className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg flex items-center gap-2"
                 onClick={handleCreate}
               >
-                <CheckCircle size={16}/> บันทึกข้อมูล
+                <CheckCircle size={16} /> บันทึกข้อมูล
               </button>
             </div>
           </div>
@@ -930,7 +939,7 @@ export default function PatientsPage() {
       {/* Edit Patient */}
       <Modal
         open={!!openEdit}
-        title={<div className="flex items-center gap-2"><Pencil size={20} className="text-orange-600"/> แก้ไขข้อมูลผู้ป่วย</div>}
+        title={<div className="flex items-center gap-2"><Pencil size={20} className="text-orange-600" /> แก้ไขข้อมูลผู้ป่วย</div>}
         size="xl"
         bodyClassName="max-h-[70vh] overflow-y-auto"
         initialFocusSelector="input,select,textarea"
@@ -949,17 +958,17 @@ export default function PatientsPage() {
                 className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
                 onClick={() => setOpenEdit(null)}
               >
-                <X size={16}/> ยกเลิก
+                <X size={16} /> ยกเลิก
               </button>
               <button
                 className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 transition-all duration-200 shadow-lg flex items-center gap-2"
                 onClick={handleUpdate}
               >
-                <CheckCircle size={16}/> บันทึกการแก้ไข
+                <CheckCircle size={16} /> บันทึกการแก้ไข
               </button>
             </div>
           </div>
-}
+        }
       >
         {/* ✅ ส่ง ref เพื่อให้เรียก validate() ได้ */}
         <PatientForm ref={editFormRef} value={editDraft} onChange={setEditDraft} />
@@ -970,7 +979,7 @@ export default function PatientsPage() {
         open={!!openAppt}
         title={
           <div className="flex items-center gap-2">
-            <CalendarPlus size={20} className="text-purple-600"/> เพิ่มการนัดหมาย
+            <CalendarPlus size={20} className="text-purple-600" /> เพิ่มการนัดหมาย
           </div>
         }
         size="lg"
@@ -990,13 +999,13 @@ export default function PatientsPage() {
                 className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
                 onClick={() => { setOpenAppt(null); setApptForm(resetApptForm()); setApptErrors({}); }}
               >
-                <X size={16}/> ยกเลิก
+                <X size={16} /> ยกเลิก
               </button>
               <button
                 className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg flex items-center gap-2"
                 onClick={saveAppt}
               >
-                <CalendarPlus size={16}/> บันทึกนัดหมาย
+                <CalendarPlus size={16} /> บันทึกนัดหมาย
               </button>
             </div>
           </div>
@@ -1017,7 +1026,7 @@ export default function PatientsPage() {
       {/* Mark Deceased */}
       <Modal
         open={!!openDeceased}
-        title={<div className="flex items-center gap-2"><Skull size={20} className="text-red-600"/> เปลี่ยนสถานะเป็น "เสียชีวิต"</div>}
+        title={<div className="flex items-center gap-2"><Skull size={20} className="text-red-600" /> เปลี่ยนสถานะเป็น "เสียชีวิต"</div>}
         size="lg"
         initialFocusSelector="input,select,textarea"
         onConfirm={handleMarkDeceased}
@@ -1035,13 +1044,13 @@ export default function PatientsPage() {
                 className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
                 onClick={() => setOpenDeceased(null)}
               >
-                <X size={16}/> ยกเลิก
+                <X size={16} /> ยกเลิก
               </button>
               <button
                 className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-lg flex items-center gap-2"
                 onClick={handleMarkDeceased}
               >
-                <CheckCircle size={16}/> ยืนยันการเปลี่ยนสถานะ
+                <CheckCircle size={16} /> ยืนยันการเปลี่ยนสถานะ
               </button>
             </div>
           </div>
@@ -1049,74 +1058,74 @@ export default function PatientsPage() {
       >
         {deceasedPatient ? (
           <div className="mb-6 p-4 bg-red-50 rounded-lg border border-red-200">
-          {/* Header Section */}
-          <div className="flex items-center gap-2 text-red-800 mb-3">
-            <User size={16}/>
-            <span className="font-medium">ผู้ป่วย:</span>
-            <span className="font-mono bg-white px-2 py-1 rounded border text-sm">
-              {deceasedPatient.patients_id}
-            </span>
+            {/* Header Section */}
+            <div className="flex items-center gap-2 text-red-800 mb-3">
+              <User size={16} />
+              <span className="font-medium">ผู้ป่วย:</span>
+              <span className="font-mono bg-white px-2 py-1 rounded border text-sm">
+                {deceasedPatient.patients_id}
+              </span>
+            </div>
+
+            {/* Patient Information Grid */}
+            <div className="grid grid-cols-3 md:grid-cols-2 gap-3">
+              {/* ชื่อ-นามสกุล */}
+              <div className="col-span-full">
+                <div className="text-sm text-gray-600 mb-1">ชื่อ-นามสกุล</div>
+                <div className="font-semibold text-gray-800">
+                  {deceasedPatient.pname || ''}{deceasedPatient.first_name} {deceasedPatient.last_name}
+                </div>
+              </div>
+
+              {/* เลขบัตรประชาชน */}
+              <div className="col-span-full">
+                <div className="text-sm text-gray-600 mb-1">เลขบัตรประชาชน</div>
+                <div className="font-mono text-gray-800">
+                  {deceasedPatient.card_id || '-'}
+                </div>
+              </div>
+
+              {/* อายุ */}
+              <div>
+                <div className="text-sm text-gray-600 mb-1">อายุ</div>
+                <div className="text-gray-800">
+                  {calculateAge(deceasedPatient.birthdate)} ปี
+                </div>
+              </div>
+
+              {/* เพศ */}
+              <div>
+                <div className="text-sm text-gray-600 mb-1">เพศ</div>
+                <div className="text-gray-800">
+                  {deceasedPatient.gender || '-'}
+                </div>
+              </div>
+
+              {/* กรุ๊ปเลือด */}
+              <div>
+                <div className="text-sm text-gray-600 mb-1">กรุ๊ปเลือด</div>
+                <div className="text-gray-800">
+                  {deceasedPatient.blood_group || '-'} {deceasedPatient.bloodgroup_rh || ''}
+                </div>
+              </div>
+
+              {/* เชื้อชาติ */}
+              <div>
+                <div className="text-sm text-gray-600 mb-1">เชื้อชาติ</div>
+                <div className="text-gray-800">
+                  {deceasedPatient.nationality || '-'}
+                </div>
+              </div>
+
+              {/* ศาสนา */}
+              <div>
+                <div className="text-sm text-gray-600 mb-1">ศาสนา</div>
+                <div className="text-gray-800">
+                  {deceasedPatient.religion || '-'}
+                </div>
+              </div>
+            </div>
           </div>
-
-          {/* Patient Information Grid */}
-          <div className="grid grid-cols-3 md:grid-cols-2 gap-3">
-            {/* ชื่อ-นามสกุล */}
-            <div className="col-span-full">
-              <div className="text-sm text-gray-600 mb-1">ชื่อ-นามสกุล</div>
-              <div className="font-semibold text-gray-800">
-                {deceasedPatient.pname || ''}{deceasedPatient.first_name} {deceasedPatient.last_name}
-              </div>
-            </div>
-
-            {/* เลขบัตรประชาชน */}
-            <div className="col-span-full">
-              <div className="text-sm text-gray-600 mb-1">เลขบัตรประชาชน</div>
-              <div className="font-mono text-gray-800">
-                {deceasedPatient.card_id || '-'}
-              </div>
-            </div>
-
-            {/* อายุ */}
-            <div>
-              <div className="text-sm text-gray-600 mb-1">อายุ</div>
-              <div className="text-gray-800">
-                {calculateAge(deceasedPatient.birthdate)} ปี
-              </div>
-            </div>
-
-            {/* เพศ */}
-            <div>
-              <div className="text-sm text-gray-600 mb-1">เพศ</div>
-              <div className="text-gray-800">
-                {deceasedPatient.gender || '-'}
-              </div>
-            </div>
-
-            {/* กรุ๊ปเลือด */}
-            <div>
-              <div className="text-sm text-gray-600 mb-1">กรุ๊ปเลือด</div>
-              <div className="text-gray-800">
-                {deceasedPatient.blood_group || '-'} {deceasedPatient.bloodgroup_rh || ''}
-              </div>
-            </div>
-
-            {/* เชื้อชาติ */}
-            <div>
-              <div className="text-sm text-gray-600 mb-1">เชื้อชาติ</div>
-              <div className="text-gray-800">
-                {deceasedPatient.nationality || '-'}
-              </div>
-            </div>
-
-            {/* ศาสนา */}
-            <div>
-              <div className="text-sm text-gray-600 mb-1">ศาสนา</div>
-              <div className="text-gray-800">
-                {deceasedPatient.religion || '-'}
-              </div>
-            </div>
-          </div>
-        </div>
         ) : (
           <div className="mb-6 p-4 bg-red-50 rounded-lg border border-red-200 text-gray-600">
             กำลังโหลดข้อมูลผู้ป่วย...
@@ -1129,7 +1138,7 @@ export default function PatientsPage() {
       {/* Verify */}
       <Modal
         open={openVerify}
-        title={<div className="flex items-center gap-2"><Eye size={20} className="text-green-600"/> ผลการตรวจสอบผู้ป่วย</div>}
+        title={<div className="flex items-center gap-2"><Eye size={20} className="text-green-600" /> ผลการตรวจสอบผู้ป่วย</div>}
         size="xl"
         bodyClassName="max-h-[80vh] overflow-y-auto"
         onClose={() => { setOpenVerify(false); setVerifyData(null); }}
@@ -1140,7 +1149,7 @@ export default function PatientsPage() {
               className="px-8 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-lg flex items-center gap-2"
               onClick={() => { setOpenVerify(false); setVerifyData(null); }}
             >
-              <X size={16}/> ปิด
+              <X size={16} /> ปิด
             </button>
           </div>
         }
@@ -1148,7 +1157,7 @@ export default function PatientsPage() {
         {!verifyData ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <AlertCircle size={48} className="text-gray-400 mx-auto mb-4"/>
+              <AlertCircle size={48} className="text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">ไม่มีข้อมูล</p>
             </div>
           </div>
@@ -1166,7 +1175,7 @@ export default function PatientsPage() {
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-600">
                     <span className="flex items-center gap-1">
-                      <User size={14}/> อายุ {calculateAge(verifyData.birthdate)} ปี
+                      <User size={14} /> อายุ {calculateAge(verifyData.birthdate)} ปี
                     </span>
                     <span className="flex items-center gap-1">
                       ประเภทผู้ป่วย: {verifyData.patients_type}
@@ -1184,21 +1193,21 @@ export default function PatientsPage() {
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center gap-2 mb-6 pb-3 border-b-2 border-green-100">
                 <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <User size={16} className="text-green-600"/>
+                  <User size={16} className="text-green-600" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-800">ข้อมูลส่วนตัว</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <User size={14} className="text-gray-600"/>
+                    <User size={14} className="text-gray-600" />
                     <span className="font-semibold text-gray-700">ชื่อ-นามสกุล</span>
                   </div>
                   <div className="text-gray-900 text-lg">{verifyData.pname} {verifyData.first_name} {verifyData.last_name}</div>
                 </div>
                 <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <IdCard size={14} className="text-gray-600"/>
+                    <IdCard size={14} className="text-gray-600" />
                     <span className="font-semibold text-gray-700">เลขบัตรประชาชน</span>
                   </div>
                   <div className="text-gray-900 text-lg">{verifyData.card_id || '-'}</div>
@@ -1229,14 +1238,14 @@ export default function PatientsPage() {
                 </div>
                 <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <Phone size={14} className="text-gray-600"/>
+                    <Phone size={14} className="text-gray-600" />
                     <span className="font-semibold text-gray-700">เบอร์โทรศัพท์</span>
                   </div>
                   <div className="text-gray-900 text-lg font-mono">{verifyData.phone || verifyData.phone_number || '-'}</div>
                 </div>
                 <div className="md:col-span-2 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <MapPin size={14} className="text-gray-600"/>
+                    <MapPin size={14} className="text-gray-600" />
                     <span className="font-semibold text-gray-700">ที่อยู่</span>
                   </div>
                   <div className="text-gray-900 leading-relaxed">{verifyData.address || '-'}</div>
@@ -1248,14 +1257,14 @@ export default function PatientsPage() {
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center gap-2 mb-6 pb-3 border-b-2 border-red-100">
                 <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                  <Droplets size={16} className="text-red-600"/>
+                  <Droplets size={16} className="text-red-600" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-800">ข้อมูลทางการแพทย์</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-xl border border-red-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <Droplets size={14} className="text-red-600"/>
+                    <Droplets size={14} className="text-red-600" />
                     <span className="font-semibold text-gray-700">กรุ๊ปเลือด</span>
                   </div>
                   <div className="text-gray-900 text-lg font-bold">
@@ -1264,14 +1273,14 @@ export default function PatientsPage() {
                 </div>
                 <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <Heart size={14} className="text-blue-600"/>
+                    <Heart size={14} className="text-blue-600" />
                     <span className="font-semibold text-gray-700">ประเภทผู้ป่วย</span>
                   </div>
                   <div className="text-gray-900 text-lg">{verifyData.patients_type || '-'}</div>
                 </div>
                 <div className="md:col-span-2 p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl border border-yellow-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <FileText size={14} className="text-yellow-600"/>
+                    <FileText size={14} className="text-yellow-600" />
                     <span className="font-semibold text-gray-700">โรคประจำตัว / ประวัติการแพทย์</span>
                   </div>
                   <div className="text-gray-900 leading-relaxed">{verifyData.disease || 'ไม่มีข้อมูล'}</div>
@@ -1283,13 +1292,13 @@ export default function PatientsPage() {
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center gap-2 mb-6 pb-3 border-b-2 border-purple-100">
                 <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Calendar size={16} className="text-purple-600"/>
+                  <Calendar size={16} className="text-purple-600" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-800">ข้อมูลการรับเข้า</h3>
               </div>
               <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl border border-purple-200">
                 <div className="flex items-center gap-2 mb-2">
-                  <Calendar size={14} className="text-purple-600"/>
+                  <Calendar size={14} className="text-purple-600" />
                   <span className="font-semibold text-gray-700">วันที่รับเข้า</span>
                 </div>
                 <div className="text-gray-900 text-lg font-medium">{formatThaiDateBE(verifyData.admittion_date || '-')}</div>
@@ -1300,7 +1309,7 @@ export default function PatientsPage() {
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center gap-2 mb-6 pb-3 border-b-2 border-blue-100">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <FileText size={16} className="text-blue-600"/>
+                  <FileText size={16} className="text-blue-600" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-800">เอกสารแนบ</h3>
               </div>
@@ -1308,10 +1317,10 @@ export default function PatientsPage() {
               {(() => {
                 // ฟิลด์ไฟล์ที่รองรับ จะมี flag has_* กลับมาจาก backend
                 const fields = [
-                  { key: 'patient_id_card',   label: 'สำเนาบัตรประชาชนผู้ป่วย' },
-                  { key: 'house_registration',label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ' },
-                  { key: 'patient_photo',     label: 'รูปถ่ายผู้ป่วย' },
-                  { key: 'relative_id_card',  label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์' },
+                  { key: 'patient_id_card', label: 'สำเนาบัตรประชาชนผู้ป่วย' },
+                  { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ' },
+                  { key: 'patient_photo', label: 'รูปถ่ายผู้ป่วย' },
+                  { key: 'relative_id_card', label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์' },
                 ] as const;
 
                 const hasAny =
@@ -1386,7 +1395,7 @@ export default function PatientsPage() {
               <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl shadow-lg p-6 border-2 border-gray-300">
                 <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-400">
                   <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center">
-                    <Skull size={16} className="text-white"/>
+                    <Skull size={16} className="text-white" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-800">ข้อมูลการเสียชีวิต</h3>
                 </div>
