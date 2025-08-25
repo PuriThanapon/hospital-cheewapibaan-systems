@@ -23,7 +23,8 @@
   LAYOUT & HEADER
 ────────────────────────────────────────────────────────── */
 .page {
-  padding: 24px;
+  padding: 20px;
+  border-radius: 15px;
   background: var(--bg);
   min-height: 100%;
   color: var(--text);
@@ -43,6 +44,8 @@
 
 .actions { display: flex; gap: 12px; align-items: center; }
 
+.title { font-size:24px; font-weight:600; }
+.subtitle { font-size:14px; color:#334155; }
 /* ─────────────────────────────────────────────────────────
   BUTTONS
 ────────────────────────────────────────────────────────── */
@@ -57,12 +60,16 @@
 .primary:hover { background: var(--primary-600); }
 
 .ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--text);
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
+  display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
 }
 .ghost:hover { background: #fff; box-shadow: var(--shadow); }
 
@@ -223,7 +230,6 @@
   border: 1px solid var(--line);
   padding: 12px;
   border-radius: 12px;
-  margin-bottom: 16px;
   align-self: start;
 }
 .filters > * { flex: 0 0 auto; }          /* ลูก ๆ อย่ายืดเต็มแถว */
@@ -309,9 +315,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   background: #fff;
 }
 .table thead th {
-  font-size: 12px;
-  color: var(--muted);
-  background: #fafafa;
+  color: black;
+  font-size: 14px;
+  /* color: var(--muted); */
+  background: #f1f5f9;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -524,7 +531,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .stickyToolbar {
   position: sticky;
   top: 0;               /* ถ้ามี navbar คงที่ด้านบน ให้ปรับค่านี้ */
-  z-index: 12;
+  z-index: 20;
   background: var(--card);
 }
 
@@ -580,4 +587,36 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .tableWrap {
   max-height: 62vh;   /* ปรับให้พอดีกับหน้าคุณ */
   overflow: auto;     /* ให้เลื่อนภายในกล่อง */
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 16px;
+}
+
+.pageBtn {
+    padding: 6px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.pageBtn:hover {
+    background: #f8fafc;
+}
+
+.pageBtn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pageInfo {
+    font-size: 14px;
+    color: #475569;
 }

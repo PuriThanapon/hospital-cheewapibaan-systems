@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import 'react-toastify/dist/ReactToastify.css';
+@import 'sweetalert2/dist/sweetalert2.min.css';
 
 :root {
   --background: #ffffff;
@@ -19,9 +21,9 @@
   --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
+/* @media (prefers-color-scheme: dark) {
   :root { --background: #0a0a0a; --foreground: #ededed; }
-}
+} */
 
 html, body {
   height: 100%;
@@ -45,3 +47,7 @@ body {
 }
 .react-calendar__tile--active{ background-color:#e6ecf1 !important; color:black !important; }
 .react-calendar__navigation__label__labelText { font-weight: 600; }
+
+.swal2-container {
+  z-index: 12060 !important; /* modal ของคุณอยู่ประมาณ 12050 */
+}

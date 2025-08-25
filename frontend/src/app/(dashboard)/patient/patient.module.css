@@ -12,8 +12,10 @@
 .wrapper {
     display: grid;
     gap: 24px;
-    padding: 24px;
+    padding: 20px;
     color: #111827;
+    background-color: #F4f4f4;
+    border-radius: 15px;
 }
 
 .header {
@@ -98,13 +100,21 @@
 }
 
 .btnPrimary {
-    background: #0f172a;
+    background: #005a50ff;
     color: #fff;
-    border-color: #0f172a;
 }
 
 .btnPrimary:hover {
-    background: #000;
+    background: rgb(0, 51, 45);
+}
+
+.btnClearfilter{
+    background: red;
+    color: #fff;
+}
+
+.btnClearfilter:hover{
+    background: rgb(122, 0, 0);
 }
 
 .btnSm {
@@ -125,14 +135,21 @@
 }
 
 .filtersBar {
-    display: grid;
-    gap: 12px;
+    display:flex;
+    flex-wrap:wrap;
+    gap: 16px;
+    align-items: flex-end;
     grid-template-columns: 1fr;
     padding: 16px;
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 16px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+}
+
+.filtersBar > div:not(.dateRangeRow):not(.clearWrap){
+  flex: 0 1 220px;
+  min-width: 220px;
 }
 
 @media (min-width: 640px) {
@@ -176,12 +193,16 @@
     cursor: pointer;
 }
 
+.overflow-y-auto {
+  scroll-behavior: smooth;
+}
 /* === Tables === */
 /*
   The `table` and related classes provide a professional, clean look for data tables.
 */
 .tableWrap {
     overflow: auto;
+    scroll-behavior: smooth;
     border: 1px solid #e5e7eb;
     border-radius: 16px;
     background: #fff;
@@ -336,11 +357,13 @@
 .modalBody {
     padding: 24px;
     overflow: auto;
+    scroll-behavior: smooth;
 }
 
 .modalBodyScroll {
     max-height: 70vh;
     overflow: auto;
+    scroll-behavior: smooth;
 }
 
 .modalFooter {
@@ -470,3 +493,49 @@
     color: #be123c;
     border-color: #fecdd3;
 }
+
+.dateRangeRow{
+  order: 50;                 /* ให้อยู่ก่อนปุ่มในแถวล่าง */
+  flex: 1 1 520px;           /* ยืดได้และมี min width เหมาะสม */
+  min-width: 420px;
+  display: flex;
+  gap: 12px;
+  align-items: end;
+}
+
+/* กล่อง field + label แนวตั้ง (ใช้ซ้ำได้) */
+.formGroup{
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+}
+
+/* ตัวคั่นกลาง “–” */
+.hyphen{
+  padding: 0 4px 6px;
+  color: #6b7280;
+}
+
+/* ปุ่มล้างตัวกรอง ให้อยู่ขวาสุดของแถวเดียวกันกับช่วงวันที่ */
+.clearWrap{
+  order: 51;                 /* ตามหลัง dateRangeRow */
+  flex: 0 0 auto;
+  margin-left: auto;         /* ดันไปชิดขวา */
+  display: flex;
+  align-items: end;
+}
+
+/* จอแคบ: ให้ช่วงวันที่และปุ่มล้างลงคนละบรรทัด */
+@media (max-width: 900px){
+  .dateRangeRow{
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .clearWrap{
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-start; /* ปุ่มไปต้นบรรทัด */
+  }
+  .hyphen{ display: none; }
+}
+

@@ -1,5 +1,5 @@
 /* Root layout */
-.wrapper { color:#111827; padding:24px; display:grid; gap:24px; }
+.wrapper { background-color:#F4f4f4; border-radius: 15; padding: 20px; display:grid; gap:24px; }
 .header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .title { font-size:24px; font-weight:600; }
 .subtitle { font-size:14px; color:#334155; }
@@ -20,6 +20,7 @@
 .tabBtn { padding:6px 12px; border:1px solid #e5e7eb; border-radius:999px; background:#fff; font-size:14px; cursor:pointer; }
 .tabBtn:hover { background:#f8fafc; }
 .tabBtnActive { background:#0f172a; color:#fff; border-color:#0f172a; }
+.tabBtnActive:hover {background: #3d4352;}
 .viewBtns { margin-left:auto; display:flex; gap:8px; }
 .viewBtn { padding:6px 12px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; font-size:14px; display:inline-flex; gap:8px; align-items:center; cursor:pointer; }
 .viewBtnActive { background:#0f172a; color:#fff; border-color:#0f172a; }
@@ -47,7 +48,7 @@
 .thead { background:#f1f5f9; }
 .th { text-align:left; padding:12px 16px; font-weight:600; }
 .td { padding:12px 16px; vertical-align:top; border-top:1px solid #e5e7eb; }
-.right { text-align:right; }
+.left { text-align:left; }
 
 /* Cards */
 .cards { display:grid; gap:16px; grid-template-columns:1fr; }
@@ -82,8 +83,8 @@
 /* Buttons */
 .btn { display:inline-flex; align-items:center; border:1px solid #e5e7eb; background:#fff; border-radius:12px; padding:6px 12px; font-size:14px; cursor:pointer; color:#111827; }
 .btn:hover { background:#f8fafc; }
-.btnPrimary { background:#0f172a; color:#fff; border-color:#0f172a; }
-.btnPrimary:hover { background:#000; }
+.btnPrimary { background:#005a50; color:#fff; border-color:#0f172a; }
+.btnPrimary:hover { background:rgb(0, 51, 45); }
 .btnSm { padding:4px 8px; font-size:12px; border-radius:10px; }
 
 /* Utilities */
@@ -91,3 +92,35 @@
 .grid2 { display:grid; gap:4px; }
 .small { font-size:12px; }
 .bold { font-weight:600; }
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 16px;
+}
+
+.pageBtn {
+    padding: 6px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.pageBtn:hover {
+    background: #f8fafc;
+}
+
+.pageBtn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pageInfo {
+    font-size: 14px;
+    color: #475569;
+}
