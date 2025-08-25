@@ -1,6 +1,6 @@
 const express = require('express');
-const ctrl = require('../controllers/patients.controller');
-
+const ctrl = require('../controllers/patients.controller')
+const homeNeedsCtrl = require('../controllers/home_needs.controller')
 const router = express.Router();
 
 // /api/patients/next-id
@@ -21,5 +21,7 @@ router.get('/:id/file/:field', ctrl.downloadPatientFile);
 
 // ✅ เปลี่ยนสถานะเป็นเสียชีวิต
 router.patch('/:id/deceased', ctrl.markDeceased);
+
+router.get('/:id/home-needs/latest', homeNeedsCtrl.latestForPatient);
 
 module.exports = router;

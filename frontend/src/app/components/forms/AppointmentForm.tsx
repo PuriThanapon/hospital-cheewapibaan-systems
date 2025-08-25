@@ -135,30 +135,36 @@ export default function AppointmentForm({
     try {
       const p = await fetchPatientSmart(raw);
       setPatientInfo(p);
-      const fullname = `${p.pname ?? ''}${p.first_name ?? ''} ${p.last_name ?? ''}`.replace(/\s+/g, ' ').trim();
-      onChange({
-        ...value,
-        hn: p.patients_id || normalizeHN(raw),
-        patient: fullname || p.patients_id,
-        phone: p.phone_number || value.phone || '',
-      });
+
+      const fullname = `${p.pname ?? ''}${p.first_name ?? ''} ${p.last_name ?? ''}`
+        .replace(/\s+/g, ' ')
+        .trim();
+
       const tVal = TYPE_VALUE_FROM_LABEL(value.type);
-      const addrRaw = getPatientAddressRaw(p); // ไม่ format
-      onChange({
+      const addrRaw = getPatientAddressRaw(p); // ที่อยู่วัตถุแบบ "ดิบ"
+
+      const newVal = {
         ...value,
         hn: p.patients_id || normalizeHN(raw),
         patient: fullname || p.patients_id,
         phone: p.phone_number || value.phone || '',
-        // ถ้าเป็นบ้านผู้ป่วย: เติมที่อยู่อัตโนมัติ (ถ้า user ยังไม่ได้พิมพ์ทับเอง)
         place: tVal === 'home'
-          ? (value.place && value.place !== 'บ้านผู้ป่วย' ? value.place : (addrRaw || 'บ้านผู้ป่วย'))
+          ? ((value.place && value.place !== 'บ้านผู้ป่วย') ? value.place : (addrRaw || 'บ้านผู้ป่วย'))
           : value.place,
-      });
+      };
+
+      onChange(newVal);
+
+      // ถ้าเป็นบ้านผู้ป่วย → โหลดรายการของใช้ครั้งก่อน
+      if (tVal === 'home' && newVal.hn) {
+        fetchLatestNeeds(newVal.hn);
+      }
     } catch (e: any) {
       setVerifyErr(e?.message || 'ตรวจสอบไม่สำเร็จ');
     } finally {
       setVerifyLoading(false);
     }
+
   };
   const TYPE_VALUE_FROM_LABEL = (label?: string) =>
     label === 'โรงพยาบาล' ? 'hospital'
@@ -176,23 +182,39 @@ export default function AppointmentForm({
     return typeof v === 'string' ? v : String(v ?? '');
   }
 
+  const [latestNeeds, setLatestNeeds] = useState<any[]>([]);
+
+  const fetchLatestNeeds = React.useCallback(async (patId: string) => {
+    if (!patId) return;
+    try {
+      const url = `/api/patients/${encodeURIComponent(patId)}/home-needs/latest`;
+      const res = await http(url);
+      const arr = (res?.data && Array.isArray(res.data)) ? res.data : [];
+      setLatestNeeds(arr);
+    } catch {
+      setLatestNeeds([]);
+    }
+  }, []);
+
   /* เมื่อสลับประเภท ให้ล้าง/ตั้งค่าอัตโนมัติให้สอดคล้อง back-end */
   useEffect(() => {
     const t = TYPE_VALUE_FROM_LABEL(value.type);
     if (t === 'home') {
-      const addrRaw = getPatientAddressRaw(patientInfo); // ดึงที่อยู่ดิบจาก patientInfo
+      const addrRaw = getPatientAddressRaw(patientInfo); // ดึงที่อยู่ “ดิบ”
       const hasUserTyped = value.place && value.place !== 'บ้านผู้ป่วย';
       onChange({
         ...value,
         place: hasUserTyped ? value.place : (addrRaw || 'บ้านผู้ป่วย'),
         hospital_address: '', // เคลียร์ช่อง รพ. เมื่อสลับเป็นบ้าน
       });
+      if (value.hn) fetchLatestNeeds(value.hn); // ← โหลดรายการของใช้ครั้งก่อน
     } else if (t === 'hospital') {
       onChange({ ...value, place: '', hospital_address: value.hospital_address || '' });
       setTimeout(() => hospitalInputRef.current?.focus(), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.type, patientInfo]);
+
 
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}>
@@ -345,6 +367,43 @@ export default function AppointmentForm({
             onChange={(e) => onChange({ ...value, place: e.target.value })}
           />
         </label>
+      )}
+
+      {TYPE_VALUE_FROM_LABEL(value.type) === 'home' && latestNeeds.length > 0 && (
+        <div className="sm:col-span-2 p-3 rounded-xl border border-amber-300 bg-amber-50">
+          <div className="text-sm font-medium text-amber-800 mb-2">
+            สิ่งที่ต้องเตรียมจากครั้งก่อน
+          </div>
+          <ul className="list-disc pl-5 text-sm text-amber-900 space-y-1">
+            {latestNeeds.map((it: any, idx: number) => (
+              <li key={idx}>
+                {typeof it === 'string'
+                  ? it
+                  : [it.item, it.qty ? `x${it.qty}` : '', it.note].filter(Boolean).join(' · ')
+                }
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3">
+            <button
+              type="button"
+              className="px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700"
+              onClick={() => {
+                const bullets = latestNeeds.map((it: any) =>
+                  typeof it === 'string'
+                    ? `• ${it}`
+                    : `• ${[it.item, it.qty ? `x${it.qty}` : '', it.note].filter(Boolean).join(' · ')}`
+                ).join('\n');
+                onChange({
+                  ...value,
+                  note: (value.note ? (value.note + '\n\n') : '') + `สิ่งที่ต้องเตรียมจากครั้งก่อน:\n${bullets}`
+                });
+              }}
+            >
+              เติมลงหมายเหตุ
+            </button>
+          </div>
+        </div>
       )}
 
       {/* สถานะ */}

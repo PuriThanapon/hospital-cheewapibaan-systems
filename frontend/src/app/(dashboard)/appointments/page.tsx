@@ -330,6 +330,61 @@ export default function AppointmentsPage() {
       setLoading(false);
     }
   }
+
+  type NeedItem = { item: string; qty?: number | string; note?: string };
+
+  const [needsModal, setNeedsModal] = useState<{
+    open: boolean;
+    appt: Appointment | null;
+    items: NeedItem[];
+    saving: boolean;
+  }>({ open: false, appt: null, items: [], saving: false });
+
+  function startNeeds(appt: Appointment, preset?: NeedItem[]) {
+    setNeedsModal({ open: true, appt, items: preset || [], saving: false });
+  }
+
+  function addNeedRow() {
+    setNeedsModal(m => ({ ...m, items: [...m.items, { item: '' }] }));
+  }
+  function updateNeedRow(i: number, patch: Partial<NeedItem>) {
+    setNeedsModal(m => {
+      const items = m.items.slice();
+      items[i] = { ...items[i], ...patch };
+      return { ...m, items };
+    });
+  }
+  function removeNeedRow(i: number) {
+    setNeedsModal(m => ({ ...m, items: m.items.filter((_, idx) => idx !== i) }));
+  }
+
+  async function saveNeeds() {
+    const m = needsModal;
+    if (!m.appt) return;
+    const cleaned = (m.items || []).filter(x => (x.item || '').trim() !== '');
+    if (cleaned.length === 0) { toast.fire({ icon:'warning', title:'กรอกอย่างน้อย 1 รายการ' }); return; }
+
+    setNeedsModal(mm => ({ ...mm, saving: true }));
+    try {
+      const apptNumId = Number(m.appt.id.replace(/[^\d]/g,'')) || null;
+      await http('/api/home_needs', {
+        method: 'POST',
+        body: JSON.stringify({
+          patients_id: m.appt.hn,
+          items: cleaned,
+          status: 'open',
+          source_appointment_id: apptNumId,
+          noted_at: m.appt.date,
+        }),
+      });
+      toast.fire({ icon:'success', title:'บันทึกรายการที่ต้องการแล้ว' });
+      setNeedsModal({ open:false, appt:null, items:[], saving:false });
+    } catch (e:any) {
+      toast.fire({ icon:'error', title: e?.message || 'บันทึกไม่สำเร็จ' });
+      setNeedsModal(mm => ({ ...mm, saving:false }));
+    }
+  }
+
   useEffect(() => {
     fetchList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -403,6 +458,21 @@ export default function AppointmentsPage() {
       if (!c.isConfirmed) { toast.fire({ icon: 'info', title: 'ยกเลิกการทำรายการ' }); return; }
     }
     await updateStatus(id, newStatus);
+
+    if (newStatus === 'done') {
+      const appt = items.find(i => i.id === id);
+      if (appt && appt.type === 'บ้านผู้ป่วย') {
+        const c = await $swal.fire({
+          title: 'บันทึกสิ่งที่ผู้ป่วยต้องการจากการเยี่ยมครั้งนี้ไหม?',
+          text: 'คุณสามารถเพิ่มรายการของใช้/เวชภัณฑ์ เพื่อให้ครั้งถัดไประบบเตือนอัตโนมัติ',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'บันทึกตอนนี้',
+          cancelButtonText: 'ไว้ก่อน',
+        });
+        if (c.isConfirmed) startNeeds(appt);
+      }
+    }
   }
 
   async function confirmDelete(id: string) {
@@ -665,6 +735,11 @@ export default function AppointmentsPage() {
                       <button className={styles.ghost} type="button" onClick={() => toggleRow(a.id)} aria-expanded={openRowId === a.id}><Eye size={14}/>{openRowId === a.id ? 'ซ่อน' : 'ตรวจสอบ'}</button>
                       <button className={styles.ghost} type="button" onClick={() => startEdit(a)}><Pencil size={14}/>แก้ไข</button>
 
+                      {a.type === 'บ้านผู้ป่วย' && (
+                        <button className={styles.ghost} type="button" onClick={() => startNeeds(a)}>
+                          <Edit3 size={14}/> บันทึกสิ่งที่ต้องการ
+                        </button>
+                      )}
                       {a.status === 'pending' && (
                         <>
                           <button className={styles.primary} type="button" onClick={() => handleStatus(a.id, 'done')} disabled={savingId === a.id}><CheckCircle width={14} height={14} />เสร็จสิ้น</button>
@@ -886,6 +961,103 @@ export default function AppointmentsPage() {
           </div>
         </Modal>
       )}
+      {needsModal.open && needsModal.appt && (
+        <Modal
+          open
+          size="lg"
+          onClose={() => setNeedsModal({ open:false, appt:null, items:[], saving:false })}
+          onConfirm={saveNeeds}
+          title={
+            <div className="flex items-center gap-2">
+              <Edit3 size={20} className="text-amber-600" />
+              <span>สิ่งที่ผู้ป่วยต้องการ — {needsModal.appt.patient}</span>
+              <span className="text-gray-500 text-sm">({needsModal.appt.hn})</span>
+            </div>
+          }
+          footer={
+            <div className="w-full flex justify-between items-center gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+                onClick={() => setNeedsModal({ open:false, appt:null, items:[], saving:false })}
+                disabled={needsModal.saving}
+              >
+                <X size={16}/> ยกเลิก
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+                  onClick={addNeedRow}
+                  disabled={needsModal.saving}
+                >
+                  + เพิ่มรายการ
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-60"
+                  onClick={saveNeeds}
+                  disabled={needsModal.saving}
+                >
+                  บันทึก
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            <div className="text-sm text-gray-600">
+              บันทึกรายการของใช้/เวชภัณฑ์จากการเยี่ยมครั้งนี้ (ครั้งถัดไประบบจะแจ้งเตือนอัตโนมัติ)
+            </div>
+            {needsModal.items.length === 0 && (
+              <div className="text-sm text-gray-500">ยังไม่มีรายการ กด “เพิ่มรายการ” เพื่อเริ่มต้น</div>
+            )}
+            <div className="space-y-2">
+              {needsModal.items.map((it, idx) => (
+                <div key={idx} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-start">
+                  <div className="md:col-span-3">
+                    <div className="text-xs text-gray-600 mb-1">รายการ</div>
+                    <input
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="เช่น ผ้าอ้อมผู้ใหญ่"
+                      value={it.item || ''}
+                      onChange={(e) => updateNeedRow(idx, { item: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-600 mb-1">จำนวน</div>
+                    <input
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="เช่น 2"
+                      value={(it.qty ?? '').toString()}
+                      onChange={(e) => updateNeedRow(idx, { qty: e.target.value })}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="text-xs text-gray-600 mb-1">หมายเหตุ</div>
+                    <input
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="เช่น ไซส์ L / ยี่ห้อที่เคยใช้"
+                      value={it.note || ''}
+                      onChange={(e) => updateNeedRow(idx, { note: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-end mt-5">
+                    <button
+                      type="button"
+                      className="px-3 py-2 border rounded-lg text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => removeNeedRow(idx)}
+                    >
+                      ลบ
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
+
     </div>
   );
 }
