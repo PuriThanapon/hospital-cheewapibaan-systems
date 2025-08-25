@@ -142,6 +142,18 @@ export default function AppointmentForm({
         patient: fullname || p.patients_id,
         phone: p.phone_number || value.phone || '',
       });
+      const tVal = TYPE_VALUE_FROM_LABEL(value.type);
+      const addrRaw = getPatientAddressRaw(p); // ไม่ format
+      onChange({
+        ...value,
+        hn: p.patients_id || normalizeHN(raw),
+        patient: fullname || p.patients_id,
+        phone: p.phone_number || value.phone || '',
+        // ถ้าเป็นบ้านผู้ป่วย: เติมที่อยู่อัตโนมัติ (ถ้า user ยังไม่ได้พิมพ์ทับเอง)
+        place: tVal === 'home'
+          ? (value.place && value.place !== 'บ้านผู้ป่วย' ? value.place : (addrRaw || 'บ้านผู้ป่วย'))
+          : value.place,
+      });
     } catch (e: any) {
       setVerifyErr(e?.message || 'ตรวจสอบไม่สำเร็จ');
     } finally {
@@ -153,23 +165,34 @@ export default function AppointmentForm({
     : label === 'บ้านผู้ป่วย' ? 'home'
     : (label || '');
 
+  function getPatientAddressRaw(p: any): string {
+    const v =
+      p?.address ??           // ← คุณบอกว่ามีฟิลด์นี้
+      p?.address_full ??
+      p?.home_address ??
+      p?.address_text ??
+      p?.addr ??
+      '';
+    return typeof v === 'string' ? v : String(v ?? '');
+  }
 
   /* เมื่อสลับประเภท ให้ล้าง/ตั้งค่าอัตโนมัติให้สอดคล้อง back-end */
   useEffect(() => {
     const t = TYPE_VALUE_FROM_LABEL(value.type);
     if (t === 'home') {
-      if (value.hospital_address) {
-        onChange({ ...value, hospital_address: '', place: value.place || 'บ้านผู้ป่วย' });
-      } else if (!value.place) {
-        onChange({ ...value, place: 'บ้านผู้ป่วย' });
-      }
+      const addrRaw = getPatientAddressRaw(patientInfo); // ดึงที่อยู่ดิบจาก patientInfo
+      const hasUserTyped = value.place && value.place !== 'บ้านผู้ป่วย';
+      onChange({
+        ...value,
+        place: hasUserTyped ? value.place : (addrRaw || 'บ้านผู้ป่วย'),
+        hospital_address: '', // เคลียร์ช่อง รพ. เมื่อสลับเป็นบ้าน
+      });
     } else if (t === 'hospital') {
-      // hospital: ซ่อน place (ไม่ใช้), focus ช่องโรงพยาบาล
-      if (value.place) onChange({ ...value, place: '' });
+      onChange({ ...value, place: '', hospital_address: value.hospital_address || '' });
       setTimeout(() => hospitalInputRef.current?.focus(), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value.type]);
+  }, [value.type, patientInfo]);
 
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}>
@@ -312,18 +335,15 @@ export default function AppointmentForm({
           <div className="mt-1 text-xs text-gray-500">* ไม่จำเป็นต้องเลือก “สถานที่” ด้านล่างเมื่อเป็นโรงพยาบาล</div>
         </label>
       ) : (
-        <label>
-          <div className="mb-1 text-sm text-gray-700">สถานที่</div>
-          <select
+         <label className="sm:col-span-2">
+          <div className="mb-1 text-sm text-gray-700">ที่อยู่บ้านผู้ป่วย</div>
+          <textarea
+            rows={2}
             className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 border-gray-300 focus:ring-purple-200"
+            placeholder="ระบบจะเติมจากข้อมูลผู้ป่วยอัตโนมัติหลังตรวจสอบ (แก้ไขได้)"
             value={value.place || ''}
             onChange={(e) => onChange({ ...value, place: e.target.value })}
-          >
-            <option value="" disabled hidden>เลือกสถานที่</option>
-            {/* ใส่ “บ้านผู้ป่วย” ไว้บนสุดเพื่อเลือกง่าย */}
-            {!PLACE_OPTIONS.includes('บ้านผู้ป่วย') && <option value="บ้านผู้ป่วย">บ้านผู้ป่วย</option>}
-            {PLACE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
+          />
         </label>
       )}
 
