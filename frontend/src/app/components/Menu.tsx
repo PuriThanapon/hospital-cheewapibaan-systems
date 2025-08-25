@@ -24,7 +24,6 @@ const menuItems = [
       { icon: <Stethoscope size={20} />, label: "ข้อมูลการรักษา", href: "/treatment" },
       { icon: <CalendarDays size={20} />, label: "การนัดหมาย", href: "/appointments" },
       { icon: <FileText size={20} />, label: "ออกรายงาน", href: "/report" },
-      { icon: <Pill size={20} />, label: "แพ้ยา", href: "/diagnosis" },
       { icon: <Archive size={20} />, label: "เอกสาร", href: "/templates"},
     ],
   },
