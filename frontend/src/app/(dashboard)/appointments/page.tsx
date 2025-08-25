@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import styles from './page.module.css';
-import { CalendarPlus, User, X, Edit3, ClipboardList, Eye, Pencil, CheckCircle } from 'lucide-react';
+import { CalendarPlus, User, X, Edit3, ClipboardList, Eye, Pencil, CheckCircle, Archive } from 'lucide-react';
 import Modal from '@/app/components/ui/Modal';
 import AppointmentForm, {type AppointmentFormValue} from '@/app/components/forms/AppointmentForm';
 import DatePickerField from '@/app/components/DatePicker';
@@ -384,6 +384,27 @@ export default function AppointmentsPage() {
       setNeedsModal(mm => ({ ...mm, saving:false }));
     }
   }
+  const [needsView, setNeedsView] = useState<{
+    open: boolean;
+    loading: boolean;
+    error: string;
+    appt: Appointment | null;
+    items: NeedItem[];
+  }>({ open: false, loading: false, error: '', appt: null, items: [] });
+
+  async function openNeedsFor(appt: Appointment) {
+    // เปิดโมดัล + โหลดรายการล่าสุดของผู้ป่วยคนนี้
+    setNeedsView({ open: true, loading: true, error: '', appt, items: [] });
+    try {
+      const res = await http<{ data?: NeedItem[] }>(
+        `/api/patients/${encodeURIComponent(appt.hn)}/home-needs/latest`
+      );
+      const items = Array.isArray(res?.data) ? res!.data! : [];
+      setNeedsView(v => ({ ...v, loading: false, items }));
+    } catch (e: any) {
+      setNeedsView(v => ({ ...v, loading: false, error: e?.message || 'โหลดไม่สำเร็จ' }));
+    }
+  }
 
   useEffect(() => {
     fetchList();
@@ -731,6 +752,15 @@ export default function AppointmentsPage() {
                     </td>
                     <td><StatusBadge status={a.status} /></td>
                     <td className={styles.actionsCell}>
+                      {a.status === 'pending' && (
+                        <button
+                          className={styles.ghost}
+                          type="button"
+                          onClick={() => openNeedsFor(a)}
+                        >
+                          <Archive size={14}/>สิ่งที่ต้องการ
+                        </button>
+                      )}
                       <button className={styles.ghost} type="button" onClick={() => setHistoryFor({ hn: a.hn, name: a.patient })}><ClipboardList size={14}/>ประวัติ</button>
                       <button className={styles.ghost} type="button" onClick={() => toggleRow(a.id)} aria-expanded={openRowId === a.id}><Eye size={14}/>{openRowId === a.id ? 'ซ่อน' : 'ตรวจสอบ'}</button>
                       <button className={styles.ghost} type="button" onClick={() => startEdit(a)}><Pencil size={14}/>แก้ไข</button>
@@ -802,6 +832,15 @@ export default function AppointmentsPage() {
                   </div>
                 )}
                 <div className={styles.cardActions}>
+                  {a.status === 'pending' && (
+                    <button
+                      className={styles.ghost}
+                      type="button"
+                      onClick={() => openNeedsFor(a)}
+                    >
+                      <ClipboardList size={14}/>สิ่งที่ต้องการ
+                    </button>
+                  )}
                   <button className={styles.ghost} type="button" onClick={() => setHistoryFor({ hn: a.hn, name: a.patient })}>ประวัติ</button>
                   <button className={styles.ghost} type="button" onClick={() => toggleCard(a.id)}>{openCards.has(a.id) ? 'ซ่อน' : 'ดู'}</button>
                   <button className={styles.ghost} type="button" onClick={() => startEdit(a)}>แก้ไข</button>
@@ -846,7 +885,7 @@ export default function AppointmentsPage() {
                 <button
                   type="button"
                   className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
-                  onClick={() => { setOpen(false); setEditingId(null); toast.fire({ icon: 'info', title: 'ยกเลิกการแก้ไข' }); }}
+                  onClick={() => { setOpen(false); setEditingId(null); toast.fire({ icon: 'info', title: 'ยกเลิก' }); }}
                 >
                   <X size={16}/> ยกเลิก
                 </button>
@@ -1057,7 +1096,71 @@ export default function AppointmentsPage() {
           </div>
         </Modal>
       )}
+      {needsView.open && needsView.appt && (
+      <Modal
+        open
+        size="lg"
+        onClose={() => setNeedsView({ open:false, loading:false, error:'', appt:null, items:[] })}
+        onConfirm={() => setNeedsView(s => ({ ...s, open:false }))}
+        title={
+          <div className="flex items-center gap-2">
+            <ClipboardList size={20} className="text-amber-600" />
+            <span>สิ่งที่ผู้ป่วยต้องการ (ล่าสุด) — {needsView.appt.patient}</span>
+            <span className="text-gray-500 text-sm">({needsView.appt.hn})</span>
+          </div>
+        }
+        footer={
+          <div className="w-full flex justify-center">
+            <button
+              className="px-8 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => setNeedsView({ open:false, loading:false, error:'', appt:null, items:[] })}
+            >
+              <X size={16}/> ปิด
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          {needsView.loading && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="animate-spin inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent" />
+              กำลังโหลด...
+            </div>
+          )}
 
+          {!needsView.loading && needsView.error && (
+            <div className="text-sm text-red-600">{needsView.error}</div>
+          )}
+
+          {!needsView.loading && !needsView.error && needsView.items.length === 0 && (
+            <div className="text-sm text-gray-500">
+              ยังไม่มีรายการความต้องการจากการเยี่ยมบ้านล่าสุด
+            </div>
+          )}
+
+          {!needsView.loading && !needsView.error && needsView.items.length > 0 && (
+            <div className="rounded-xl border bg-white p-3">
+              <div className="text-sm text-gray-600 mb-2">รายการสิ่งที่ต้องการ (ล่าสุด)</div>
+              <ul className="divide-y">
+                {needsView.items.map((it, idx) => (
+                  <li key={idx} className="py-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium text-gray-900 break-words">{it.item}</div>
+                        {it.note && <div className="text-sm text-gray-600 break-words">หมายเหตุ: {it.note}</div>}
+                      </div>
+                      <div className="shrink-0 text-sm text-gray-700">
+                        {it.qty != null && String(it.qty).trim() !== '' ? `× ${it.qty}` : ''}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </Modal>
+    )}
     </div>
   );
 }

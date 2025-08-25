@@ -13,6 +13,12 @@ router.use('/dashboard', require('./dashboard.routes'));
 router.use('/stats', require('./stats.routes'));
 router.use('/notification', require('./notification.routes'));
 router.use('/home_needs', require('./home_needs.routes'));
+
+router.use('/patient_diagnosis', require('./diagnosis.routes'));
+
+router.use('/beds', require('./beds.routes'));
+router.use('/bed_stays', require('./bed_stays.routes'));
+
 router.get('/patients/:id/home-needs/latest', homeNeedsController.latestForPatient);
 
 router.patch('/patients/:id/deceased', deathController.aliasMarkFromPatients);

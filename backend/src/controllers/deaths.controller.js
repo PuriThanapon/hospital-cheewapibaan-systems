@@ -1,6 +1,6 @@
 // backend/src/controllers/death.controller.js
 const Death = require('../models/deaths.model');
-
+const bedStays = require('../models/bed_stays.model');
 /** GET /api/deaths */
 exports.list = async (req, res, next) => {
   try {
@@ -31,7 +31,29 @@ exports.createOrMark = async (req, res, next) => {
     if (!death_date || !death_time || !death_cause) {
       return res.status(400).json({ message: 'ต้องระบุ death_date, death_time, death_cause' });
     }
-    const row = await Death.markDeceased(req.params.id, { death_date, death_time, death_cause, management });
+
+    // 1) บันทึกสถานะเสียชีวิตในตารางผู้ป่วย/ตาราง death ของคุณ
+    const row = await Death.markDeceased(req.params.id, {
+      death_date, death_time, death_cause, management
+    });
+
+    // 2) ปล่อยเตียงที่ผู้ป่วยยังครองอยู่ (ถ้ามี) ณ เวลาเสียชีวิต
+    const deceasedAt = composeDeceasedAt(death_date, death_time);
+    try {
+      await bedStays.forceEndActiveForPatient(req.params.id, {
+        at: deceasedAt,         // timestamptz string (เช่น 2025-08-25T12:34:00+07:00)
+        reason: 'deceased'
+      });
+    } catch (e) {
+      // ไม่ให้ทั้งงานล้ม แต่อยากรู้ว่าปิดเตียงไม่สำเร็จ
+      console.error('forceEndActiveForPatient failed:', e);
+      return res.status(201).json({
+        message: 'บันทึกการเสียชีวิตสำเร็จ แต่ปล่อยเตียงไม่สำเร็จ กรุณาตรวจสอบประวัติเตียง',
+        patient: row,
+        warn: 'bed_release_failed'
+      });
+    }
+
     res.status(201).json({ message: 'บันทึกการเสียชีวิตสำเร็จ', patient: row });
   } catch (e) { next(e); }
 };

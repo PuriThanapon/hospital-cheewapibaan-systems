@@ -12,7 +12,8 @@ import {
   Settings,
   LogOut,
   Archive,
-  FolderClosed
+  FolderClosed,
+  Pill
 } from "lucide-react";
 const Select = dynamic(() => import('react-select'), { ssr: false });
 const menuItems = [

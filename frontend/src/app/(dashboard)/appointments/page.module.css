@@ -323,7 +323,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   top: 0;
   z-index: 1;
 }
-.actionsCell { text-align: right; display: flex; gap: 8px; flex-wrap: wrap; }
+.actionsCell { text-align: right; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;}
 
 /* แถวว่างตอนไม่มีข้อมูล */
 .emptyCell {

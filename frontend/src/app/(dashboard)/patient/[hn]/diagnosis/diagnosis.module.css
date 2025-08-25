@@ -1,0 +1,220 @@
+
+/* =====================================================
+   File: patient-diagnosis.module.css
+   Purpose: Clean, readable CSS Module for PatientDiagnosisPage
+   Notes:
+   - No Tailwind / no UI libs
+   - Organized by: Tokens → Base → Layout → Components → Utilities → Responsive
+===================================================== */
+
+/* ------------------------------
+   TOKENS (design system)
+-------------------------------- */
+:root {
+  /* Palette */
+  --bg: #f7f7fb;
+  --card: #ffffff;
+  --text: #1f2430;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --primary: #2563eb;
+  --danger: #ef4444;
+
+  /* Semantic accents */
+  --ok-bg: #ecfdf5;   /* green-50 */
+  --ok-fg: #065f46;   /* green-800 */
+  --warn-bg: #fffbeb; /* amber-50 */
+  --warn-fg: #92400e; /* amber-800 */
+  --neutral-bg: #f3f4f6; /* gray-100 */
+  --neutral-fg: #374151; /* gray-700 */
+
+  /* Elevation, radius, spacing */
+  --shadow: 0 2px 10px rgba(0,0,0,.08);
+  --radius: 12px;
+  --sp-1: 6px;  /* xs */
+  --sp-2: 8px;  /* sm */
+  --sp-3: 10px; /* md */
+  --sp-4: 12px; /* lg */
+  --sp-5: 16px; /* xl */
+}
+
+/* ------------------------------
+   BASE
+-------------------------------- */
+.page {
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+.title { margin: 0; font-size: 20px; }
+
+/* ------------------------------
+   LAYOUT SECTIONS
+-------------------------------- */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+.inline { display: flex; gap: var(--sp-2); align-items: center; }
+
+.patient {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-2);
+  background: var(--card);
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.notice {
+  background: #fff7ed;
+  border: 1px dashed #fdba74;
+  color: var(--warn-fg);
+  padding: var(--sp-4);
+  border-radius: var(--radius);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-4);
+  margin: var(--sp-4) 0;
+}
+.stat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--sp-4);
+}
+.statLabel { font-size: 12px; color: var(--muted); }
+.statValue { font-size: 22px; font-weight: 600; }
+
+.filters { display: flex; gap: var(--sp-2); align-items: flex-end; margin: var(--sp-2) 0; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.tableWrap { overflow: auto; }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.table th,
+.table td {
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+/* ------------------------------
+   COMPONENTS
+-------------------------------- */
+.input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: var(--sp-3);
+  background: #fff;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s ease, filter .15s ease;
+}
+.btn:hover { background: #f9fafb; }
+.btnPrimary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btnPrimary:hover { filter: brightness(.95); }
+.btnDanger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+.actions { display: flex; gap: var(--sp-2); }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+}
+.badge[data-status="active"]   { background: var(--ok-bg);     color: var(--ok-fg);     border-color: #a7f3d0; }
+.badge[data-status="resolved"] { background: var(--neutral-bg); color: var(--neutral-fg); }
+.badge[data-status="inactive"] { background: var(--warn-bg);    color: var(--warn-fg);   border-color: #fde68a; }
+
+.message {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  border-radius: 8px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.dialog {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-width: 560px;
+  width: 100%;
+  padding: var(--sp-5);
+  border: 1px solid var(--line);
+}
+.dialogSmall { max-width: 420px; }
+.dialogTitle { margin: 0 0 var(--sp-2) 0; }
+.dialogActions { display: flex; gap: var(--sp-2); justify-content: flex-end; margin-top: var(--sp-2); }
+
+/* Forms */
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+}
+.formGrid label { display: flex; flex-direction: column; gap: var(--sp-2); }
+.col2 { grid-column: span 2; }
+
+/* ------------------------------
+   UTILITIES
+-------------------------------- */
+.muted  { color: var(--muted); }
+.center { text-align: center; }
+.mono   { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.w160   { width: 160px; }
+
+/* ------------------------------
+   RESPONSIVE
+-------------------------------- */
+@media (max-width: 768px) {
+  .patient { grid-template-columns: 1fr 1fr; }
+  .stats   { grid-template-columns: 1fr 1fr; }
+  .formGrid { grid-template-columns: 1fr; }
+  .col2 { grid-column: auto; }
+}
