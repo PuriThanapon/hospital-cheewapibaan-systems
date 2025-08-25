@@ -1,0 +1,94 @@
+const { pool } = require('../config/db');
+
+// แปลง error จาก Postgres -> HTTP ที่อ่านง่าย
+function handlePgError(res, err) {
+  const code = err?.code;
+  if (code === '23505') {
+    return res.status(409).json({ error: 'ตั้ง Primary ซ้ำ: ผู้ป่วยนี้มี Primary ที่ active อยู่แล้ว' });
+  }
+  if (code === '23514') {
+    return res.status(400).json({ error: err.detail || err.message });
+  }
+  return res.status(500).json({ error: err.message || 'Internal error' });
+}
+
+// POST /api/patient_diagnosis
+exports.createDiagnosis = async (req, res) => {
+  try {
+    const { patients_id, code, term, is_primary, onset_date, status } = req.body;
+    if (!patients_id || !term) {
+      return res.status(400).json({ error: 'patients_id และ term จำเป็น' });
+    }
+    const q = `
+      INSERT INTO patient_diagnosis
+        (patients_id, code, term, is_primary, onset_date, status)
+      VALUES ($1,$2,$3,$4,$5,$6)
+      RETURNING *`;
+    const r = await pool.query(q, [patients_id, code ?? null, term, !!is_primary, onset_date ?? null, status ?? 'active']);
+    res.json(r.rows[0]);
+  } catch (err) {
+    handlePgError(res, err);
+  }
+};
+
+// GET /api/patient_diagnosis?patients_id=HN-xxx
+exports.listDiagnosis = async (req, res) => {
+  const { patients_id } = req.query;
+  if (!patients_id) return res.status(400).json({ error: 'ต้องส่ง patients_id' });
+  const r = await pool.query(
+    `SELECT * FROM patient_diagnosis
+     WHERE patients_id = $1
+     ORDER BY is_primary DESC, created_at DESC`,
+    [patients_id]
+  );
+  res.json(r.rows);
+};
+
+// (ทางเลือก) GET /api/patients/:id/diagnosis
+exports.getDiagnosisByPatient = async (req, res) => {
+  const { id } = req.params;
+  const r = await pool.query(
+    `SELECT * FROM patient_diagnosis
+     WHERE patients_id = $1
+     ORDER BY is_primary DESC, created_at DESC`,
+    [id]
+  );
+  res.json(r.rows);
+};
+
+// PATCH /api/patient_diagnosis/:diag_id
+exports.updateDiagnosis = async (req, res) => {
+  try {
+    const { diag_id } = req.params;
+    const { code, term, is_primary, onset_date, status } = req.body;
+
+    const sets = [];
+    const vals = [];
+    let i = 1;
+
+    if (code !== undefined)       { sets.push(`code=$${i++}`);       vals.push(code ?? null); }
+    if (term !== undefined)       { sets.push(`term=$${i++}`);       vals.push(term); }
+    if (is_primary !== undefined) { sets.push(`is_primary=$${i++}`); vals.push(!!is_primary); }
+    if (onset_date !== undefined) { sets.push(`onset_date=$${i++}`); vals.push(onset_date ?? null); }
+    if (status !== undefined)     { sets.push(`status=$${i++}`);     vals.push(status); }
+
+    sets.push(`updated_at=now()`);
+
+    const q = `UPDATE patient_diagnosis SET ${sets.join(', ')} WHERE diag_id=$${i} RETURNING *`;
+    vals.push(diag_id);
+
+    const r = await pool.query(q, vals);
+    if (!r.rows[0]) return res.status(404).json({ error: 'ไม่พบรายการ' });
+    res.json(r.rows[0]);
+  } catch (err) {
+    handlePgError(res, err);
+  }
+};
+
+// DELETE /api/patient_diagnosis/:diag_id
+exports.deleteDiagnosis = async (req, res) => {
+  const { diag_id } = req.params;
+  const r = await pool.query('DELETE FROM patient_diagnosis WHERE diag_id=$1', [diag_id]);
+  if (r.rowCount === 0) return res.status(404).json({ error: 'ไม่พบรายการ' });
+  res.status(204).end();
+};
