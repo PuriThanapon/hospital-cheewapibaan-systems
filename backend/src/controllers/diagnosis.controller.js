@@ -12,26 +12,36 @@ function handlePgError(res, err) {
   return res.status(500).json({ error: err.message || 'Internal error' });
 }
 
-// POST /api/patient_diagnosis
+// ---------------------- CRUD แบบเดิม ----------------------
 exports.createDiagnosis = async (req, res) => {
   try {
     const { patients_id, code, term, is_primary, onset_date, status } = req.body;
-    if (!patients_id || !term) {
-      return res.status(400).json({ error: 'patients_id และ term จำเป็น' });
-    }
-    const q = `
-      INSERT INTO patient_diagnosis
-        (patients_id, code, term, is_primary, onset_date, status)
-      VALUES ($1,$2,$3,$4,$5,$6)
-      RETURNING *`;
-    const r = await pool.query(q, [patients_id, code ?? null, term, !!is_primary, onset_date ?? null, status ?? 'active']);
-    res.json(r.rows[0]);
+
+    // 1) สร้าง encounter ใหม่
+    const encRes = await pool.query(
+      `INSERT INTO encounters (patients_id, encounter_type, note)
+       VALUES ($1, 'diagnosis', 'สร้างจากการเพิ่มการวินิจฉัย')
+       RETURNING encounter_id`,
+      [patients_id]
+    );
+
+    const encounter_id = encRes.rows[0].encounter_id;
+
+    // 2) สร้าง diagnosis โดยผูก encounter_id ด้วย
+    const dxRes = await pool.query(
+      `INSERT INTO patient_diagnosis
+        (patients_id, encounter_id, code, term, is_primary, onset_date, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING *`,
+      [patients_id, encounter_id, code ?? null, term, !!is_primary, onset_date ?? null, status ?? 'active']
+    );
+
+    res.json(dxRes.rows[0]);
   } catch (err) {
     handlePgError(res, err);
   }
 };
 
-// GET /api/patient_diagnosis?patients_id=HN-xxx
 exports.listDiagnosis = async (req, res) => {
   const { patients_id } = req.query;
   if (!patients_id) return res.status(400).json({ error: 'ต้องส่ง patients_id' });
@@ -44,19 +54,17 @@ exports.listDiagnosis = async (req, res) => {
   res.json(r.rows);
 };
 
-// (ทางเลือก) GET /api/patients/:id/diagnosis
 exports.getDiagnosisByPatient = async (req, res) => {
-  const { id } = req.params;
+  const { patients_id } = req.params;
   const r = await pool.query(
     `SELECT * FROM patient_diagnosis
      WHERE patients_id = $1
      ORDER BY is_primary DESC, created_at DESC`,
-    [id]
+    [patients_id]
   );
   res.json(r.rows);
 };
 
-// PATCH /api/patient_diagnosis/:diag_id
 exports.updateDiagnosis = async (req, res) => {
   try {
     const { diag_id } = req.params;
@@ -85,10 +93,43 @@ exports.updateDiagnosis = async (req, res) => {
   }
 };
 
-// DELETE /api/patient_diagnosis/:diag_id
 exports.deleteDiagnosis = async (req, res) => {
   const { diag_id } = req.params;
   const r = await pool.query('DELETE FROM patient_diagnosis WHERE diag_id=$1', [diag_id]);
   if (r.rowCount === 0) return res.status(404).json({ error: 'ไม่พบรายการ' });
   res.status(204).end();
+};
+
+// ---------------------- ผูกกับ Encounter ----------------------
+exports.listByEncounter = async (req, res) => {
+  const { encounter_id } = req.params;
+  const r = await pool.query(
+    `SELECT * FROM patient_diagnosis WHERE encounter_id=$1 ORDER BY is_primary DESC, created_at DESC`,
+    [encounter_id]
+  );
+  res.json(r.rows);
+};
+
+exports.createForEncounter = async (req, res) => {
+  const { encounter_id } = req.params;
+  const { code, term, is_primary, onset_date, status } = req.body;
+
+  try {
+    // หา patients_id จาก encounters
+    const enc = await pool.query(`SELECT patients_id FROM encounters WHERE encounter_id=$1`, [encounter_id]);
+    if (!enc.rows[0]) return res.status(404).json({ error: 'ไม่พบ encounter' });
+
+    const patients_id = enc.rows[0].patients_id;
+    const r = await pool.query(
+      `INSERT INTO patient_diagnosis
+        (patients_id, encounter_id, code, term, is_primary, onset_date, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING *`,
+      [patients_id, encounter_id, code ?? null, term, !!is_primary, onset_date ?? null, status ?? 'active']
+    );
+
+    res.json(r.rows[0]);
+  } catch (err) {
+    handlePgError(res, err);
+  }
 };
