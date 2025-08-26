@@ -331,8 +331,7 @@ export default function PatientDiagnosisPage() {
                 <input className={styles.input} value={form.term ?? ''} onChange={(e) => setForm({ ...form, term: e.target.value })} placeholder="เช่น เบาหวานชนิดที่ 2" />
               </label>
               <label>
-                <span>ตั้งเป็นโรคหลัก</span>
-                <input type="checkbox" checked={!!form.is_primary} onChange={(e) => setForm({ ...form, is_primary: e.target.checked })} />
+                <span>ตั้งเป็นโรคหลัก<input className="ml-2"type="checkbox" checked={!!form.is_primary} onChange={(e) => setForm({ ...form, is_primary: e.target.checked })} /></span>
               </label>
               <label>
                 <span>สถานะ</span>
