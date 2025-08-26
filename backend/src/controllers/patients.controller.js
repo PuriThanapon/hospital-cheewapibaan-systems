@@ -281,6 +281,26 @@ async function createPatient(req, res, next) {
       console.error('LINE push failed:', e); // ไม่ให้ล้มทั้งรีเควส
     }
 
+    // ✅ แจ้งเตือนเข้า LINE ส่วนตัว (ถ้าตั้ง LINE_USER_ID ไว้ใน .env)
+    try {
+      const userId = process.env.LINE_USER_ID;
+      if (userId) {
+        const nowTH = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+        const msg =
+    `🆕 เพิ่มผู้ป่วยใหม่
+    HN: ${row.patients_id}
+    ชื่อ: ${row.first_name ?? ''} ${row.last_name ? row.last_name[0] + '.' : ''}
+    ประเภท: ${row.patients_type ?? '-'}
+    เวลา: ${nowTH}`;
+
+        await pushText(userId, msg);
+      }
+    } catch (e) {
+      console.error('LINE push failed:', e); // ไม่ให้ล้มทั้งรีเควส
+    }
+
+
+
 
     res.status(201).json({ ...row, hn: row.patients_id });
   } catch (err) { next(err); }
