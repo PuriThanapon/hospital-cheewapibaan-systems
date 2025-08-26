@@ -2,7 +2,6 @@ const cron = require("node-cron");
 const { pool } = require("../config/db");
 const { pushText, pushMessage } = require("../utils/line");
 
-/** สร้าง Flex Card ของแต่ละนัด */
 function buildAppointmentFlex(r) {
   return {
     type: "bubble",
@@ -30,7 +29,6 @@ function buildAppointmentFlex(r) {
   };
 }
 
-/** Flex Message แบบ carousel */
 function buildAppointmentsFlex(rows, today) {
   return {
     type: "flex",
@@ -42,10 +40,10 @@ function buildAppointmentsFlex(rows, today) {
   };
 }
 
-// 🕕 ตั้งเวลาให้รันทุกวัน 06:00 น.
-cron.schedule("*/1 * * * *", async () => {
+// 🕕 ทุกวัน 06:00
+cron.schedule("* 6 * * *", async () => {
   try {
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = new Date().toISOString().slice(0, 10);
 
     const { rows } = await pool.query(
       `SELECT a.appointment_date, a.start_time, a.end_time, a.place, a.note,
@@ -57,19 +55,21 @@ cron.schedule("*/1 * * * *", async () => {
       [today]
     );
 
-    if (!rows.length) {
-      await pushText(process.env.LINE_USER_ID, "📭 วันนี้ไม่มีนัดหมายผู้ป่วย");
-      return;
+    const targets = [process.env.LINE_USER_ID, process.env.LINE_GROUP_ID].filter(Boolean);
+
+    for (const target of targets) {
+      if (!rows.length) {
+        await pushText(target, "📭 วันนี้ไม่มีนัดหมายผู้ป่วย");
+        continue;
+      }
+
+      const flexMsg = buildAppointmentsFlex(rows, today);
+      await pushMessage(target, flexMsg);
+
+      await pushText(target, `✅ วันนี้มีนัดทั้งหมด ${rows.length} ราย`);
     }
 
-    // ส่ง Flex Message (carousel)
-    const flexMsg = buildAppointmentsFlex(rows, today);
-    await pushMessage(process.env.LINE_USER_ID, flexMsg);
-
-    // ส่งสรุปจำนวนต่อท้าย
-    await pushText(process.env.LINE_USER_ID, `✅ วันนี้มีนัดทั้งหมด ${rows.length} ราย`);
-
-    console.log("✅ ส่งแจ้งเตือนนัดหมาย (Flex) เรียบร้อย");
+    console.log("✅ ส่งแจ้งเตือนนัดหมายเรียบร้อย (Flex + สรุป)");
   } catch (err) {
     console.error("❌ ส่งแจ้งเตือนนัดหมายล้มเหลว:", err);
   }
