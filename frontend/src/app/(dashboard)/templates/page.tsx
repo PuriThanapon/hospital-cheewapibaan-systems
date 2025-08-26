@@ -18,9 +18,17 @@ type TemplateDoc = {
   updated_at?: string;
 };
 
+// ✔ ใช้เป็นแหล่งข้อมูลของ select
+const Template_type = [
+  { value: 'แบบฟอร์ม', label: 'แบบฟอร์ม' },
+  { value: 'แบบประเมิน', label: 'แบบประเมิน' },
+  { value: 'หนังสือ', label: 'หนังสือ' },
+  { value: 'ใบรายงาน', label: 'ใบรายงาน' },
+];
+
 export function fileUrl(id: number | string, opts?: { download?: boolean }) {
   const u = new URL(`${API_BASE}/api/templates/${id}/file`);
-  if (opts?.download) u.searchParams.set('download', '1'); // ให้แบ็กเอนด์ส่ง attachment
+  if (opts?.download) u.searchParams.set('download', '1');
   return u.toString();
 }
 
@@ -66,12 +74,12 @@ export default function TemplatesPage() {
   const [rows, setRows] = useState<TemplateDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
-  const [cat, setCat] = useState('');
+  const [cat, setCat] = useState(''); // ✔ ใช้กับ select ตัวกรอง
 
   // upload form state
   const [openUpload, setOpenUpload] = useState(false);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(''); // ✔ ใช้กับ select ในโมดัล
   const [desc, setDesc] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
@@ -109,7 +117,7 @@ export default function TemplatesPage() {
     try {
       const fd = new FormData();
       fd.append('title', title.trim());
-      if (category.trim()) fd.append('category', category.trim());
+      if (category.trim()) fd.append('category', category.trim()); // ✔ ค่ามาจาก select
       if (desc.trim()) fd.append('description', desc.trim());
       fd.append('file', file);
 
@@ -163,12 +171,20 @@ export default function TemplatesPage() {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <input
-            className="w-48 px-3 py-2 border rounded-lg"
-            placeholder="หมวดหมู่ (เช่น แบบฟอร์ม, หนังสือ, ฯลฯ)"
+
+          {/* ✔ เปลี่ยนเป็น select สำหรับตัวกรองหมวดหมู่ */}
+          <select
+            className="w-48 px-3 py-2 border rounded-lg bg-white"
             value={cat}
             onChange={(e) => setCat(e.target.value)}
-          />
+            aria-label="กรองตามหมวดหมู่"
+          >
+            <option value="">ทุกหมวดหมู่</option>
+            {Template_type.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
           <button
             className="px-3 py-2 border rounded-lg hover:bg-gray-50"
             onClick={() => { setQ(''); setCat(''); }}
@@ -221,7 +237,7 @@ export default function TemplatesPage() {
                 className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border hover:bg-gray-50"
                 >
                 <Download size={16}/> ดาวน์โหลด
-                </a>
+              </a>
               <button
                 className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50"
                 onClick={() => handleDelete(r.id)}
@@ -234,7 +250,7 @@ export default function TemplatesPage() {
         ))}
       </div>
 
-      {/* Upload Modal (ง่ายๆด้วย div overlay) */}
+      {/* Upload Modal */}
       {openUpload && (
         <div className="fixed inset-0 z-[12000] bg-black/50 flex items-center justify-center">
           <div className="w-[92vw] max-w-lg bg-white rounded-xl p-5">
@@ -250,15 +266,23 @@ export default function TemplatesPage() {
                   placeholder="เช่น แบบฟอร์มขอรับบริการ..."
                 />
               </div>
+
+              {/* ✔ เปลี่ยนเป็น select สำหรับเลือกหมวดหมู่ */}
               <div>
                 <div className="text-sm mb-1">หมวดหมู่</div>
-                <input
-                  className="w-full px-3 py-2 border rounded-lg"
+                <select
+                  className="w-full px-3 py-2 border rounded-lg bg-white"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  placeholder="เช่น แบบฟอร์ม, หนังสือ, ใบรายงาน"
-                />
+                  aria-label="เลือกหมวดหมู่"
+                >
+                  <option value="">— เลือกหมวดหมู่ —</option>
+                  {Template_type.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
+
               <div>
                 <div className="text-sm mb-1">คำอธิบาย</div>
                 <textarea
