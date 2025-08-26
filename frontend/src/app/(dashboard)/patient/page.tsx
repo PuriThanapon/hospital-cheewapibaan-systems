@@ -867,6 +867,10 @@ export default function PatientsPage() {
                       </button>
                     )}
 
+                    <Link className="px-2 py-1 border rounded-lg"
+                      href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`}>
+                      Encounter
+                    </Link>
                     {/* ✅ ปุ่มไปหน้าวินิจฉัย */}
                     <Link
                       href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
