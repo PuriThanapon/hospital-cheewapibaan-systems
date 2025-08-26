@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BedDouble, Plus, ArrowLeftRight, History, X, CheckCircle2, LogOut } from 'lucide-react';
+import { BedDouble, Plus, ArrowLeftRight, History, X, CheckCircle2, LogOut, Users, Clock, Calendar, User, Stethoscope, Building2, AlertCircle, Check } from 'lucide-react';
 import Modal from '@/app/components/ui/Modal';
 import DatePickerField from '@/app/components/DatePicker';
 import TimePicker from '@/app/components/TimePicker';
@@ -317,23 +317,28 @@ export default function BedStaysPage() {
     }
     async function saveEnd() {
         if (!openEnd.stay) return;
-        setOpenEnd(s => ({ ...s, saving: true }));
-        try {
-            await http(`/api/bed_stays/${openEnd.stay.id}/end`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    at: buildTs(openEnd.date, openEnd.time),
-                    reason: openEnd.reason,
-                }),
-            });
-            toast.fire({ icon: 'success', title: 'สิ้นสุดการครองเตียงแล้ว' });
-            setOpenEnd({ open: false, stay: null, date: YMD(), time: HM(), reason: 'discharge', saving: false });
-            await fetchCurrent();
-        } catch (e: any) {
-            toast.fire({ icon: 'error', title: e?.message || 'ไม่สำเร็จ' });
-            setOpenEnd(s => ({ ...s, saving: false }));
+        const stayId = (openEnd.stay as any).id ?? (openEnd.stay as any).stay_id;
+        if (!stayId) {
+            toast.fire({ icon:'error', title:'ไม่พบรหัสการครองเตียง (stay_id)' });
+            return;
         }
-    }
+        setOpenEnd(s => ({ ...s, saving:true }));
+        try {
+            await http(`/api/bed_stays/${stayId}/end`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                at: `${openEnd.date} ${openEnd.time}`,
+                reason: openEnd.reason || null, // ส่งมาเป็น string/null ชัดๆ
+            }),
+            });
+            toast.fire({ icon:'success', title:'สิ้นสุดการครองเตียงแล้ว' });
+            setOpenEnd({ open:false, stay:null, date:YMD(), time:HM(), reason:'discharge', saving:false });
+            await fetchCurrent();
+        } catch (e:any) {
+            toast.fire({ icon:'error', title: e?.message || 'ไม่สำเร็จ' });
+            setOpenEnd(s => ({ ...s, saving:false }));
+        }
+        }
 
     /* ---------------- Transfer ---------------- */
     function openTransferModal(stay: Occupancy) {
@@ -377,333 +382,380 @@ export default function BedStaysPage() {
             setOpenHistory({ open: true, patient: null, items: [], loading: false, err: e?.message || 'โหลดประวัติไม่สำเร็จ' });
         }
     }
-
     return (
-        <div className="p-4 sm:p-6 space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <BedDouble className="text-purple-600" />
-                    <h1 className="text-xl font-semibold">จัดการเตียง</h1>
+        <div className="bg-gray-100 min-h-screen p-6 md:p-10 font-sans bg-[#f7f7fb] rounded-2xl">
+            <div className="w-full mx-auto bg-[#f7f7fb]">
+
+                {/* Header and Controls */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div className="flex items-center gap-4">
+                        <BedDouble className="w-10 h-10 text-purple-600" />
+                        <h1 className="text-3xl font-bold text-gray-800">การจัดการเตียงผู้ป่วย</h1>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        {/* Tab Switcher */}
+                        <div className="inline-flex rounded-full border border-gray-300 bg-white p-1">
+                            {(['ALL', 'LTC', 'PC'] as const).map(t => (
+                                <button
+                                    key={t}
+                                    onClick={() => setServiceTab(t)}
+                                    className={`
+                                        px-4 py-2 text-sm font-medium rounded-full
+                                        transition-colors duration-200
+                                        ${serviceTab === t ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}
+                                    `}
+                                >
+                                    {t === 'ALL' ? 'ทั้งหมด' : t}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Main Action Button */}
+                        <button
+                            className="flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 text-white font-medium shadow-lg hover:from-purple-700 hover:to-purple-900 transition-all duration-200"
+                            onClick={openAssignModal}
+                        >
+                            <Plus size={18} /> รับเข้าครองเตียง
+                        </button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="inline-flex rounded-lg border bg-white overflow-hidden">
-                        {(['ALL', 'LTC', 'PC'] as const).map(t => (
-                            <button
-                                key={t}
-                                onClick={() => setServiceTab(t)}
-                                className={`px-3 py-1.5 text-sm ${serviceTab === t ? 'bg-purple-600 text-white' : 'hover:bg-gray-50'}`}
-                            >{t === 'ALL' ? 'ทั้งหมด' : t}</button>
+
+                {/* Status Banners */}
+                {err && (
+                    <div className="p-4 rounded-xl border border-red-300 bg-red-50 text-red-700 mb-6 font-medium flex items-center gap-2">
+                        <X size={20} className="text-red-500" /> {err}
+                    </div>
+                )}
+                {!err && loading && (
+                    <div className="p-4 rounded-xl border border-blue-300 bg-blue-50 text-blue-700 mb-6 font-medium flex items-center gap-2">
+                        <div className="animate-spin h-5 w-5 rounded-full border-2 border-t-2 border-blue-500 border-t-transparent"></div>
+                        กำลังโหลดข้อมูล...
+                    </div>
+                )}
+
+                {/* Overview by service cards */}
+                {!loading && !err && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {(['LTC', 'PC'] as ServiceType[]).map(svc => (
+                            <div key={svc} className="rounded-3xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+                                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                                    <div className="text-lg font-semibold text-gray-800">{svc} — เตียงที่กำลังใช้งาน</div>
+                                    <div className="text-base text-gray-500">
+                                        ว่าง <span className="font-bold text-gray-700">{hasBedsApi ? freeBedsByService[svc].length : '-'}</span> เตียง
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-gray-200">
+                                    {occupancyGrouped[svc].length === 0 && (
+                                        <div className="p-6 text-base text-gray-500 text-center">
+                                            ไม่มีผู้ป่วยครองเตียงอยู่ในขณะนี้
+                                        </div>
+                                    )}
+                                    {occupancyGrouped[svc].map(o => (
+                                        <div key={o.id ?? (o as any).stay_id ?? `${o.bed_id}-${o.patients_id}-${o.start_at}`} className="p-6 transition-colors hover:bg-gray-50">
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <div className="text-sm font-bold text-white bg-purple-600 px-3 py-1 rounded-full">{o.bed_code}</div>
+                                                    <div className="font-medium text-gray-800">
+                                                        {`${o.pname ?? ''}${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() || `ผู้ป่วย (${o.patients_id})`}
+                                                        <span className="text-gray-500 font-normal ml-2 text-sm">({o.patients_id})</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-sm text-gray-600 font-medium">
+                                                    เริ่มเมื่อ: {TH_DATETIME(o.start_at)}
+                                                </div>
+                                            </div>
+                                            {o.note && <div className="text-sm text-gray-700 mt-2 pl-2 border-l-2 border-gray-300">หมายเหตุ: {o.note}</div>}
+                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                <button
+                                                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm transition-colors"
+                                                    onClick={() => openHistoryModal(o.patients_id)}
+                                                >
+                                                    <History size={16} /> ประวัติเตียง
+                                                </button>
+                                                <button
+                                                    className="px-4 py-2 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 flex items-center gap-2 text-sm transition-colors"
+                                                    onClick={() => openTransferModal(o)}
+                                                >
+                                                    <ArrowLeftRight size={16} /> โอนย้ายเตียง
+                                                </button>
+                                                <button
+                                                    className="px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 flex items-center gap-2 text-sm transition-colors"
+                                                    onClick={() => openEndModal(o)}
+                                                >
+                                                    <LogOut size={16} /> สิ้นสุดการครองเตียง
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         ))}
                     </div>
-                    <button
-                        className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800 flex items-center gap-2"
-                        onClick={openAssignModal}
+                )}
+
+                {/* Assign Modal */}
+                {openAssign && (
+                    <Modal
+                        open
+                        size="lg"
+                        onClose={() => setOpenAssign(false)}
+                        onConfirm={saveAssign}
+                        title={
+                            <div className="flex items-center gap-2">
+                                <Plus size={20} className="text-purple-600" />
+                                <span className="font-bold">รับเข้าครองเตียง</span>
+                            </div>
+                        }
+                        footer={
+                            <div className="w-full flex flex-col sm:flex-row sm:justify-between items-center gap-2">
+                                <div className="text-sm text-gray-500 hidden sm:block">ระบุ HN → ตรวจสอบ → เลือกเตียง</div>
+                                <div className="flex gap-2">
+                                    <button className="px-5 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 flex items-center gap-2" onClick={() => setOpenAssign(false)} disabled={assign.saving}><X size={16} /> ยกเลิก</button>
+                                    <button className="px-5 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60 flex items-center gap-2" onClick={saveAssign} disabled={assign.saving || !assign.verified}><CheckCircle2 size={16} /> บันทึก</button>
+                                </div>
+                            </div>
+                        }
                     >
-                        <Plus size={16} /> รับเข้าครองเตียง
-                    </button>
-                </div>
-            </div>
-
-            {/* banners */}
-            {err && <div className="p-3 rounded-lg border bg-red-50 border-red-200 text-red-700">{err}</div>}
-            {!err && loading && (
-                <div className="p-3 rounded-lg border bg-blue-50 border-blue-200 text-blue-700">
-                    กำลังโหลด...
-                </div>
-            )}
-
-            {/* Overview by service */}
-            {!loading && !err && (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {(['LTC', 'PC'] as ServiceType[]).map(svc => (
-                        <div key={svc} className="rounded-2xl border bg-white shadow-sm">
-                            <div className="px-4 py-3 border-b flex items-center justify-between">
-                                <div className="font-semibold">{svc} — เตียงที่กำลังใช้งาน</div>
-                                <div className="text-sm text-gray-500">
-                                    ว่าง {hasBedsApi ? freeBedsByService[svc].length : '-'} เตียง
-                                </div>
-                            </div>
-                            <div className="divide-y">
-                                {occupancyGrouped[svc].length === 0 && (
-                                    <div className="p-4 text-sm text-gray-500">ไม่มีการครองเตียง</div>
-                                )}
-                                {occupancyGrouped[svc].map(o => (
-                                    <div key={o.id ?? (o as any).stay_id ?? `${o.bed_id}-${o.patients_id}-${o.start_at}`}className="p-4">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <div className="font-mono px-2 py-1 rounded bg-gray-100 border text-gray-700">{o.bed_code}</div>
-                                            <div className="font-medium">
-                                                {`${o.pname ?? ''}${o.first_name ?? ''} ${o.last_name ?? ''}`.replace(/\s+/g, ' ').trim() || o.patients_id}
-                                                <span className="text-gray-500 font-normal ml-2">({o.patients_id})</span>
-                                            </div>
-                                            <div className="text-sm text-gray-600">เริ่ม {TH_DATETIME(o.start_at)}</div>
-                                        </div>
-                                        {o.note && <div className="mt-1 text-sm text-gray-700">หมายเหตุ: {o.note}</div>}
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            <button
-                                                className="px-3 py-1.5 rounded-lg border text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"
-                                                onClick={() => openHistoryModal(o.patients_id)}
-                                            >
-                                                <History size={14} /> ประวัติเตียง
-                                            </button>
-                                            <button
-                                                className="px-3 py-1.5 rounded-lg border text-amber-700 border-amber-200 hover:bg-amber-50 flex items-center gap-1.5"
-                                                onClick={() => openTransferModal(o)}
-                                            >
-                                                <ArrowLeftRight size={14} /> โอนย้ายเตียง
-                                            </button>
-                                            <button
-                                                className="px-3 py-1.5 rounded-lg border text-red-700 border-red-200 hover:bg-red-50 flex items-center gap-1.5"
-                                                onClick={() => openEndModal(o)}
-                                            >
-                                                <LogOut size={14} /> สิ้นสุดการครองเตียง
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Assign Modal */}
-            {openAssign && (
-                <Modal
-                    open
-                    size="lg"
-                    onClose={() => setOpenAssign(false)}
-                    onConfirm={saveAssign}
-                    title={<div className="flex items-center gap-2"><Plus size={18} className="text-purple-600" /> รับเข้าครองเตียง</div>}
-                    footer={
-                        <div className="w-full flex justify-between items-center">
-                            <div className="text-sm text-gray-500">ระบุ HN → ตรวจสอบ → เลือกเตียง</div>
-                            <div className="flex gap-2">
-                                <button className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50" onClick={() => setOpenAssign(false)} disabled={assign.saving}><X size={16} /> ยกเลิก</button>
-                                <button className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60" onClick={saveAssign} disabled={assign.saving || !assign.verified}><CheckCircle2 size={16} /> บันทึก</button>
-                            </div>
-                        </div>
-                    }
-                >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <label className="sm:col-span-2">
-                            <div className="mb-1 text-sm text-gray-700">รหัสผู้ป่วย (HN)</div>
-                            <div className="flex gap-2">
-                                <input
-                                    className="flex-1 px-3 py-2 border rounded-lg"
-                                    placeholder="เช่น HN-00000001 หรือ 1"
-                                    value={assign.hn}
-                                    onChange={(e) => setAssign(a => ({ ...a, hn: e.target.value, verified: false, patient: '' }))}
-                                    onBlur={(e) => setAssign(a => ({ ...a, hn: normalizeHN(e.target.value) }))}
-                                />
-                                <button className="px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white" type="button" onClick={verifyHN}>ตรวจสอบ</button>
-                            </div>
-                            {assign.patient && <div className="mt-1 text-sm text-gray-600">ผู้ป่วย: <span className="font-medium">{assign.patient}</span></div>}
-                        </label>
-
-                        <label>
-                            <div className="mb-1 text-sm text-gray-700">ประเภทฝั่งเตียง</div>
-                            <select
-                                className="w-full px-3 py-2 border rounded-lg"
-                                value={assign.service_type}
-                                onChange={(e) => setAssign(a => ({ ...a, service_type: e.target.value as ServiceType, bed_id: '' }))}
-                            >
-                                <option value="LTC">LTC</option>
-                                <option value="PC">PC</option>
-                            </select>
-                        </label>
-
-                        {hasBedsApi ? (
-                            <label>
-                                <div className="mb-1 text-sm text-gray-700">เตียง (ว่าง)</div>
-                                <select
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    value={assign.bed_id}
-                                    onChange={(e) => setAssign(a => ({ ...a, bed_id: e.target.value }))}
-                                >
-                                    <option value="">— เลือกเตียง —</option>
-                                    {freeBedsByService[assign.service_type].map(b => (
-                                        <option key={b.id} value={b.id}>{b.code}</option>
-                                    ))}
-                                </select>
-                                <div className="mt-1 text-xs text-gray-500">
-                                    {freeBedsByService[assign.service_type].length > 0
-                                        ? `* แสดงเฉพาะเตียงว่างของ ${assign.service_type}`
-                                        : `* ยังไม่มีเตียงว่างในฝั่ง ${assign.service_type}`}
-                                </div>
-                            </label>
-                        ) : (
-                            <label>
-                                <div className="mb-1 text-sm text-gray-700">รหัสเตียง (กรอกเลข id)</div>
-                                <input
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    placeholder="เช่น 12"
-                                    value={assign.bed_id}
-                                    onChange={(e) => setAssign(a => ({ ...a, bed_id: e.target.value }))}
-                                />
-                                <div className="mt-1 text-xs text-gray-500">* ยังไม่มี API /api/beds ให้กรอก id ตรงๆ ชั่วคราว</div>
-                            </label>
-                        )}
-
-                        <label>
-                            <div className="mb-1 text-sm text-gray-700">วันที่เริ่ม</div>
-                            <DatePickerField value={assign.date} onChange={(d: string) => setAssign(a => ({ ...a, date: d }))} />
-                        </label>
-                        <label>
-                            <div className="mb-1 text-sm text-gray-700">เวลาเริ่ม</div>
-                            <TimePicker value={assign.time} onChange={(t: string) => setAssign(a => ({ ...a, time: t }))} mode="select" />
-                        </label>
-
-                        <label className="sm:col-span-2">
-                            <div className="mb-1 text-sm text-gray-700">หมายเหตุ</div>
-                            <input className="w-full px-3 py-2 border rounded-lg" value={assign.note} onChange={(e) => setAssign(a => ({ ...a, note: e.target.value }))} />
-                        </label>
-                    </div>
-                </Modal>
-            )}
-
-            {/* End Modal */}
-            {openEnd.open && openEnd.stay && (
-                <Modal
-                    open
-                    size="md"
-                    onClose={() => setOpenEnd({ open: false, stay: null, date: YMD(), time: HM(), reason: 'discharge', saving: false })}
-                    onConfirm={saveEnd}
-                    title={<div className="flex items-center gap-2"><LogOut size={18} className="text-red-600" /> สิ้นสุดการครองเตียง</div>}
-                    footer={
-                        <div className="w-full flex justify-end gap-2">
-                            <button className="px-4 py-2 border rounded-lg" onClick={() => setOpenEnd({ open: false, stay: null, date: YMD(), time: HM(), reason: 'discharge', saving: false })} disabled={openEnd.saving}><X size={16} /> ยกเลิก</button>
-                            <button className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60" onClick={saveEnd} disabled={openEnd.saving}><CheckCircle2 size={16} /> บันทึก</button>
-                        </div>
-                    }
-                >
-                    <div className="space-y-3">
-                        <div className="text-sm text-gray-600">
-                            เตียง <span className="font-mono">{openEnd.stay.bed_code}</span> • ผู้ป่วย {`${openEnd.stay.pname ?? ''}${openEnd.stay.first_name ?? ''} ${openEnd.stay.last_name ?? ''}`.trim()} ({openEnd.stay.patients_id})
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <label>
-                                <div className="mb-1 text-sm">วันที่สิ้นสุด</div>
-                                <DatePickerField value={openEnd.date} onChange={(d: string) => setOpenEnd(s => ({ ...s, date: d }))} />
-                            </label>
-                            <label>
-                                <div className="mb-1 text-sm">เวลาสิ้นสุด</div>
-                                <TimePicker value={openEnd.time} onChange={(t: string) => setOpenEnd(s => ({ ...s, time: t }))} mode="select" />
-                            </label>
-                        </div>
-                        <label>
-                            <div className="mb-1 text-sm">เหตุผล</div>
-                            <select className="w-full px-3 py-2 border rounded-lg" value={openEnd.reason} onChange={(e) => setOpenEnd(s => ({ ...s, reason: e.target.value }))}>
-                                <option value="discharge">จำหน่าย</option>
-                                <option value="death">เสียชีวิต</option>
-                                <option value="transfer">ย้ายเตียง</option>
-                                <option value="other">อื่นๆ</option>
-                            </select>
-                        </label>
-                    </div>
-                </Modal>
-            )}
-
-            {/* Transfer Modal */}
-            {openTransfer.open && openTransfer.stay && (
-                <Modal
-                    open
-                    size="lg"
-                    onClose={() => setOpenTransfer({ open: false, stay: null, to_bed_id: '', date: YMD(), time: HM(), note: '', saving: false })}
-                    onConfirm={saveTransfer}
-                    title={<div className="flex items-center gap-2"><ArrowLeftRight size={18} className="text-amber-600" /> โอนย้ายเตียง</div>}
-                    footer={
-                        <div className="w-full flex justify-end gap-2">
-                            <button className="px-4 py-2 border rounded-lg" onClick={() => setOpenTransfer({ open: false, stay: null, to_bed_id: '', date: YMD(), time: HM(), note: '', saving: false })} disabled={openTransfer.saving}><X size={16} /> ยกเลิก</button>
-                            <button className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60" onClick={saveTransfer} disabled={openTransfer.saving}><CheckCircle2 size={16} /> บันทึก</button>
-                        </div>
-                    }
-                >
-                    <div className="space-y-3">
-                        <div className="text-sm text-gray-600">
-                            จากเตียง <span className="font-mono">{openTransfer.stay.bed_code}</span> ({openTransfer.stay.service_type})
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label>
-                                <div className="mb-1 text-sm">ไปเตียง</div>
-                                {hasBedsApi ? (
-                                    <select
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={openTransfer.to_bed_id}
-                                        onChange={(e) => setOpenTransfer(s => ({ ...s, to_bed_id: e.target.value }))}
-                                    >
-                                        <option value="">— เลือกเตียงว่าง —</option>
-                                        {freeBeds
-                                            .filter(b => b.service_type === openTransfer.stay!.service_type) // ย้ายในฝั่งเดียวกัน หากต้องการข้ามฝั่งให้ตัดเงื่อนไข
-                                            .map(b => <option key={b.id ?? (b as any).bed_id ?? b.code} value={b.id}>{b.code}</option>)}
-                                    </select>
-                                ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label className="sm:col-span-2">
+                                <div className="mb-1 text-sm text-gray-700 font-medium">รหัสผู้ป่วย (HN)</div>
+                                <div className="flex gap-2">
                                     <input
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        placeholder="กรอกรหัสเตียง (id)"
-                                        value={openTransfer.to_bed_id}
-                                        onChange={(e) => setOpenTransfer(s => ({ ...s, to_bed_id: e.target.value }))}
+                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                        placeholder="เช่น HN-00000001"
+                                        value={assign.hn}
+                                        onChange={(e) => setAssign(a => ({ ...a, hn: e.target.value, verified: false, patient: '' }))}
+                                        onBlur={(e) => setAssign(a => ({ ...a, hn: normalizeHN(e.target.value) }))}
                                     />
-                                )}
+                                    <button className="px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors" type="button" onClick={verifyHN}>ตรวจสอบ</button>
+                                </div>
+                                {assign.patient && <div className="mt-2 text-sm text-gray-600">ผู้ป่วย: <span className="font-bold">{assign.patient}</span></div>}
                             </label>
+
+                            <label>
+                                <div className="mb-1 text-sm text-gray-700 font-medium">ประเภทฝั่งเตียง</div>
+                                <select
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                    value={assign.service_type}
+                                    onChange={(e) => setAssign(a => ({ ...a, service_type: e.target.value as ServiceType, bed_id: '' }))}
+                                >
+                                    <option value="LTC">LTC</option>
+                                    <option value="PC">PC</option>
+                                </select>
+                            </label>
+
+                            {hasBedsApi ? (
+                                <label>
+                                    <div className="mb-1 text-sm text-gray-700 font-medium">เตียง (ว่าง)</div>
+                                    <select
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                        value={assign.bed_id}
+                                        onChange={(e) => setAssign(a => ({ ...a, bed_id: e.target.value }))}
+                                    >
+                                        <option value="">— เลือกเตียง —</option>
+                                        {freeBedsByService[assign.service_type].map(b => (
+                                            <option key={b.id} value={b.id}>{b.code}</option>
+                                        ))}
+                                    </select>
+                                    <div className="mt-1 text-xs text-gray-500">
+                                        {freeBedsByService[assign.service_type].length > 0
+                                            ? `* แสดงเฉพาะเตียงว่างของ ${assign.service_type}`
+                                            : `* ยังไม่มีเตียงว่างในฝั่ง ${assign.service_type}`}
+                                    </div>
+                                </label>
+                            ) : (
+                                <label>
+                                    <div className="mb-1 text-sm text-gray-700 font-medium">รหัสเตียง (กรอกเลข id)</div>
+                                    <input
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                        placeholder="เช่น 12"
+                                        value={assign.bed_id}
+                                        onChange={(e) => setAssign(a => ({ ...a, bed_id: e.target.value }))}
+                                    />
+                                    <div className="mt-1 text-xs text-gray-500">* ยังไม่มี API /api/beds ให้กรอก id ตรงๆ ชั่วคราว</div>
+                                </label>
+                            )}
+
+                            <label>
+                                <div className="mb-1 text-sm text-gray-700 font-medium">วันที่เริ่ม</div>
+                                <DatePickerField value={assign.date} onChange={(d) => setAssign(a => ({ ...a, date: d }))} />
+                            </label>
+                            <label>
+                                <div className="mb-1 text-sm text-gray-700 font-medium">เวลาเริ่ม</div>
+                                <TimePicker value={assign.time} onChange={(t) => setAssign(a => ({ ...a, time: t }))} mode="select" />
+                            </label>
+
+                            <label className="sm:col-span-2">
+                                <div className="mb-1 text-sm text-gray-700 font-medium">หมายเหตุ</div>
+                                <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300" value={assign.note} onChange={(e) => setAssign(a => ({ ...a, note: e.target.value }))} />
+                            </label>
+                        </div>
+                    </Modal>
+                )}
+
+                {/* End Modal */}
+                {openEnd.open && openEnd.stay && (
+                    <Modal
+                        open
+                        size="md"
+                        onClose={() => setOpenEnd({ open: false, stay: null, date: YMD(), time: HM(), reason: 'discharge', saving: false })}
+                        onConfirm={saveEnd}
+                        title={
+                            <div className="flex items-center gap-2">
+                                <LogOut size={20} className="text-red-600" />
+                                <span className="font-bold">สิ้นสุดการครองเตียง</span>
+                            </div>
+                        }
+                        footer={
+                            <div className="w-full flex justify-end gap-2">
+                                <button className="px-5 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 flex items-center gap-2" onClick={() => setOpenEnd({ open: false, stay: null, date: YMD(), time: HM(), reason: 'discharge', saving: false })} disabled={openEnd.saving}><X size={16} /> ยกเลิก</button>
+                                <button className="px-5 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-2" onClick={saveEnd} disabled={openEnd.saving}><CheckCircle2 size={16} /> บันทึก</button>
+                            </div>
+                        }
+                    >
+                        <div className="space-y-4">
+                            <div className="text-sm text-gray-600">
+                                ผู้ป่วย <span className="font-bold text-gray-800">{`${openEnd.stay.pname ?? ''}${openEnd.stay.first_name ?? ''} ${openEnd.stay.last_name ?? ''}`.trim()}</span> ({openEnd.stay.patients_id})
+                            </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <label>
-                                    <div className="mb-1 text-sm">วันที่ย้าย</div>
-                                    <DatePickerField value={openTransfer.date} onChange={(d: string) => setOpenTransfer(s => ({ ...s, date: d }))} />
+                                    <div className="mb-1 text-sm text-gray-700 font-medium">วันที่สิ้นสุด</div>
+                                    <DatePickerField value={openEnd.date} onChange={(d) => setOpenEnd(s => ({ ...s, date: d }))} />
                                 </label>
                                 <label>
-                                    <div className="mb-1 text-sm">เวลาย้าย</div>
-                                    <TimePicker value={openTransfer.time} onChange={(t: string) => setOpenTransfer(s => ({ ...s, time: t }))} mode="select" />
+                                    <div className="mb-1 text-sm text-gray-700 font-medium">เวลาสิ้นสุด</div>
+                                    <TimePicker value={openEnd.time} onChange={(t) => setOpenEnd(s => ({ ...s, time: t }))} mode="select" />
+                                </label>
+                            </div>
+                            <label>
+                                <div className="mb-1 text-sm text-gray-700 font-medium">เหตุผล</div>
+                                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300" value={openEnd.reason} onChange={(e) => setOpenEnd(s => ({ ...s, reason: e.target.value }))}>
+                                    <option value="discharge">จำหน่าย</option>
+                                    <option value="death">เสียชีวิต</option>
+                                    <option value="transfer">ย้ายเตียง</option>
+                                    <option value="other">อื่นๆ</option>
+                                </select>
+                            </label>
+                        </div>
+                    </Modal>
+                )}
+
+                {/* Transfer Modal */}
+                {openTransfer.open && openTransfer.stay && (
+                    <Modal
+                        open
+                        size="lg"
+                        onClose={() => setOpenTransfer({ open: false, stay: null, to_bed_id: '', date: YMD(), time: HM(), note: '', saving: false })}
+                        onConfirm={saveTransfer}
+                        title={
+                            <div className="flex items-center gap-2">
+                                <ArrowLeftRight size={20} className="text-amber-600" />
+                                <span className="font-bold">โอนย้ายเตียง</span>
+                            </div>
+                        }
+                        footer={
+                            <div className="w-full flex justify-end gap-2">
+                                <button className="px-5 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 flex items-center gap-2" onClick={() => setOpenTransfer({ open: false, stay: null, to_bed_id: '', date: YMD(), time: HM(), note: '', saving: false })} disabled={openTransfer.saving}><X size={16} /> ยกเลิก</button>
+                                <button className="px-5 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 flex items-center gap-2" onClick={saveTransfer} disabled={openTransfer.saving}><CheckCircle2 size={16} /> บันทึก</button>
+                            </div>
+                        }
+                    >
+                        <div className="space-y-4">
+                            <div className="text-sm text-gray-600">
+                                ผู้ป่วย <span className="font-bold text-gray-800">{`${openTransfer.stay.pname ?? ''}${openTransfer.stay.first_name ?? ''} ${openTransfer.stay.last_name ?? ''}`.trim()}</span> ({openTransfer.stay.patients_id})
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <div className="mb-1 text-sm text-gray-700 font-medium">จากเตียง</div>
+                                    <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 flex items-center gap-2 text-sm text-gray-600">
+                                        <BedDouble size={16} />
+                                        <span className="font-bold text-gray-800">{openTransfer.stay.bed_code}</span>
+                                    </div>
+                                </div>
+                                <label>
+                                    <div className="mb-1 text-sm text-gray-700 font-medium">ไปเตียง</div>
+                                    {hasBedsApi ? (
+                                        <select
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                            value={openTransfer.to_bed_id}
+                                            onChange={(e) => setOpenTransfer(s => ({ ...s, to_bed_id: e.target.value }))}
+                                        >
+                                            <option value="">— เลือกเตียงว่าง —</option>
+                                            {freeBeds
+                                                .filter(b => b.service_type === openTransfer.stay!.service_type)
+                                                .map(b => <option key={b.id ?? (b as any).bed_id ?? b.code} value={b.id}>{b.code}</option>)}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                            placeholder="กรอกรหัสเตียง (id)"
+                                            value={openTransfer.to_bed_id}
+                                            onChange={(e) => setOpenTransfer(s => ({ ...s, to_bed_id: e.target.value }))}
+                                        />
+                                    )}
+                                </label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <label>
+                                    <div className="mb-1 text-sm text-gray-700 font-medium">วันที่ย้าย</div>
+                                    <DatePickerField value={openTransfer.date} onChange={(d) => setOpenTransfer(s => ({ ...s, date: d }))} />
+                                </label>
+                                <label>
+                                    <div className="mb-1 text-sm text-gray-700 font-medium">เวลาย้าย</div>
+                                    <TimePicker value={openTransfer.time} onChange={(t) => setOpenTransfer(s => ({ ...s, time: t }))} mode="select" />
                                 </label>
                             </div>
                             <label className="md:col-span-2">
-                                <div className="mb-1 text-sm">หมายเหตุ</div>
-                                <input className="w-full px-3 py-2 border rounded-lg" value={openTransfer.note} onChange={(e) => setOpenTransfer(s => ({ ...s, note: e.target.value }))} />
+                                <div className="mb-1 text-sm text-gray-700 font-medium">หมายเหตุ</div>
+                                <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300" value={openTransfer.note} onChange={(e) => setOpenTransfer(s => ({ ...s, note: e.target.value }))} />
                             </label>
                         </div>
-                    </div>
-                </Modal>
-            )}
+                    </Modal>
+                )}
 
-            {/* History Modal */}
-            {openHistory.open && (
-                <Modal
-                    open
-                    size="xl"
-                    onClose={() => setOpenHistory({ open: false, patient: null, items: [], loading: false, err: '' })}
-                    onConfirm={() => setOpenHistory({ open: false, patient: null, items: [], loading: false, err: '' })}
-                    title={<div className="flex items-center gap-2"><History size={18} className="text-blue-600" /> ประวัติการครองเตียง — {fullName(openHistory.patient)} <span className="text-gray-500 text-sm">({openHistory.patient?.patients_id || ''})</span></div>}
-                    footer={
-                        <div className="w-full flex justify-center">
-                            <button className="px-8 py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 text-white" onClick={() => setOpenHistory({ open: false, patient: null, items: [], loading: false, err: '' })}><X size={16} /> ปิด</button>
-                        </div>
-                    }
-                >
-                    {openHistory.loading && <div className="text-sm text-gray-600">กำลังโหลด...</div>}
-                    {!openHistory.loading && openHistory.err && <div className="text-sm text-red-600">{openHistory.err}</div>}
-                    {!openHistory.loading && !openHistory.err && (
-                        <ul className="divide-y">
-                            {(openHistory.items || []).map((s: any) => (
-                                <li
-                                    key={s.id ?? s.stay_id ?? `${s.bed_id}-${s.start_at}`}
-                                    className="py-3"
-                                >
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="font-mono px-2 py-0.5 rounded bg-gray-100 border">{s.bed_code}</span>
-                                        <span className="text-gray-700">{s.service_type}</span>
-                                        <span className="text-sm text-gray-600">เริ่ม {TH_DATETIME(s.start_at)}</span>
-                                        {s.end_at && <span className="text-sm text-gray-600">สิ้นสุด {TH_DATETIME(s.end_at)}</span>}
-                                    </div>
-                                    {s.note && <div className="text-sm text-gray-700 mt-1">หมายเหตุ: {s.note}</div>}
-                                </li>
-                            ))}
-                            {(!openHistory.items || openHistory.items.length === 0) && (
-                                <li className="py-3 text-sm text-gray-500">ไม่มีประวัติ</li>
-                            )}
-                        </ul>
-                    )}
-                </Modal>
-            )}
+                {/* History Modal */}
+                {openHistory.open && (
+                    <Modal
+                        open
+                        size="xl"
+                        onClose={() => setOpenHistory({ open: false, patient: null, items: [], loading: false, err: '' })}
+                        title={
+                            <div className="flex items-center gap-2">
+                                <History size={20} className="text-blue-600" />
+                                <span className="font-bold">ประวัติการครองเตียง</span>
+                                <span className="text-gray-500 font-normal text-sm ml-1">
+                                    — {fullName(openHistory.patient)} ({openHistory.patient?.patients_id || ''})
+                                </span>
+                            </div>
+                        }
+                        footer={
+                            <div className="w-full flex justify-center">
+                                <button className="px-8 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700" onClick={() => setOpenHistory({ open: false, patient: null, items: [], loading: false, err: '' })}><X size={16} /> ปิด</button>
+                            </div>
+                        }
+                    >
+                        {openHistory.loading && <div className="text-center p-4 text-gray-600">กำลังโหลด...</div>}
+                        {!openHistory.loading && openHistory.err && <div className="text-center p-4 text-red-600">{openHistory.err}</div>}
+                        {!openHistory.loading && !openHistory.err && (
+                            <ul className="divide-y divide-gray-200">
+                                {(openHistory.items || []).map((s: any) => (
+                                    <li key={s.id ?? s.stay_id ?? `${s.bed_id}-${s.start_at}`} className="py-4">
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <div className="text-sm font-bold text-white bg-gray-700 px-3 py-1 rounded-full">{s.bed_code}</div>
+                                            <div className="text-sm text-gray-600 font-medium">เริ่ม {TH_DATETIME(s.start_at)}</div>
+                                            {s.end_at && <div className="text-sm text-gray-600 font-medium">สิ้นสุด {TH_DATETIME(s.end_at)}</div>}
+                                            <div className="text-sm font-medium text-purple-600">{s.service_type}</div>
+                                        </div>
+                                        {s.note && <div className="text-sm text-gray-700 mt-2 pl-2 border-l-2 border-gray-300">หมายเหตุ: {s.note}</div>}
+                                    </li>
+                                ))}
+                                {(!openHistory.items || openHistory.items.length === 0) && (
+                                    <li className="py-4 text-center text-sm text-gray-500">ไม่มีประวัติการครองเตียงสำหรับผู้ป่วยรายนี้</li>
+                                )}
+                            </ul>
+                        )}
+                    </Modal>
+                )}
+            </div>
         </div>
     );
 }

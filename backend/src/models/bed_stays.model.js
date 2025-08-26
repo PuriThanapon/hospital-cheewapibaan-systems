@@ -41,15 +41,31 @@ exports.occupy = async ({
   }
 };
 
+exports.end = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: 'invalid stay id' });
+    }
+    const { at, reason } = req.body || {};
+    const data = await stays.endStay(id, { at, reason });
+    if (!data) return res.status(404).json({ message: 'not found' });
+    res.json({ data });
+  } catch (e) { next(e); }
+};
+
 exports.endStay = async (stay_id, { at = null, reason = null } = {}) => {
   const sql = `
     UPDATE bed_stays
-       SET end_at = COALESCE($2, now()),
+       SET end_at = GREATEST(
+                      COALESCE($2::timestamptz, now()),
+                      start_at + interval '1 second'   -- กันเท่ากับ start_at
+                    ),
            status = 'completed',
            note   = CASE
-                      WHEN $3 IS NULL OR $3 = '' THEN note
-                      WHEN note IS NULL OR note = '' THEN $3
-                      ELSE note || E'\n' || $3
+                      WHEN COALESCE($3::text,'') = '' THEN note
+                      WHEN COALESCE(note,'') = ''     THEN $3::text
+                      ELSE note || E'\n' || $3::text
                     END
      WHERE stay_id = $1
      RETURNING *
@@ -71,59 +87,102 @@ exports.cancel = async (stay_id) => {
 };
 
 // โอนย้ายเตียง: ปิด stay เดิม แล้วเปิด stay ใหม่เตียงปลายทาง
+// ---------- โอนย้ายเตียง ----------
 exports.transfer = async (stay_id, { to_bed_id, at = null, note = null, by = null } = {}) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // ดึง stay เดิม
+    // ให้ DB ช่วยตัดสินว่า tAt อยู่ "ก่อนเริ่ม" หรือไม่
     const { rows: oldRows } = await client.query(
-      `SELECT * FROM bed_stays WHERE stay_id = $1 FOR UPDATE`,
-      [stay_id]
+      `SELECT s.*,
+              ($2::timestamptz <= s.start_at) AS before_start
+         FROM bed_stays s
+        WHERE s.stay_id = $1
+        FOR UPDATE`,
+      [stay_id, at || new Date()]  // ถ้าไม่ส่ง at มาก็ใช้ now()
     );
-    const oldStay = oldRows[0];
-    if (!oldStay) {
-      await client.query('ROLLBACK');
-      return null;
+    const s = oldRows[0];
+    if (!s) { await client.query('ROLLBACK'); return null; }
+
+    const tAtParam = at || new Date();
+
+    if (s.before_start) {
+      // ⏳ โอนก่อนเริ่ม: ยกเลิกรายการเดิม (end_at ต้อง > start_at)
+      await client.query(
+        `UPDATE bed_stays
+            SET status = 'cancelled',
+                end_at = start_at + interval '1 second',
+                note   = CASE
+                           WHEN COALESCE($2::text,'') = '' THEN note
+                           WHEN COALESCE(note,'') = ''     THEN $2::text
+                           ELSE note || E'\n' || $2::text
+                         END
+          WHERE stay_id = $1`,
+        [
+          stay_id,
+          `Transfer (before start) — ${tAtParam.toISOString()}${note ? ` — ${note}` : ''}`
+        ]
+      );
+
+      // เปิด stay ใหม่ที่เตียงปลายทาง ด้วยเวลาเริ่มเดิม → จะเป็น reserved โดยอัตโนมัติถ้าเริ่มในอนาคต
+      const { rows: newRows } = await client.query(
+        `INSERT INTO bed_stays
+           (bed_id, patients_id, start_at, end_at, status, note, source_appointment_id)
+         VALUES
+           ($1, $2, $3, NULL,
+            CASE WHEN $3 <= now() THEN 'occupied'::bed_stay_status ELSE 'reserved'::bed_stay_status END,
+            $4, $5)
+         RETURNING *`,
+        [
+          Number(to_bed_id),
+          s.patients_id,
+          s.start_at,                      // ใช้เวลาเริ่มเดิม
+          note,
+          s.source_appointment_id || null
+        ]
+      );
+
+      await client.query('COMMIT');
+      return newRows[0];
     }
 
-    const tAt = at || new Date();
-
-    // ปิด stay เดิม
+    // 🔁 โอนระหว่างใช้งาน: ปิดสเตย์เดิม (กันเท่ากับ start_at) แล้วเปิดสเตย์ใหม่ทันที
     await client.query(
       `UPDATE bed_stays
-          SET end_at = $2,
+          SET end_at = GREATEST($2::timestamptz, start_at + interval '1 second'),
               status = 'completed',
-              note = CASE
-                       WHEN $3 IS NULL OR $3 = '' THEN note
-                       WHEN note IS NULL OR note = '' THEN $3
-                       ELSE note || E'\n' || $3
-                     END
+              note   = CASE
+                         WHEN COALESCE($3::text,'') = '' THEN note
+                         WHEN COALESCE(note,'') = ''     THEN $3::text
+                         ELSE note || E'\n' || $3::text
+                       END
         WHERE stay_id = $1`,
-      [stay_id, tAt, note ? `Transfer at ${tAt.toISOString()} — ${note}` : `Transfer at ${tAt.toISOString()}`]
+      [stay_id, tAtParam, `Transfer at ${new Date(tAtParam).toISOString()}${note ? ` — ${note}` : ''}`]
     );
 
-    // เปิด stay ใหม่
-    const insertSql = `
-      INSERT INTO bed_stays
-        (bed_id, patients_id, start_at, end_at, status, note, source_appointment_id)
-      VALUES
-        ($1, $2, $3, NULL, 'occupied', $4, $5)
-      RETURNING *
-    `;
-    const { rows: newRows } = await client.query(insertSql, [
-      to_bed_id,
-      oldStay.patients_id,
-      tAt,
-      note,
-      oldStay.source_appointment_id || null,
-    ]);
+    const { rows: newRows } = await client.query(
+      `INSERT INTO bed_stays
+         (bed_id, patients_id, start_at, end_at, status, note, source_appointment_id)
+       VALUES
+         ($1, $2, $3, NULL,
+          CASE WHEN $3 <= now() THEN 'occupied'::bed_stay_status ELSE 'reserved'::bed_stay_status END,
+          $4, $5)
+       RETURNING *`,
+      [
+        Number(to_bed_id),
+        s.patients_id,
+        tAtParam,          // เริ่มทันทีตามเวลาย้าย
+        note,
+        s.source_appointment_id || null
+      ]
+    );
 
     await client.query('COMMIT');
     return newRows[0];
   } catch (e) {
-    await pool.query('ROLLBACK');
-    if (e && e.code === EXCLUSION_CONFLICT) {
+    try { await client.query('ROLLBACK'); } catch {}
+    if (e?.code === '23P01') {           // EXCLUDE overlap
       e.status = 409;
       e.message = 'ช่วงเวลาทับซ้อนกับการจอง/ครอบครองเตียงปลายทาง';
     }
@@ -136,49 +195,52 @@ exports.transfer = async (stay_id, { to_bed_id, at = null, note = null, by = nul
 exports.historyByPatient = async (patients_id) => {
   const sql = `
     SELECT
-      s.stay_id,
-      s.bed_id,
+      s.stay_id AS id,                -- << ทำให้ตรงกับฝั่งหน้า
       s.patients_id,
       s.start_at,
       s.end_at,
       s.status,
       s.note,
-      s.source_appointment_id,
-      b.code         AS bed_code,
-      b.care_side    AS care_side,
-      w.name         AS ward_name
+      b.bed_id   AS bed_id,
+      b.code     AS bed_code,
+      b.care_side AS service_type
     FROM bed_stays s
-    LEFT JOIN beds  b ON b.bed_id  = s.bed_id
-    LEFT JOIN wards w ON w.ward_id = b.ward_id
+    JOIN beds b ON b.bed_id = s.bed_id
     WHERE s.patients_id = $1
-    ORDER BY COALESCE(s.end_at, s.start_at) DESC, s.start_at DESC, s.stay_id DESC
+    ORDER BY s.start_at DESC, s.stay_id DESC
   `;
   const { rows } = await pool.query(sql, [patients_id]);
   return rows;
 };
 
+
 exports.currentOccupancy = async () => {
-  // โชว์ทั้ง reserved (อนาคต/รอเข้าเตียง) และ occupied (กำลังอยู่เตียง) ที่ยังไม่จบ
   const sql = `
     SELECT
-      s.stay_id,
+      s.stay_id AS id,
       s.bed_id,
+      b.code       AS bed_code,
+      b.care_side  AS service_type,   -- 'LTC' | 'PC'
       s.patients_id,
+      p.pname, p.first_name, p.last_name,
       s.start_at,
       s.end_at,
-      s.status,
       s.note,
-      b.code         AS bed_code,
-      b.care_side    AS care_side,
-      w.name         AS ward_name,
-      p.pname, p.first_name, p.last_name
+      CASE
+        WHEN s.status = 'cancelled' THEN 'cancelled'
+        WHEN s.end_at IS NULL THEN 'active'
+        ELSE 'ended'
+      END AS status
     FROM bed_stays s
-    LEFT JOIN beds     b ON b.bed_id  = s.bed_id
-    LEFT JOIN wards    w ON w.ward_id = b.ward_id
-    LEFT JOIN patients p ON p.patients_id = s.patients_id
-    WHERE s.status IN ('reserved','occupied') AND s.end_at IS NULL
-    ORDER BY w.name NULLS LAST, b.care_side, b.code
+    JOIN beds b     ON b.bed_id = s.bed_id
+    JOIN patients p ON p.patients_id = s.patients_id
+    WHERE s.end_at IS NULL
+      AND s.start_at <= now()          -- << เพิ่มเงื่อนไขนี้
+      AND s.status <> 'cancelled'
+    ORDER BY b.care_side, b.code, s.stay_id;
   `;
   const { rows } = await pool.query(sql);
   return rows;
 };
+
+

@@ -41,17 +41,23 @@ exports.cancel = async (req, res, next) => {
 
 exports.transfer = async (req, res, next) => {
   try {
-    const stay_id = Number(req.params.id);
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: 'invalid stay id' });
+    }
     const { to_bed_id, at, note } = req.body || {};
     if (!to_bed_id) return res.status(400).json({ message: 'to_bed_id จำเป็น' });
-    const data = await stays.transfer(stay_id, {
+
+    const data = await stays.transfer(id, {
       to_bed_id: Number(to_bed_id),
-      at, note, by: req.user?.id || null
+      at,
+      note,
+      by: req.user?.id || null,
     });
     if (!data) return res.status(404).json({ message: 'not found' });
     res.json({ data });
   } catch (e) {
-    if (e.code === '23P01') return res.status(409).json({ message: e.message });
+    if (e?.status) return res.status(e.status).json({ message: e.message });
     next(e);
   }
 };
