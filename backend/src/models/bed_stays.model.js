@@ -217,27 +217,27 @@ exports.historyByPatient = async (patients_id) => {
 exports.currentOccupancy = async () => {
   const sql = `
     SELECT
-      s.stay_id AS id,
-      s.bed_id,
-      b.code       AS bed_code,
-      b.care_side  AS service_type,   -- 'LTC' | 'PC'
-      s.patients_id,
-      p.pname, p.first_name, p.last_name,
-      s.start_at,
-      s.end_at,
-      s.note,
-      CASE
-        WHEN s.status = 'cancelled' THEN 'cancelled'
-        WHEN s.end_at IS NULL THEN 'active'
-        ELSE 'ended'
-      END AS status
-    FROM bed_stays s
-    JOIN beds b     ON b.bed_id = s.bed_id
-    JOIN patients p ON p.patients_id = s.patients_id
-    WHERE s.end_at IS NULL
-      AND s.start_at <= now()          -- << เพิ่มเงื่อนไขนี้
-      AND s.status <> 'cancelled'
-    ORDER BY b.care_side, b.code, s.stay_id;
+    s.stay_id AS id,
+    s.bed_id,
+    b.code       AS bed_code,
+    b.care_side  AS service_type,
+    s.patients_id,
+    p.pname, p.first_name, p.last_name,
+    s.start_at,
+    s.end_at,
+    s.note,
+    CASE
+      WHEN s.status = 'cancelled' THEN 'cancelled'
+      WHEN s.end_at IS NULL AND s.start_at <= now() THEN s.status -- ใช้ status เดิม (reserved หรือ occupied)
+      ELSE 'completed'
+    END AS status
+  FROM bed_stays s
+  JOIN beds b     ON b.bed_id = s.bed_id
+  JOIN patients p ON p.patients_id = s.patients_id
+  WHERE s.end_at IS NULL
+    AND s.start_at <= now()
+    AND s.status <> 'cancelled'
+  ORDER BY b.care_side, b.code, s.stay_id;
   `;
   const { rows } = await pool.query(sql);
   return rows;

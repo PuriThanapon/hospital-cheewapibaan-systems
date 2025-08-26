@@ -164,8 +164,18 @@ export default function BedStaysPage() {
     // fetch
 
     async function fetchCurrent() {
-        const data = await http<{ data: Occupancy[] }>('/api/bed_stays/current');
-        setOccupancy(data.data || []);
+            const data = await http<{ data: Occupancy[] }>('/api/bed_stays/current');
+            
+            setOccupancy(data.data || []);
+        }async function fetchCurrent() {
+        try {
+            const data = await http<{ data: Occupancy[] }>('/api/bed_stays/current');
+             // Debug: ดูโครงสร้างข้อมูล
+            setOccupancy(data.data || []);
+        } catch (e) {
+            console.error('fetchCurrent error:', e);
+            setOccupancy([]);
+        }
     }
     async function fetchBedsMaybe() {
         try {
@@ -174,15 +184,16 @@ export default function BedStaysPage() {
             const list: Bed[] = (rawList || []).map((b: any) => ({
                 id: Number(b.id ?? b.bed_id),
                 code: String(b.code),
-                // รองรับ API ที่ส่ง care_side หรือ service_type มาก็ได้ และกันค่าเพี้ยนให้เป็น 'PC' เป็นค่า default
                 service_type: (b.service_type ?? b.care_side) === 'LTC' ? 'LTC' : 'PC',
             })).filter((b: Bed) => Number.isFinite(b.id));
+             // Debug: ดูรายการเตียง
             setBeds(list);
             setHasBedsApi(true);
         } catch (e: any) {
+            // Debug: ดู error
             if (e?.status === 404) {
                 setHasBedsApi(false);
-                setBeds([]); // โหมดกรอก id ตรงๆ
+                setBeds([]);
             } else {
                 throw e;
             }
@@ -204,19 +215,34 @@ export default function BedStaysPage() {
         })();
     }, []);
 
-    const occupiedBedIds = useMemo(
-        () =>
-            new Set(
-                (Array.isArray(occupancy) ? occupancy : [])
-                    .filter(o => (o.status === 'reserved' || o.status === 'occupied') && !o.end_at)
-                    .map(o => Number(o.bed_id))
-            ),
-        [occupancy]
-    );
+    const occupiedBedIds = useMemo(() => {
+        console.log('Occupancy data:', occupancy); // Debug: ดูข้อมูลทั้งหมดใน occupancy
+        const ids = new Set(
+            (Array.isArray(occupancy) ? occupancy : [])
+                .filter(o => {
+                    const isActive = (o.status === 'reserved' || o.status === 'occupied') && !o.end_at;
+                    console.log('Filtering occupancy item:', o, 'isActive:', isActive); // Debug: ดูแต่ละรายการและผลลัพธ์
+                    return isActive;
+                })
+                .map(o => {
+                    const id = Number(o.bed_id);
+                    console.log('Mapped bed_id:', id, 'from', o.bed_id); // Debug: ดูการแปลง bed_id
+                    return id;
+                })
+        );
+        console.log('occupiedBedIds:', Array.from(ids)); // Debug: ดู Set สุดท้าย
+        return ids;
+    }, [occupancy]);
 
     const freeBeds = useMemo(() => {
         if (!hasBedsApi) return [];
-        return beds.filter(b => !occupiedBedIds.has(b.id));
+        const free = beds.filter(b => {
+            const isOccupied = occupiedBedIds.has(b.id);
+            console.log(`Bed ${b.id} (${b.code}) - Type: ${typeof b.id}, Occupied: ${isOccupied}, occupiedBedIds:`, Array.from(occupiedBedIds)); // Debug: ดูประเภทและการเปรียบเทียบ
+            return !isOccupied;
+        });
+        console.log('freeBeds:', free);
+        return free;
     }, [beds, occupiedBedIds, hasBedsApi]);
 
     const freeBedsByService = useMemo(() => {
@@ -287,10 +313,10 @@ export default function BedStaysPage() {
         setOpenAssign(true);
     }
     async function saveAssign() {
-        if (!assign.verified) { toast.fire({ icon: 'warning', title: 'กรุณาตรวจสอบ HN ก่อน' }); return; }
-        if (!assign.bed_id) { toast.fire({ icon: 'warning', title: 'กรุณาเลือก/กรอกเตียง' }); return; }
+    if (!assign.verified) { toast.fire({ icon: 'warning', title: 'กรุณาตรวจสอบ HN ก่อน' }); return; }
+    if (!assign.bed_id) { toast.fire({ icon: 'warning', title: 'กรุณาเลือก/กรอกเตียง' }); return; }
 
-        setAssign(a => ({ ...a, saving: true }));
+    setAssign(a => ({ ...a, saving: true }));
         try {
             await http('/api/bed_stays', {
                 method: 'POST',
@@ -303,7 +329,7 @@ export default function BedStaysPage() {
             });
             toast.fire({ icon: 'success', title: 'รับเข้าครองเตียงแล้ว' });
             setOpenAssign(false);
-            await fetchCurrent();
+            await Promise.all([fetchCurrent(), fetchBedsMaybe()]); // รีเฟรชทั้งสองพร้อมกัน
         } catch (e: any) {
             toast.fire({ icon: 'error', title: e?.message || 'บันทึกไม่สำเร็จ' });
         } finally {
