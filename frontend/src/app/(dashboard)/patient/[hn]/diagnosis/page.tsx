@@ -29,6 +29,13 @@ type Patient = {
   phone_number?: string | null
 }
 
+// ===== แปลงค่าสถานะ -> ข้อความไทย (โชว์อย่างเดียว) =====
+const STATUS_LABEL: Record<DxStatus, string> = {
+  active: 'กำลังรักษา',
+  resolved: 'หายแล้ว',
+  inactive: 'ยกเลิกติดตาม',
+}
+
 // ================== API ==================
 const API_BASE = (
   (process as any).env.NEXT_PUBLIC_API_BASE ||
@@ -176,7 +183,7 @@ export default function PatientDiagnosisPage() {
     } catch (err: any) {
       const msg = String(err?.message || '')
       if (msg.includes('unique') || msg.includes('23505')) {
-        setMessage('ตั้งโรคหลักซ้ำ: มีโรคหลักที่ active อยู่แล้ว')
+        setMessage("ตั้งโรคหลักซ้ำ: มี 'โรคหลัก' ที่สถานะ 'กำลังรักษา' อยู่แล้ว")
       } else {
         setMessage(msg || 'บันทึกไม่สำเร็จ')
       }
@@ -239,9 +246,9 @@ export default function PatientDiagnosisPage() {
 
       <section className={styles.stats}>
         <div className={styles.stat}><div className={styles.statLabel}>ทั้งหมด</div><div className={styles.statValue}>{summary.total}</div></div>
-        <div className={styles.stat}><div className={styles.statLabel}>Active</div><div className={styles.statValue}>{summary.active}</div></div>
-        <div className={styles.stat}><div className={styles.statLabel}>Resolved</div><div className={styles.statValue}>{summary.resolved}</div></div>
-        <div className={styles.stat}><div className={styles.statLabel}>Inactive</div><div className={styles.statValue}>{summary.inactive}</div></div>
+        <div className={styles.stat}><div className={styles.statLabel}>กำลังรักษา</div><div className={styles.statValue}>{summary.active}</div></div>
+        <div className={styles.stat}><div className={styles.statLabel}>หายแล้ว</div><div className={styles.statValue}>{summary.resolved}</div></div>
+        <div className={styles.stat}><div className={styles.statLabel}>ยกเลิกติดตาม</div><div className={styles.statValue}>{summary.inactive}</div></div>
       </section>
 
       <section className={styles.filters}>
@@ -250,9 +257,9 @@ export default function PatientDiagnosisPage() {
           <span className={styles.muted}>สถานะ</span>
           <select className={styles.input} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
             <option value="all">ทั้งหมด</option>
-            <option value="active">active</option>
-            <option value="resolved">resolved</option>
-            <option value="inactive">inactive</option>
+            <option value="active">กำลังรักษา</option>
+            <option value="resolved">หายแล้ว</option>
+            <option value="inactive">ยกเลิกติดตาม</option>
           </select>
         </label>
       </section>
@@ -280,7 +287,9 @@ export default function PatientDiagnosisPage() {
                   <td>{row.term}</td>
                   <td>{fmtDate(row.onset_date)}</td>
                   <td>
-                    <span className={styles.badge} data-status={row.status}>{row.status}</span>
+                    <span className={styles.badge} data-status={row.status}>
+                      {STATUS_LABEL[row.status]}
+                    </span>
                   </td>
                   <td>
                     <div className={styles.actions}>
@@ -328,9 +337,9 @@ export default function PatientDiagnosisPage() {
               <label>
                 <span>สถานะ</span>
                 <select className={styles.input} value={(form.status as DxStatus) ?? 'active'} onChange={(e) => setForm({ ...form, status: e.target.value as DxStatus })}>
-                  <option value="active">active</option>
-                  <option value="resolved">resolved</option>
-                  <option value="inactive">inactive</option>
+                  <option value="active">กำลังรักษา</option>
+                  <option value="resolved">หายแล้ว</option>
+                  <option value="inactive">ยกเลิกติดตาม</option>
                 </select>
               </label>
               <div className={`${styles.dialogActions} ${styles.col2}`}>

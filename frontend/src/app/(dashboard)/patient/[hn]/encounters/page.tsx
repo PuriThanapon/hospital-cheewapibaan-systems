@@ -36,6 +36,7 @@ type Diagnosis = {
   term: string
   is_primary: boolean
   status: DxStatus
+  onset_date?: string | null
 }
 
 // ---------- API endpoints ----------
@@ -49,18 +50,6 @@ const ENDPOINTS = {
   getPatient: (id: string) => `${API_BASE}/api/patients/${encodeURIComponent(id)}`,
   listEnc:    (id: string) => `${API_BASE}/api/encounters?patients_id=${encodeURIComponent(id)}`,
   listDx:     (id: string) => `${API_BASE}/api/patient_diagnosis?patients_id=${encodeURIComponent(id)}`,
-  createEnc:  () => `${API_BASE}/api/encounters`,
-  updateEnc:  (id: number) => `${API_BASE}/api/encounters/${id}`,
-  deleteEnc:  (id: number) => `${API_BASE}/api/encounters/${id}`,
-}
-
-const EMPTY_FORM: Partial<Encounter> = {
-  encounter_date: new Date().toISOString().slice(0,10),
-  encounter_type: '',
-  provider: '',
-  place: '',
-  note: '',
-  status: 'open',
 }
 
 function fmtDate(d?: string | null) {
@@ -69,34 +58,19 @@ function fmtDate(d?: string | null) {
   return isNaN(dt.getTime()) ? d : dt.toLocaleDateString()
 }
 
-const statusTH: Record<EncStatus, string> = {
-  open: 'เปิด',
-  closed: 'ปิดแล้ว',
-  cancelled: 'ยกเลิก',
-}
 const dxStatusTH: Record<DxStatus, string> = {
   active: 'กำลังรักษา',
   resolved: 'หายแล้ว',
   inactive: 'ยุติ',
 }
 
-// หัวข้อหลักของการพบครั้งนั้น ๆ
+// หัวข้อหลักของการพบ (หัวการ์ดไม่แสดง ICD-10)
 function getEncounterHeadline(enc: Encounter, dxList: Diagnosis[]) {
-  // ถ้ามีวินิจฉัย -> หัวข้อ = วินิจฉัย (โชว์ชื่อโรคหลักสั้น ๆ เป็นคำโปรย)
   if (dxList?.length) {
     const primary = dxList.find(d => d.is_primary) || dxList[0]
-    const subtitle = [primary.term, primary.code ? `[${primary.code}]` : ''].filter(Boolean).join(' ')
-    return { title: 'วินิจฉัย', subtitle }
+    return { title: 'วินิจฉัย', subtitle: primary.term }
   }
-  // ถ้าประเภทสื่อถึงนัดหมาย
-  if (/(นัด|follow|appt|appoint|ติดตาม)/i.test(enc.encounter_type || '')) {
-    return { title: 'นัดหมาย', subtitle: enc.encounter_type || '' }
-  }
-  // ถ้ามีหมายเหตุ -> บันทึก
-  if ((enc.note || '').trim()) {
-    return { title: 'บันทึก', subtitle: enc.encounter_type || '' }
-  }
-  // อย่างอื่น ๆ ใช้ประเภทเป็นคำโปรยไป
+  if ((enc.note || '').trim()) return { title: 'บันทึก', subtitle: enc.encounter_type || '' }
   return { title: 'การพบแพทย์', subtitle: enc.encounter_type || '' }
 }
 
@@ -113,16 +87,8 @@ export default function PatientEncountersPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  const [q, setQ] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | EncStatus>('all')
-
   // วินิจฉัยแบบกรุ๊ปตาม encounter_id ('none' = ไม่ผูก)
   const [dxByEncounter, setDxByEncounter] = useState<Record<string, Diagnosis[]>>({})
-
-  const [openForm, setOpenForm] = useState(false)
-  const [editing, setEditing] = useState<Encounter | null>(null)
-  const [form, setForm] = useState<Partial<Encounter>>(EMPTY_FORM)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   // load
   async function loadAll() {
@@ -130,9 +96,9 @@ export default function PatientEncountersPage() {
     try {
       setLoading(true); setMessage(null)
       const [pRes, eRes, dRes] = await Promise.all([
-        fetch(ENDPOINTS.getPatient(patientsId)),
-        fetch(ENDPOINTS.listEnc(patientsId)),
-        fetch(ENDPOINTS.listDx(patientsId)),
+        fetch(ENDPOINTS.getPatient(patientsId), { cache: 'no-store' }),
+        fetch(ENDPOINTS.listEnc(patientsId),    { cache: 'no-store' }),
+        fetch(ENDPOINTS.listDx(patientsId),     { cache: 'no-store' }),
       ])
 
       setPatient(pRes.ok ? await pRes.json() : null)
@@ -160,89 +126,6 @@ export default function PatientEncountersPage() {
   }
   useEffect(() => { loadAll() }, [patientsId])
 
-  // filter + sort
-  const filtered = useMemo(() => {
-    let list = rows
-    const s = q.trim().toLowerCase()
-    if (s) {
-      list = list.filter(x =>
-        x.encounter_type.toLowerCase().includes(s) ||
-        (x.provider||'').toLowerCase().includes(s) ||
-        (x.place||'').toLowerCase().includes(s) ||
-        (x.note||'').toLowerCase().includes(s)
-      )
-    }
-    if (statusFilter !== 'all') list = list.filter(x => x.status === statusFilter)
-    return list.sort((a,b) =>
-      (b.encounter_date > a.encounter_date ? 1 : -1) ||
-      (b.created_at > a.created_at ? 1 : -1)
-    )
-  }, [rows, q, statusFilter])
-
-  const summary = useMemo(() => {
-    const total = rows.length
-    const open = rows.filter(x => x.status==='open').length
-    const closed = rows.filter(x => x.status==='closed').length
-    const cancelled = rows.filter(x => x.status==='cancelled').length
-    return { total, open, closed, cancelled }
-  }, [rows])
-
-  // actions
-  function openCreate() {
-    setEditing(null)
-    setForm({ ...EMPTY_FORM, encounter_date: new Date().toISOString().slice(0,10) })
-    setOpenForm(true)
-  }
-  function openEdit(row: Encounter) {
-    setEditing(row)
-    setForm({ ...row })
-    setOpenForm(true)
-  }
-
-  async function submitForm(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.encounter_type) { setMessage('กรุณาระบุประเภทการดูแล'); return }
-    if (!form.encounter_date) { setMessage('กรุณาระบุวันที่'); return }
-
-    const payload = {
-      patients_id: patientsId,
-      encounter_date: form.encounter_date,
-      encounter_type: form.encounter_type,
-      provider: form.provider || null,
-      place: form.place || null,
-      note: form.note || null,
-      status: (form.status as EncStatus) || 'open',
-    }
-
-    try {
-      const url = editing ? ENDPOINTS.updateEnc(editing.encounter_id) : ENDPOINTS.createEnc()
-      const method = editing ? 'PATCH' : 'POST'
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error(await res.text() || 'บันทึกไม่สำเร็จ')
-      setOpenForm(false); setEditing(null); setForm({ ...EMPTY_FORM })
-      await loadAll()
-      setMessage('บันทึกสำเร็จ')
-    } catch (err:any) {
-      setMessage(err?.message || 'บันทึกไม่สำเร็จ')
-    }
-  }
-
-  async function onDelete(id: number) {
-    try {
-      const res = await fetch(ENDPOINTS.deleteEnc(id), { method: 'DELETE' })
-      if (!res.ok) throw new Error(await res.text() || 'ลบไม่สำเร็จ')
-      setConfirmDeleteId(null)
-      await loadAll()
-      setMessage('ลบสำเร็จ')
-    } catch (e:any) {
-      setMessage(e?.message || 'ลบไม่สำเร็จ')
-    }
-  }
-
   // เปลี่ยน HN จากช่องค้นหา
   const [hnInput, setHnInput] = useState(patientsId)
   useEffect(() => setHnInput(patientsId), [patientsId])
@@ -257,19 +140,18 @@ export default function PatientEncountersPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Encounter (ครั้งการดูแล)</h1>
+        <h1 className={styles.title}>ประวัติการดูแล</h1>
         <div className={styles.toolbar}>
           <label className={styles.inline}>
             <span>HN</span>
             <input
-              className={`${styles.input} ${styles.w160}`}
+              className={`${styles.input} ${styles.w220}`}
               value={hnInput}
               onChange={(e) => setHnInput(e.target.value)}
-              placeholder="HN-00000001"
+              placeholder="เช่น HN-00000001"
             />
           </label>
           <button className={styles.btn} onClick={goToPatient}>โหลดข้อมูล</button>
-          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={openCreate}>+ เพิ่ม Encounter</button>
         </div>
       </header>
 
@@ -279,154 +161,75 @@ export default function PatientEncountersPage() {
           <div><span className={styles.muted}>HN:</span> <b>{patient.patients_id}</b></div>
         </section>
       ) : (
-        <section className={styles.notice}>ไม่พบข้อมูลผู้ป่วย</section>
+        <section className={`${styles.notice} ${styles.sectionPad}`}>ไม่พบข้อมูลผู้ป่วย</section>
       )}
 
-      <section className={styles.stats}>
-        <div className={styles.stat}><div className={styles.statLabel}>ทั้งหมด</div><div className={styles.statValue}>{summary.total}</div></div>
-        <div className={styles.stat}><div className={styles.statLabel}>เปิด</div><div className={styles.statValue}>{summary.open}</div></div>
-        <div className={styles.stat}><div className={styles.statLabel}>ปิดแล้ว</div><div className={styles.statValue}>{summary.closed}</div></div>
-        <div className={styles.stat}><div className={styles.statLabel}>ยกเลิก</div><div className={styles.statValue}>{summary.cancelled}</div></div>
-      </section>
-
-      {/* ***** TIMELINE VIEW ***** */}
-      <section className={styles.timeline}>
-        {filtered.map((row, i) => {
-          const countLabel = `ครั้งที่ ${filtered.length - i}`
+      {/* ***** TIMELINE VIEW (แบบย่อ: แสดงเฉพาะวินิจฉัย + หมายเหตุ) ***** */}
+      <section className={`${styles.timeline} ${styles.sectionPad}`}>
+        {rows.length > 0 && rows.map((row, i) => {
+          const countLabel = `ครั้งที่ ${rows.length - i}`
           const dxList = dxByEncounter[String(row.encounter_id)] || []
           const { title, subtitle } = getEncounterHeadline(row, dxList)
+          const hasDx = dxList.length > 0
+          const hasNote = (row.note || '').trim().length > 0
 
           return (
             <article key={`enc-${row.encounter_id}`} className={styles.card}>
-              {/* หัวการ์ด: ครั้งที่ + หัวข้อใหญ่ + วันที่ */}
               <div className={styles.cardHead}>
                 <div className={styles.count}>{countLabel}</div>
-
                 <div className={styles.bigTitle}>
                   <span className={styles.bigMain}>{title}</span>
                   {subtitle ? <span className={styles.bigSub}>· {subtitle}</span> : null}
                 </div>
-
                 <div className={styles.date}>{fmtDate(row.encounter_date)}</div>
               </div>
 
               <div className={styles.cardBody}>
-                {/* เมตาเบื้องต้น */}
-                <div className={styles.cols}>
-                  <p><b>ประเภท:</b> {row.encounter_type || '-'}</p>
-                  <p><b>ผู้ดูแล:</b> {row.provider || '-'}</p>
-                  <p><b>สถานที่:</b> {row.place || '-'}</p>
-                  <p><b>สถานะ:</b> <span className={styles.badge} data-status={row.status}>{statusTH[row.status]}</span></p>
-                </div>
-
                 {/* วินิจฉัย */}
-                <div className={styles.block}>
-                  <h4 className={styles.sectionTitle}>วินิจฉัย</h4>
-                  {dxList.length ? (
+                {hasDx && (
+                  <div className={styles.block}>
                     <ul className={styles.dxList}>
                       {dxList.map(dx => (
-                        <li key={`dx-${dx.diag_id}`}>
-                          <span className={styles.dxTerm}>
-                            {dx.term}{dx.is_primary ? ' (โรคหลัก)' : ''}
-                          </span>
-                          {dx.code ? <span className={styles.dxCode}>[{dx.code}]</span> : null}
-                          <span className={styles.badgeSmall} data-status={dx.status}>
-                            {dxStatusTH[dx.status]}
-                          </span>
+                        <li key={`dx-${dx.diag_id}`} className={styles.dxRow}>
+                          <div className={styles.dxMain}>
+                            <span className={styles.dxTerm}>
+                              {dx.term}{dx.is_primary ? ' (โรคหลัก)' : ''}
+                            </span>
+                            <span className={styles.badgeSmall} data-status={dx.status}>
+                              {dxStatusTH[dx.status]}
+                            </span>
+                          </div>
+                          <div className={styles.dxMeta}>
+                            <span className={styles.muted}>
+                              วันที่: {fmtDate(dx.onset_date) !== '-' ? fmtDate(dx.onset_date) : fmtDate(row.encounter_date)}
+                            </span>
+                            {/* ต้องการซ่อนรหัส ICD-10 ทั้งหมด? ลบบรรทัดด้านล่างได้เลย */}
+                            {dx.code ? <span className={styles.dxCode}>[{dx.code}]</span> : null}
+                          </div>
                         </li>
                       ))}
                     </ul>
-                  ) : (
-                    <div className={styles.muted}>— ไม่มีการวินิจฉัยที่ผูกกับการพบครั้งนี้ —</div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* หมายเหตุ */}
-                <div className={styles.block}>
-                  <h4 className={styles.sectionTitle}>หมายเหตุ</h4>
-                  <div className={styles.note}>{row.note || '-'}</div>
-                </div>
-
-                {/* นัดหมาย (placeholder) */}
-                <div className={styles.block}>
-                  <h4 className={styles.sectionTitle}>นัดหมาย</h4>
-                  <div className={styles.muted}>— ยังไม่มีนัดหมายที่เชื่อมกับการพบครั้งนี้ —</div>
-                </div>
-
-                <div className={styles.actionsRow}>
-                  <button className={styles.btn} onClick={() => openEdit(row)}>แก้ไข</button>
-                  <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setConfirmDeleteId(row.encounter_id)}>ลบ</button>
-                </div>
+                {hasNote && (
+                  <div className={styles.block}>
+                    <div className={styles.note}>{row.note}</div>
+                  </div>
+                )}
               </div>
             </article>
           )
         })}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && rows.length === 0 && (
           <div className={`${styles.center} ${styles.muted}`}>ยังไม่มีข้อมูล</div>
         )}
         {loading && <div className={styles.center}>กำลังโหลด…</div>}
       </section>
 
-      {message && <div className={styles.message}>{message}</div>}
-
-      {/* Modal: Create/Edit */}
-      {openForm && (
-        <div className={styles.modal} role="dialog" aria-modal="true">
-          <div className={styles.dialog}>
-            <h3 className={styles.dialogTitle}>{editing ? 'แก้ไข Encounter' : 'เพิ่ม Encounter'}</h3>
-            <form onSubmit={submitForm} className={styles.formGrid}>
-              <label>
-                <span>วันที่</span>
-                <input className={styles.input} type="date" value={(form.encounter_date as string) ?? ''} onChange={(e)=>setForm({...form, encounter_date: e.target.value})} />
-              </label>
-              <label>
-                <span>ประเภท</span>
-                <input className={styles.input} value={form.encounter_type ?? ''} onChange={(e)=>setForm({...form, encounter_type: e.target.value})} placeholder="เยี่ยมบ้าน / นัดติดตาม / รับเข้า / โทรศัพท์" />
-              </label>
-              <label>
-                <span>ผู้ดูแล</span>
-                <input className={styles.input} value={form.provider ?? ''} onChange={(e)=>setForm({...form, provider: e.target.value})} placeholder="เช่น RN สุชาดา / พญ. ชุติมา" />
-              </label>
-              <label>
-                <span>สถานที่</span>
-                <input className={styles.input} value={form.place ?? ''} onChange={(e)=>setForm({...form, place: e.target.value})} placeholder="OPD ชีวาภิบาล / บ้านผู้ป่วย" />
-              </label>
-              <label className={styles.col2}>
-                <span>หมายเหตุ</span>
-                <textarea className={`${styles.input} ${styles.textarea}`} value={form.note ?? ''} onChange={(e)=>setForm({...form, note: e.target.value})} placeholder="รายละเอียด / ข้อสังเกต / แผนการดูแล"></textarea>
-              </label>
-              <label>
-                <span>สถานะ</span>
-                <select className={styles.input} value={(form.status as EncStatus) ?? 'open'} onChange={(e)=>setForm({...form, status: e.target.value as EncStatus})}>
-                  <option value="open">เปิด</option>
-                  <option value="closed">ปิดแล้ว</option>
-                  <option value="cancelled">ยกเลิก</option>
-                </select>
-              </label>
-
-              <div className={`${styles.dialogActions} ${styles.col2}`}>
-                <button type="button" className={styles.btn} onClick={()=>setOpenForm(false)}>ยกเลิก</button>
-                <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`}>{editing ? 'บันทึกการแก้ไข' : 'เพิ่ม Encounter'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Delete confirm */}
-      {confirmDeleteId !== null && (
-        <div className={styles.modal} role="dialog" aria-modal="true">
-          <div className={`${styles.dialog} ${styles.dialogSmall}`}>
-            <h3 className={styles.dialogTitle}>ลบ Encounter นี้?</h3>
-            <p className={styles.muted}>การลบจะไม่สามารถย้อนกลับได้</p>
-            <div className={styles.dialogActions}>
-              <button className={styles.btn} onClick={()=>setConfirmDeleteId(null)}>ยกเลิก</button>
-              <button className={`${styles.btn} ${styles.btnDanger}`} onClick={()=>onDelete(confirmDeleteId!)}>ลบ</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {message && <div className={`${styles.message} ${styles.sectionPad}`}>{message}</div>}
     </div>
   )
 }

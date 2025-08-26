@@ -866,10 +866,11 @@ export default function PatientsPage() {
                         <CalendarPlus size={14} /> เพิ่มนัด
                       </button>
                     )}
-
-                    <Link className="px-2 py-1 border rounded-lg"
-                      href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`}>
-                      Encounter
+                    <Link
+                      href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`}
+                      className={`${styles.btn} ${styles.btnSm}`}
+                    >
+                      <FileText size={14} /> ประวัติ
                     </Link>
                     {/* ✅ ปุ่มไปหน้าวินิจฉัย */}
                     <Link
