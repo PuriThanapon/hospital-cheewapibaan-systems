@@ -1,14 +1,19 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const apiRouter = require('./routes');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
 
-// รวมทุก route ไว้ใต้ /api
-app.use('/api', apiRouter);
+// 1) ⬅️ ต้อง mount LINE webhook ก่อน parsers ทุกตัว
+app.use('/api/line', require('./routes/line.routes')); // ใช้ express.raw() ภายในไฟล์นี้แล้ว
+
+// 2) parsers สำหรับ route อื่น ๆ
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 3) รวมทุก route อื่นไว้ใต้ /api (ยกเว้น /api/line/webhook ที่แยกไว้แล้ว)
+app.use('/api', require('./routes'));
 
 // 404
 app.use((req, res) => {

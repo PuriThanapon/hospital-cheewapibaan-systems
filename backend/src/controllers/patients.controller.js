@@ -2,7 +2,7 @@
 const { pool } = require('../config/db');
 const multer = require('multer');
 const model = require('../models/patients.model'); // ✅ ต้องมี
-
+const { pushText } = require('../utils/line'); // ✅ เพิ่มบรรทัดนี้
 /* ---------------- helpers ---------------- */
 const toPatientsId = (v) => {
   const digits = String(v ?? '')
@@ -81,36 +81,36 @@ async function getNextPatientId(req, res, next) {
 // GET /api/patients
 async function listPatients(req, res, next) {
   try {
-    const page  = Math.max(parseInt(req.query.page, 10)  || 1, 1);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit, 10) || 20, 1);
     const offset = (page - 1) * limit;
 
-    const patientId    = req.query.patient_id || req.query.patients_id || '';
-    const gender       = req.query.gender || '';
+    const patientId = req.query.patient_id || req.query.patients_id || '';
+    const gender = req.query.gender || '';
     const patientsType = req.query.patients_type || '';
-    const status       = req.query.status || '';
-    const bloodGroup   = req.query.blood_group || '';
+    const status = req.query.status || '';
+    const bloodGroup = req.query.blood_group || '';
     const bloodgroupRh = req.query.bloodgroup_rh || '';
-    const religion     = req.query.religion || '';
-    const admitFrom    = req.query.admit_from || '';
-    const admitTo      = req.query.admit_to || '';
-    const q            = (req.query.q || '').trim();
-    const sortName     = (req.query.sort_name || '').toLowerCase();
+    const religion = req.query.religion || '';
+    const admitFrom = req.query.admit_from || '';
+    const admitTo = req.query.admit_to || '';
+    const q = (req.query.q || '').trim();
+    const sortName = (req.query.sort_name || '').toLowerCase();
 
     const where = [];
-    const vals  = [];
+    const vals = [];
     let i = 1;
 
     const normalizedHN = normalizePatientsIdFromQuery(patientId);
     if (normalizedHN) { where.push(`p.patients_id = $${i++}`); vals.push(normalizedHN); }
-    if (gender)       { where.push(`p.gender = $${i++}`); vals.push(gender); }
+    if (gender) { where.push(`p.gender = $${i++}`); vals.push(gender); }
     if (patientsType) { where.push(`p.patients_type = $${i++}`); vals.push(patientsType); }
-    if (status)       { where.push(`p.status = $${i++}`); vals.push(status); }
-    if (bloodGroup)   { where.push(`p.blood_group = $${i++}`); vals.push(bloodGroup); }
+    if (status) { where.push(`p.status = $${i++}`); vals.push(status); }
+    if (bloodGroup) { where.push(`p.blood_group = $${i++}`); vals.push(bloodGroup); }
     if (bloodgroupRh) { where.push(`p.bloodgroup_rh = $${i++}`); vals.push(bloodgroupRh); }
-    if (religion)     { where.push(`p.religion = $${i++}`); vals.push(religion); }
-    if (admitFrom)    { where.push(`p.admittion_date >= $${i++}`); vals.push(admitFrom); }
-    if (admitTo)      { where.push(`p.admittion_date <= $${i++}`); vals.push(admitTo); }
+    if (religion) { where.push(`p.religion = $${i++}`); vals.push(religion); }
+    if (admitFrom) { where.push(`p.admittion_date >= $${i++}`); vals.push(admitFrom); }
+    if (admitTo) { where.push(`p.admittion_date <= $${i++}`); vals.push(admitTo); }
 
     if (q) {
       where.push(`(
@@ -221,10 +221,10 @@ async function createPatient(req, res, next) {
     const phone_number = b.phone_number ?? b.phone ?? null;
 
     const f = {
-      patient_id_card:    fileFrom(req.files, 'patient_id_card'),
+      patient_id_card: fileFrom(req.files, 'patient_id_card'),
       house_registration: fileFrom(req.files, 'house_registration'),
-      patient_photo:      fileFrom(req.files, 'patient_photo'),
-      relative_id_card:   fileFrom(req.files, 'relative_id_card'),
+      patient_photo: fileFrom(req.files, 'patient_photo'),
+      relative_id_card: fileFrom(req.files, 'relative_id_card'),
     };
 
     const sql = `
@@ -254,15 +254,34 @@ async function createPatient(req, res, next) {
       b.patients_type, b.blood_group, b.bloodgroup_rh, phone_number, b.height, b.weight, 'มีชีวิต',
       b.admittion_date, b.disease, b.religion,
 
-      f.patient_id_card?.buffer || null,    f.patient_id_card?.mime || null,    f.patient_id_card?.name || null,
+      f.patient_id_card?.buffer || null, f.patient_id_card?.mime || null, f.patient_id_card?.name || null,
       f.house_registration?.buffer || null, f.house_registration?.mime || null, f.house_registration?.name || null,
-      f.patient_photo?.buffer || null,      f.patient_photo?.mime || null,      f.patient_photo?.name || null,
-      f.relative_id_card?.buffer || null,   f.relative_id_card?.mime || null,   f.relative_id_card?.name || null,
+      f.patient_photo?.buffer || null, f.patient_photo?.mime || null, f.patient_photo?.name || null,
+      f.relative_id_card?.buffer || null, f.relative_id_card?.mime || null, f.relative_id_card?.name || null,
     ];
 
     const r = await pool.query(sql, params);
     const row = r.rows[0];
     FILE_FIELDS.forEach(ff => { delete row[ff]; });
+
+    // ✅ แจ้งเตือนเข้า LINE กลุ่ม (ถ้าตั้ง LINE_GROUP_ID ไว้ใน .env)
+    try {
+      const groupId = process.env.LINE_GROUP_ID;
+      if (groupId) {
+        const nowTH = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+        const msg =
+          `🆕 เพิ่มผู้ป่วยใหม่
+        HN: ${row.patients_id}
+        ชื่อ: ${row.first_name ?? ''} ${row.last_name ? row.last_name[0] + '.' : ''}
+        ประเภท: ${row.patients_type ?? '-'}
+        เวลา: ${nowTH}`;
+        await pushText(groupId, msg);
+      }
+    } catch (e) {
+      console.error('LINE push failed:', e); // ไม่ให้ล้มทั้งรีเควส
+    }
+
+
     res.status(201).json({ ...row, hn: row.patients_id });
   } catch (err) { next(err); }
 }
@@ -281,10 +300,10 @@ async function updatePatient(req, res, next) {
     let i = 1;
 
     const updatable = [
-      'pname','first_name','last_name','card_id','birthdate',
-      'gender','nationality','weight','height',
-      'patients_type','blood_group','bloodgroup_rh',
-      'disease','address','admittion_date','religion',
+      'pname', 'first_name', 'last_name', 'card_id', 'birthdate',
+      'gender', 'nationality', 'weight', 'height',
+      'patients_type', 'blood_group', 'bloodgroup_rh',
+      'disease', 'address', 'admittion_date', 'religion',
     ];
 
     for (const key of updatable) {
@@ -300,15 +319,15 @@ async function updatePatient(req, res, next) {
     sets.push(`updated_at = NOW()`);
 
     const f = {
-      patient_id_card:    fileFrom(req.files, 'patient_id_card'),
+      patient_id_card: fileFrom(req.files, 'patient_id_card'),
       house_registration: fileFrom(req.files, 'house_registration'),
-      patient_photo:      fileFrom(req.files, 'patient_photo'),
-      relative_id_card:   fileFrom(req.files, 'relative_id_card'),
+      patient_photo: fileFrom(req.files, 'patient_photo'),
+      relative_id_card: fileFrom(req.files, 'relative_id_card'),
     };
 
     for (const field of FILE_FIELDS) {
       if (f[field]) {
-        sets.push(`${field} = $${i++}`);      vals.push(f[field].buffer);
+        sets.push(`${field} = $${i++}`); vals.push(f[field].buffer);
         sets.push(`${field}_mime = $${i++}`); vals.push(f[field].mime || null);
         sets.push(`${field}_name = $${i++}`); vals.push(f[field].name || null);
       } else if (String(b[`clear_${field}`] || '') === '1') {
@@ -388,7 +407,7 @@ async function markDeceased(req, res, next) {
     return res.json({ message: 'บันทึกการเสียชีวิตสำเร็จ', patient: { ...updated, hn: updated.patients_id } });
   } catch (e) {
     // ✅ ต้อง rollback บน client ไม่ใช่ pool
-    try { await client.query('ROLLBACK'); } catch {}
+    try { await client.query('ROLLBACK'); } catch { }
     next(e);
   } finally {
     client.release();
@@ -404,8 +423,8 @@ async function search(req, res, next) {
 }
 async function recent(req, res, next) {
   try {
-    const limit = Math.min(parseInt(req.query.limit || 50,10), 200);
-    const offset = parseInt(req.query.offset || 0,10);
+    const limit = Math.min(parseInt(req.query.limit || 50, 10), 200);
+    const offset = parseInt(req.query.offset || 0, 10);
     const rows = await model.listRecentPatients({ limit, offset });
     res.json({ data: rows });
   } catch (e) { next(e); }
