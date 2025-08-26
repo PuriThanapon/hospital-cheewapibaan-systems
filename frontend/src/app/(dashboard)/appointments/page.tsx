@@ -7,6 +7,7 @@ import Modal from '@/app/components/ui/Modal';
 import AppointmentForm, {type AppointmentFormValue} from '@/app/components/forms/AppointmentForm';
 import DatePickerField from '@/app/components/DatePicker';
 import { notifyBadgeInvalidate } from '@/app/components/Navbar';
+import PatientLookupModal from '@/app/components/modals/PatientLookupModal';
 
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
@@ -240,6 +241,7 @@ export default function AppointmentsPage() {
   const [sortKey, setSortKey] = useState<'datetime'|'created'|'patient'|'hn'|'status'|'type'|'place'>('status');
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
 
+  const [lookupOpen, setLookupOpen] = useState(false);  
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<10 | 25 | 50>(10);
   const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
@@ -615,6 +617,26 @@ export default function AppointmentsPage() {
     return () => { alive = false; };
   }, [historyFor]);
 
+  function pickPatientFromLookup(p: {
+    patients_id: string;
+    pname?: string; first_name?: string; last_name?: string;
+    phone_number?: string;
+  }) {
+    const name = [p.pname, p.first_name, p.last_name]
+      .filter(Boolean).join(' ').replace(/\s/g, ' ').trim();
+    const hn = normalizeHN(p.patients_id || '');
+    const next = {
+      ...form,
+      patient: name || hn,
+      hn,
+      phone: p.phone_number || form.phone,
+    };
+    setForm(next);
+    setErrors(validate(next));
+    setLookupOpen(false);
+    toast.fire({ icon: 'success', title: `เลือกผู้ป่วย: ${name || hn}` });
+  }
+
   const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const end   = Math.min(totalCount, page * pageSize);
@@ -901,7 +923,6 @@ export default function AppointmentsPage() {
             </div>
           }
         >
-
           <AppointmentForm
             value={form}
             onChange={setForm}

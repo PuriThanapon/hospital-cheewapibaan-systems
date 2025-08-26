@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DatePickerField from '@/app/components/DatePicker';
 import TimePicker from '@/app/components/TimePicker';
+import PatientLookupModal from '../modals/PatientLookupModal';
 
 type Status = 'pending' | 'done' | 'cancelled';
 
@@ -116,6 +117,7 @@ export default function AppointmentForm({
   value, onChange, errors, TYPE_OPTIONS, PLACE_OPTIONS, className = '',
 }: Props) {
   const [verifyLoading, setVerifyLoading] = useState(false);
+  const [lookupOpen, setLookupOpen] = useState(false);
   const [verifyErr, setVerifyErr] = useState('');
   const [patientInfo, setPatientInfo] = useState<any | null>(null);
   const hnInputRef = useRef<HTMLInputElement | null>(null);
@@ -215,6 +217,25 @@ export default function AppointmentForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.type, patientInfo]);
 
+  function pickPatientFromLookup(p: {
+    patients_id: string;
+    pname?: string; first_name?: string; last_name?: string;
+    phone_number?: string;
+  }) {
+    const name = [p.pname, p.first_name, p.last_name]
+      .filter(Boolean).join(' ').replace(/\s/g, ' ').trim();
+    const hn = normalizeHN(p.patients_id || '');
+    const next = {
+      ...form,
+      patient: name || hn,
+      hn,
+      phone: p.phone_number || form.phone,
+    };
+    setForm(next);
+    setErrors(validate(next));
+    setLookupOpen(false);
+    toast.fire({ icon: 'success', title: `เลือกผู้ป่วย: ${name || hn}` });
+  }
 
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}>
@@ -239,6 +260,51 @@ export default function AppointmentForm({
             {verifyLoading ? 'กำลังตรวจสอบ...' : 'ตรวจสอบ'}
           </button>
         </div>
+        <div className="mt-2">
+          <button
+            type="button"
+            className="text-sm text-blue-600 hover:text-blue-700 underline"
+            onClick={() => setLookupOpen(true)}
+          >
+            ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
+          </button>
+        </div>
+        <PatientLookupModal
+          open={lookupOpen}
+          onClose={() => setLookupOpen(false)}
+          onSelect={(p) => {
+            // สร้างชื่อเต็ม
+            const name = [p.pname, p.first_name, p.last_name]
+              .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+
+            const hn = normalizeHN(p.patients_id || '');
+            const tVal = TYPE_VALUE_FROM_LABEL(value.type);
+            const addrRaw = getPatientAddressRaw(p);
+
+            // อัปเดตค่าในฟอร์มผ่าน onChange
+            const next = {
+              ...value,
+              hn,
+              patient: name || hn,
+              phone: p.phone_number || value.phone || '',
+            };
+
+            // ถ้าเป็น "บ้านผู้ป่วย" ให้ช่วยเติมที่อยู่อัตโนมัติ (ถ้ายังว่าง/เป็นค่าดีฟอลต์)
+            if (tVal === 'home') {
+              const hasUserTyped = value.place && value.place !== 'บ้านผู้ป่วย';
+              next.place = hasUserTyped ? value.place : (addrRaw || 'บ้านผู้ป่วย');
+            }
+
+            onChange(next);
+            setPatientInfo(p);        // เก็บไว้โชว์การ์ดข้อมูลผู้ป่วย
+            setLookupOpen(false);
+
+            // โหลด "สิ่งที่ต้องเตรียมจากครั้งก่อน" ถ้าเป็นเยี่ยมบ้าน
+            if (tVal === 'home' && hn) {
+              fetchLatestNeeds(hn);
+            }
+          }}
+        />
         {errors?.hn && <div className="mt-1 text-xs text-red-600">{errors.hn}</div>}
         {verifyErr && <div className="mt-2 text-sm text-red-600">{verifyErr}</div>}
       </label>
@@ -431,5 +497,8 @@ export default function AppointmentForm({
         />
       </label>
     </div>
+    
+
+    
   );
 }

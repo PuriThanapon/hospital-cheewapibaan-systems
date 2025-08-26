@@ -12,9 +12,8 @@ import styles from './treatment.module.css';
 import Modal from '@/app/components/ui/Modal';
 import DatePickerField from '@/app/components/DatePicker';
 import TreatmentForm, { TreatmentDraft, TreatmentFormHandle } from '@/app/components/forms/TreatmentForm';
-type TreatmentFormHandleExt = TreatmentFormHandle & {
-  setPatientInfo?: (p: any) => void;
-};
+type TreatmentFormHandleExt = TreatmentFormHandle & { setPatientInfo?: (p: any) => void };
+import PatientLookupModal from '@/app/components/modals/PatientLookupModal';
 import TreatmentStatusPill from '@/app/components/ui/TreatmentPill';
 import Swal from 'sweetalert2';
 
@@ -470,7 +469,7 @@ export default function TreatmentsListPage() {
 
   // Add Treatment Modal
   const [openAdd, setOpenAdd] = useState(false);
-  const addFormRef = useRef<TreatmentFormHandle>(null);
+  const addFormRef = useRef<TreatmentFormHandleExt>(null);
   const [draft, setDraft] = useState<TreatmentDraft>({
     patients_id: patientIdFromUrl ? normalizePatientsId(patientIdFromUrl) : '',
     treatment_type: '',
@@ -484,6 +483,8 @@ export default function TreatmentsListPage() {
   const editFormRef = useRef<TreatmentFormHandleExt>(null);
   const [editDraft, setEditDraft] = useState<TreatmentDraft | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const [lookupFor, setLookupFor] = useState<null | 'add' | 'edit'>(null);
 
   // Patient auto-fetch for EDIT only
   const [editPatient, setEditPatient] = useState<any | null>(null);
@@ -516,7 +517,7 @@ export default function TreatmentsListPage() {
       const hn = normalizePatientsId(raw);
       try {
         setEditPatientLoading(true);
-        const p = await http(`/api/patient/${encodeURIComponent(hn)}`);
+        const [lookupFor, setLookupFor] = useState<null | 'add' | 'edit'>(null);
         setEditPatient(p);
         editFormRef.current?.setPatientInfo?.(p);
       } catch (e: any) {
@@ -721,7 +722,6 @@ export default function TreatmentsListPage() {
       setOpenAdd(false);
       setDraft(initialDraft());
       addFormRef.current?.reset?.();
-      setDraft(d => ({ ...d, treatment_type: '', diagnosis_summary: '', note: '' }));
       setTick(t => t + 1);
     } catch (e: any) {
       Swal.close();
@@ -917,7 +917,7 @@ export default function TreatmentsListPage() {
       let patient = null;
       if (pid) {
         try {
-          patient = await http(`/api/patient/${encodeURIComponent(pid)}`);
+          patient = await http(`/api/patients/${encodeURIComponent(pid)}`);
         } catch {}
       }
 
@@ -1104,6 +1104,15 @@ export default function TreatmentsListPage() {
         }
       >
         <TreatmentForm ref={addFormRef} value={draft} onChange={setDraft} />
+        <div className="mt-2">
+          <button
+            type="button"
+            className="text-sm text-blue-600 hover:text-blue-700 underline"
+            onClick={() => setLookupFor('add')}
+          >
+            ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
+          </button>
+        </div>
       </Modal>
 
       {/* Detail Treatment Modal */}
@@ -1447,9 +1456,34 @@ export default function TreatmentsListPage() {
         {editDraft && (
           <>
             <TreatmentForm ref={editFormRef} value={editDraft} onChange={setEditDraft} />
+            <div className="mt-2">
+              <button
+                type="button"
+                className="text-sm text-blue-600 hover:text-blue-700 underline"
+                onClick={() => setLookupFor('edit')}
+              >
+                ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
+              </button>
+            </div>
           </>
         )}
       </Modal>
+
+      {/* 🔎 Patient Lookup (แชร์ทั้ง Add/Edit) */}
+      <PatientLookupModal
+        open={!!lookupFor}
+        onClose={() => setLookupFor(null)}
+        onSelect={(p) => {
+          if (lookupFor === 'add') {
+            setDraft((v) => ({ ...v, patients_id: p.patients_id }));
+            addFormRef.current?.setPatientInfo?.(p);   // แสดงการ์ดใน TreatmentForm เลย
+          } else if (lookupFor === 'edit' && editDraft) {
+            setEditDraft((v) => v ? ({ ...v, patients_id: p.patients_id }) : v);
+            editFormRef.current?.setPatientInfo?.(p);  // แสดงการ์ดใน TreatmentForm เลย
+          }
+          setLookupFor(null);
+        }}
+      />
     </div>
   );
 }

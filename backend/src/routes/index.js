@@ -18,6 +18,7 @@ router.use('/patient_diagnosis', require('./diagnosis.routes'));
 router.use('/encounters', require('./encounters.routes'));
 router.use('/beds', require('./beds.routes'));
 router.use('/bed_stays', require('./bed_stays.routes'));
+router.use('/careplans', require('./careplan.routes'));
 
 router.get('/patients/:id/home-needs/latest', homeNeedsController.latestForPatient);
 

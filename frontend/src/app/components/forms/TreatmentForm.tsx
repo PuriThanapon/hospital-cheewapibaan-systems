@@ -3,6 +3,7 @@ import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react
 import makeAnimated from 'react-select/animated';
 import dynamic from 'next/dynamic';
 import DatePickerField from '../DatePicker';
+import PatientLookupModal from '../modals/PatientLookupModal';
 
 const Select = dynamic(() => import('react-select'), { ssr: false });
 const animatedComponents = makeAnimated();
@@ -17,7 +18,6 @@ const rsx = {
     ':hover': { borderColor: '#60a5fa' },
     color: '#000000',
   }),
-  /* ⬇️ ให้สูงกว่า overlay ของ Modal (ที่คุณตั้ง ~10000) */
   menuPortal: (base) => ({ ...base, color: '#000000', zIndex: 12050 }),
   menu: (base) => ({ ...base, zIndex: 12050 }),
 };
@@ -30,7 +30,7 @@ const treatmentTypeOptions = [
 export type TreatmentDraft = {
   patients_id: string;
   treatment_type: '' | 'ประจำ' | 'ทำครั้งเดียว';
-  treatment_date: string; // ISO: YYYY-MM-DD
+  treatment_date: string; // YYYY-MM-DD
   diagnosis_summary?: string;
   note?: string;
 };
@@ -38,15 +38,17 @@ export type TreatmentDraft = {
 export type TreatmentFormHandle = {
   validate: () => boolean;
   reset: () => void;
+  setPatientInfo?: (p: any) => void;
 };
 
 type Props = {
   value: TreatmentDraft;
   onChange: (v: TreatmentDraft) => void;
   className?: string;
+  onOpenLookup?: () => void;
 };
 
-/** ---------- http helper (เหมือนหน้า list) ---------- */
+/** http helper */
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
 function joinUrl(base: string, path: string) {
   if (!base) return path;
@@ -76,7 +78,7 @@ async function http(url: string, options: RequestInit = {}) {
   return res.text();
 }
 
-/** ---------- utils ---------- */
+/** utils */
 function normalizePatientsId(id: string) {
   if (!id) return '';
   const t = String(id).trim();
@@ -94,7 +96,7 @@ function toNumericId(id: string) {
 }
 function unwrapPatient(p: any) {
   if (!p) return null;
-  return p?.data ?? p; // รองรับทั้ง {data:{...}} หรือ {...}
+  return p?.data ?? p;
 }
 function calcAgeFromBirthdate(birthdate?: string) {
   if (!birthdate) return '-';
@@ -109,10 +111,10 @@ function calcAgeFromBirthdate(birthdate?: string) {
   return years > 0 ? `${years} ปี` : `${months} เดือน`;
 }
 
-/** ---------- smart fetch: HN -> numeric fallback ---------- */
+/** smart fetch */
 async function fetchPatientSmart(rawId: string) {
-  const hn = normalizePatientsId(rawId); // e.g. HN-00000018
-  const num = toNumericId(rawId);        // e.g. 18
+  const hn = normalizePatientsId(rawId);
+  const num = toNumericId(rawId);
   const attempts = [
     `/api/patients/${encodeURIComponent(hn)}`,
     num ? `/api/patients/${encodeURIComponent(num)}` : null,
@@ -131,224 +133,238 @@ async function fetchPatientSmart(rawId: string) {
   throw lastErr || new Error('ไม่พบข้อมูลผู้ป่วย');
 }
 
-/** ---------- Form ---------- */
-const TreatmentForm = forwardRef<TreatmentFormHandle, Props>(({ value, onChange, className = '' }, ref) => {
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [verifyLoading, setVerifyLoading] = useState(false);
-  const [verifyErr, setVerifyErr] = useState('');
-  const [patientInfo, setPatientInfo] = useState<any | null>(null);
+/** form */
+const TreatmentForm = forwardRef<TreatmentFormHandle, Props>(
+  ({ value, onChange, className = '', onOpenLookup }, ref) => {
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [verifyLoading, setVerifyLoading] = useState(false);
+    const [verifyErr, setVerifyErr] = useState('');
+    const [patientInfo, setPatientInfo] = useState<any | null>(null);
+    const [lookupOpen, setLookupOpen] = useState(false); // ⭐️ สำคัญ
 
-  useImperativeHandle(ref, () => ({
-    validate: () => {
-      const e: Record<string, string> = {};
-      if (!value.patients_id?.trim()) e.patients_id = 'กรุณากรอกรหัสผู้ป่วย';
-      if (!value.treatment_type) e.treatment_type = 'กรุณาเลือกประเภทการรักษา';
-      if (!value.treatment_date) e.treatment_date = 'กรุณาเลือกวันที่บันทึก';
-      setErrors(e);
-      return Object.keys(e).length === 0;
-    },
-    reset: () => {                // ✅ ล้างสถานะภายในฟอร์ม
-      setErrors({});
-      setVerifyLoading(false);
+    useImperativeHandle(ref, () => ({
+      validate: () => {
+        const e: Record<string, string> = {};
+        if (!value.patients_id?.trim()) e.patients_id = 'กรุณากรอกรหัสผู้ป่วย';
+        if (!value.treatment_type) e.treatment_type = 'กรุณาเลือกประเภทการรักษา';
+        if (!value.treatment_date) e.treatment_date = 'กรุณาเลือกวันที่บันทึก';
+        setErrors(e);
+        return Object.keys(e).length === 0;
+      },
+      reset: () => {
+        setErrors({});
+        setVerifyLoading(false);
+        setVerifyErr('');
+        setPatientInfo(null);
+      },
+      setPatientInfo: (p: any) => setPatientInfo(p),
+    }), [value]);
+
+    const todayISO = useMemo(() => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    }, []);
+
+    const handleVerifyPatient = async () => {
+      const raw = value.patients_id;
+      if (!raw?.trim()) {
+        setErrors(prev => ({ ...prev, patients_id: 'กรุณากรอกรหัสผู้ป่วย (HN)' }));
+        return;
+      }
+      setVerifyLoading(true);
       setVerifyErr('');
       setPatientInfo(null);
-    },
-    setPatientInfo: (p: any) => {
-      setPatientInfo(p); // อัปเดตข้อมูลผู้ป่วยใน UI
-    },
-  }), [value]);
-
-  const todayISO = useMemo(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${dd}`;
-  }, []);
-  
-
-  const handleVerifyPatient = async () => {
-    const raw = value.patients_id;
-    if (!raw?.trim()) {
-      setErrors(prev => ({ ...prev, patients_id: 'กรุณากรอกรหัสผู้ป่วย (HN)' }));
-      return;
-    }
-    setVerifyLoading(true);
-    setVerifyErr('');
-    setPatientInfo(null);
-    try {
-      const p = await fetchPatientSmart(raw);
-      setPatientInfo(p);
-      // sync รูปแบบในช่องกรอกตามที่ normalize + ตามที่ API ตอบกลับ (ถ้ามี)
-      const hn = p?.patients_id || normalizePatientsId(raw);
-      if (hn && hn !== value.patients_id) {
-        onChange({ ...value, patients_id: hn });
+      try {
+        const p = await fetchPatientSmart(raw);
+        setPatientInfo(p);
+        const hn = p?.patients_id || normalizePatientsId(raw);
+        if (hn && hn !== value.patients_id) {
+          onChange({ ...value, patients_id: hn });
+        }
+      } catch (e: any) {
+        setVerifyErr(e?.message || 'ตรวจสอบไม่สำเร็จ');
+      } finally {
+        setVerifyLoading(false);
       }
-    } catch (e: any) {
-      setVerifyErr(e?.message || 'ตรวจสอบไม่สำเร็จ');
-    } finally {
-      setVerifyLoading(false);
-    }
-  };
+    };
 
-  return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${className}`}>
-      {/* patients_id + ตรวจสอบ */}
-      <div className="md:col-span-2">
-        <label className="text-sm text-gray-600 mb-1 block">รหัสผู้ป่วย (HN)</label>
-        <div className="flex gap-2">
-          <input
-            className="flex-1 border rounded-lg px-3 py-2 text-[14px] border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="เช่น HN-00000001 หรือ 1"
-            value={value.patients_id}
-            onChange={(e) => {
-              setPatientInfo(null);
-              setVerifyErr('');
-              onChange({ ...value, patients_id: e.target.value });
-            }}
-            onBlur={(e) => onChange({ ...value, patients_id: normalizePatientsId(e.target.value) })}
-          />
-          <button
-            type="button"
-            onClick={handleVerifyPatient}
-            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-60"
-            disabled={verifyLoading || !value.patients_id?.trim()}
-          >
-            {verifyLoading ? 'กำลังตรวจสอบ...' : 'ตรวจสอบ'}
-          </button>
-        </div>
-        {errors.patients_id && <div className="text-red-600 text-sm mt-1">{errors.patients_id}</div>}
-        {verifyErr && <div className="text-red-600 text-sm mt-2">{verifyErr}</div>}
-      </div>
-
-      {/* แสดงข้อมูลผู้ป่วย (ตามที่ต้องการ) */}
-      {patientInfo && (
-        <div className="md:col-span-2">
-          <div className="bg-white rounded-2xl shadow p-4 border border-gray-200">
-            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-emerald-100">
-              <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center">
-                {/* ใช้ emoji/ไอคอนพื้นฐาน แสดงชื่อส่วน */}
-                <span className="text-emerald-700 text-xs">i</span>
-              </div>
-              <h3 className="text-base font-semibold text-gray-800">ข้อมูลผู้ป่วย</h3>
+    return (
+      <>
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${className}`}>
+          {/* patients_id + ตรวจสอบ */}
+          <div className="md:col-span-2">
+            <label className="text-sm text-gray-600 mb-1 block">รหัสผู้ป่วย (HN)</label>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 border rounded-lg px-3 py-2 text-[14px] border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="เช่น HN-00000001 หรือ 1"
+                value={value.patients_id}
+                onChange={(e) => {
+                  setPatientInfo(null);
+                  setVerifyErr('');
+                  onChange({ ...value, patients_id: e.target.value });
+                }}
+                onBlur={(e) => onChange({ ...value, patients_id: normalizePatientsId(e.target.value) })}
+              />
+              <button
+                type="button"
+                onClick={handleVerifyPatient}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-60"
+                disabled={verifyLoading || !value.patients_id?.trim()}
+              >
+                {verifyLoading ? 'กำลังตรวจสอบ...' : 'ตรวจสอบ'}
+              </button>
             </div>
+            <div className="mt-2">
+              <button
+                type="button"
+                className="text-sm text-blue-600 hover:text-blue-700 underline"
+                onClick={() => (onOpenLookup ? onOpenLookup() : setLookupOpen(true))}
+              >
+                ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
+              </button>
+            </div>
+            {errors.patients_id && <div className="text-red-600 text-sm mt-1">{errors.patients_id}</div>}
+            {verifyErr && <div className="text-red-600 text-sm mt-2">{verifyErr}</div>}
+          </div>
 
-            {(() => {
-              const p = patientInfo || {};
-              const fullname = `${p.pname || ''} ${p.first_name || ''} ${p.last_name || ''}`.trim() || '-';
-              const ageText =
-                p.age != null && p.age !== ''
-                  ? `${p.age} ปี`
-                  : (p.birthdate ? calcAgeFromBirthdate(p.birthdate) : '-');
-              const gender = p.gender || '-';
-              const blood = [p.blood_group || '-', p.bloodgroup_rh || ''].filter(Boolean).join(' ');
-              const disease = p.disease || '-';
-
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <div className="text-xs text-gray-500 mb-1">ชื่อ-นามสกุล</div>
-                    <div className="text-gray-900">{fullname}</div>
+          {/* การ์ดข้อมูลผู้ป่วย */}
+          {patientInfo && (
+            <div className="md:col-span-2">
+              <div className="bg-white rounded-2xl shadow p-4 border border-gray-200">
+                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-emerald-100">
+                  <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center">
+                    <span className="text-emerald-700 text-xs">i</span>
                   </div>
-                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <div className="text-xs text-gray-500 mb-1">อายุ</div>
-                    <div className="text-gray-900">{ageText}</div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <div className="text-xs text-gray-500 mb-1">เพศ</div>
-                    <div className="text-gray-900">{gender}</div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-                    <div className="text-xs text-gray-500 mb-1">กรุ๊ปเลือด</div>
-                    <div className="text-gray-900 font-medium">{blood}</div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <div className="text-xs text-gray-500 mb-1">น้ำหนัก</div>
-                    <div className="text-gray-900">{p.weight || '-'}</div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <div className="text-xs text-gray-500 mb-1">ส่วนสูง</div>
-                    <div className="text-gray-900">{p.height || '-'}</div>
-                  </div>
-                  <div className="md:col-span-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
-                    <div className="text-xs text-gray-500 mb-1">โรคประจำตัว</div>
-                    <div className="text-gray-900">{disease}</div>
-                  </div>
+                  <h3 className="text-base font-semibold text-gray-800">ข้อมูลผู้ป่วย</h3>
                 </div>
-              );
-            })()}
+
+                {(() => {
+                  const p = patientInfo || {};
+                  const fullname = `${p.pname || ''} ${p.first_name || ''} ${p.last_name || ''}`.trim() || '-';
+                  const ageText =
+                    p.age != null && p.age !== ''
+                      ? `${p.age} ปี`
+                      : (p.birthdate ? calcAgeFromBirthdate(p.birthdate) : '-');
+                  const gender = p.gender || '-';
+                  const blood = [p.blood_group || '-', p.bloodgroup_rh || ''].filter(Boolean).join(' ');
+                  const disease = p.disease || '-';
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                        <div className="text-xs text-gray-500 mb-1">ชื่อ-นามสกุล</div>
+                        <div className="text-gray-900">{fullname}</div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                        <div className="text-xs text-gray-500 mb-1">อายุ</div>
+                        <div className="text-gray-900">{ageText}</div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                        <div className="text-xs text-gray-500 mb-1">เพศ</div>
+                        <div className="text-gray-900">{gender}</div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                        <div className="text-xs text-gray-500 mb-1">กรุ๊ปเลือด</div>
+                        <div className="text-gray-900 font-medium">{blood}</div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                        <div className="text-xs text-gray-500 mb-1">น้ำหนัก</div>
+                        <div className="text-gray-900">{p.weight || '-'}</div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                        <div className="text-xs text-gray-500 mb-1">ส่วนสูง</div>
+                        <div className="text-gray-900">{p.height || '-'}</div>
+                      </div>
+                      <div className="md:col-span-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                        <div className="text-xs text-gray-500 mb-1">โรคประจำตัว</div>
+                        <div className="text-gray-900">{disease}</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* ประเภทการรักษา */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1 block">ประเภทการรักษา</label>
+            <Select
+              components={animatedComponents}
+              styles={rsx}
+              menuPortalTarget={menuPortalTarget}
+              menuPosition="fixed"
+              menuShouldBlockScroll
+              isSearchable={false}
+              isClearable={false}
+              placeholder="-- เลือกประเภทการรักษา --"
+              options={treatmentTypeOptions}
+              value={treatmentTypeOptions.find(o => o.value === value.treatment_type) ?? null}
+              onChange={(opt) =>
+                onChange({
+                  ...value,
+                  treatment_type: opt ? (opt as { value: 'ประจำ' | 'ทำครั้งเดียว' }).value : '',
+                })
+              }
+              name="treatment_type"
+            />
+            {errors.treatment_type && <div className="text-red-600 text-sm mt-1">{errors.treatment_type}</div>}
+          </div>
+
+          {/* วันที่รักษา */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1 block">วันที่รักษา</label>
+            <DatePickerField
+              value={value.treatment_date}
+              onChange={(iso) => onChange({ ...value, treatment_date: iso })}
+              maxDate={new Date()}
+              placeholder="เลือกวันที่รักษา"
+            />
+            {errors.treatment_date && <div className="text-red-600 text-sm mt-1">{errors.treatment_date}</div>}
+          </div>
+
+          {/* สรุป & หมายเหตุ */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1 block">สรุปการรักษา</label>
+            <input
+              className="w-full border rounded-lg px-3 py-2 text-[14px] border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="สรุป/วินิจฉัยโดยย่อ"
+              value={value.diagnosis_summary || ''}
+              onChange={(e) => onChange({ ...value, diagnosis_summary: e.target.value })}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-sm text-gray-600 mb-1 block">หมายเหตุ</label>
+            <textarea
+              rows={3}
+              className="w-full border rounded-lg px-3 py-2 text-[14px] border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="บันทึกเพิ่มเติม (ถ้ามี)"
+              value={value.note || ''}
+              onChange={(e) => onChange({ ...value, note: e.target.value })}
+            />
           </div>
         </div>
-      )}
 
-      {/* treatment_type */}
-      <div>
-        <label className="text-sm text-gray-600 mb-1 block">ประเภทการรักษา</label>
-        <Select
-          components={animatedComponents}
-          styles={rsx}
-          menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
-          menuPosition="fixed"
-          menuShouldBlockScroll
-          isSearchable={false}
-          isClearable={false}
-          placeholder="-- เลือกประเภทการรักษา --"
-          options={treatmentTypeOptions}
-          // map สตริงใน state -> option object
-          value={treatmentTypeOptions.find(o => o.value === value.treatment_type) ?? null}
-          // รับค่าที่เลือก (หรือ null ถ้าล้าง) แล้ว map กลับเป็นสตริงเก็บใน state
-          onChange={(opt) => onChange({
-            ...value,
-            treatment_type: opt ? (opt as { value: 'ประจำ' | 'ทำครั้งเดียว' }).value : '',
-          })}
-
-          name="treatment_type"
+        {/* 🔎 Modal ค้นหาผู้ป่วย — อยู่ “ใน” คอมโพเนนต์ เพื่อให้มองเห็น lookupOpen */}
+        <PatientLookupModal
+          open={lookupOpen}
+          onClose={() => setLookupOpen(false)}
+          onSelect={(p: any) => {
+            const hn = normalizePatientsId(p?.patients_id || '');
+            onChange({ ...value, patients_id: hn });
+            setPatientInfo(p);
+            setVerifyErr('');
+            setLookupOpen(false);
+          }}
         />
-        {errors.treatment_type && <div className="text-red-600 text-sm mt-1">{errors.treatment_type}</div>}
-      </div>
-
-      {/* treatment_date */}
-      <div>
-        <label className="text-sm text-gray-600 mb-1 block">วันที่รักษา</label>
-        <DatePickerField
-          value={value.treatment_date}                 // string: 'YYYY-MM-DD'
-          onChange={(iso) => onChange({               // iso คือ string 'YYYY-MM-DD'
-            ...value,
-            treatment_date: iso,
-          })}
-          maxDate={new Date()}                         // ไม่ให้เลือกวันที่อนาคต
-          placeholder="เลือกวันที่รักษา"
-        />
-        {errors.treatment_date && (
-          <div className="text-red-600 text-sm mt-1">{errors.treatment_date}</div>
-        )}
-      </div>
-
-      {/* diagnosis_summary */}
-      <div>
-        <label className="text-sm text-gray-600 mb-1 block">สรุปการรักษา</label>
-        <input
-          className="w-full border rounded-lg px-3 py-2 text-[14px] border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="สรุป/วินิจฉัยโดยย่อ"
-          value={value.diagnosis_summary || ''}
-          onChange={(e) => onChange({ ...value, diagnosis_summary: e.target.value })}
-        />
-      </div>
-
-      {/* note */}
-      <div className="md:col-span-2">
-        <label className="text-sm text-gray-600 mb-1 block">หมายเหตุ</label>
-        <textarea
-          rows={3}
-          className="w-full border rounded-lg px-3 py-2 text-[14px] border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="บันทึกเพิ่มเติม (ถ้ามี)"
-          value={value.note || ''}
-          onChange={(e) => onChange({ ...value, note: e.target.value })}
-        />
-      </div>
-    </div>
-  );
-});
+      </>
+    );
+  }
+);
 
 TreatmentForm.displayName = 'TreatmentForm';
 export default TreatmentForm;

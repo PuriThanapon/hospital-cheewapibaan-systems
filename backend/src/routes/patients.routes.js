@@ -1,27 +1,32 @@
 const express = require('express');
-const ctrl = require('../controllers/patients.controller')
-const homeNeedsCtrl = require('../controllers/home_needs.controller')
+const ctrl = require('../controllers/patients.controller');
+const homeNeedsCtrl = require('../controllers/home_needs.controller');
 const router = express.Router();
 
-// /api/patients/next-id
-router.get('/next-id', ctrl.getNextPatientId);
+/**
+ * ⛳️ หลักการ:
+ * 1) เส้นทาง static/specific ต้องมาก่อน :id
+ * 2) ไม่ใช้ regex ใน path เพื่อหลีกเลี่ยง path-to-regexp version mismatch
+ */
 
-// /api/patients
+// static/specific
+router.get('/next-id', ctrl.getNextPatientId);
+router.get('/search', ctrl.search);
+router.get('/recent', ctrl.recent);
+
+// list ทั้งหมด
 router.get('/', ctrl.listPatients);
 
-// /api/patients/:id
+// เส้นทางย่อยที่ขึ้นต้นด้วย :id (อย่ามี regex)
+router.get('/:id/file/:field', ctrl.downloadPatientFile);
+router.patch('/:id/deceased', ctrl.markDeceased);
+router.get('/:id/home-needs/latest', homeNeedsCtrl.latestForPatient);
+
+// รายการเดียว (วางท้ายสุด)
 router.get('/:id', ctrl.getOnePatient);
 
-// ✅ รองรับ multipart/form-data และไฟล์แนบ
+// เขียน/แก้ไข (multipart)
 router.post('/', ctrl.uploadPatientFiles, ctrl.createPatient);
 router.put('/:id', ctrl.uploadPatientFiles, ctrl.updatePatient);
-
-// ✅ ดาวน์โหลดไฟล์แนบ: field = patient_id_card | house_registration | patient_photo | relative_id_card
-router.get('/:id/file/:field', ctrl.downloadPatientFile);
-
-// ✅ เปลี่ยนสถานะเป็นเสียชีวิต
-router.patch('/:id/deceased', ctrl.markDeceased);
-
-router.get('/:id/home-needs/latest', homeNeedsCtrl.latestForPatient);
 
 module.exports = router;

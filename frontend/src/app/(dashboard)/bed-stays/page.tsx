@@ -5,6 +5,8 @@ import { BedDouble, Plus, ArrowLeftRight, History, X, CheckCircle2, LogOut, User
 import Modal from '@/app/components/ui/Modal';
 import DatePickerField from '@/app/components/DatePicker';
 import TimePicker from '@/app/components/TimePicker';
+import PatientLookupModal from '@/app/components/modals/PatientLookupModal';
+
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
@@ -136,6 +138,7 @@ export default function BedStaysPage() {
     const [hasBedsApi, setHasBedsApi] = useState(true); // ถ้า 404 จะสลับไปโหมดกรอก bed_id ตรงๆ
 
     // modals state
+    const [lookupOpen, setLookupOpen] = useState(false);
     const [openAssign, setOpenAssign] = useState(false);
     const [assign, setAssign] = useState({
         hn: '',
@@ -163,20 +166,16 @@ export default function BedStaysPage() {
 
     // fetch
 
-    async function fetchCurrent() {
-            const data = await http<{ data: Occupancy[] }>('/api/bed_stays/current');
-            
-            setOccupancy(data.data || []);
-        }async function fetchCurrent() {
-        try {
-            const data = await http<{ data: Occupancy[] }>('/api/bed_stays/current');
-             // Debug: ดูโครงสร้างข้อมูล
-            setOccupancy(data.data || []);
-        } catch (e) {
-            console.error('fetchCurrent error:', e);
-            setOccupancy([]);
-        }
+   async function fetchCurrent() {
+    try {
+        const data = await http<{ data: Occupancy[] }>('/api/bed_stays/current');
+        setOccupancy(data.data || []);
+    } catch (e) {
+        console.error('fetchCurrent error:', e);
+        setOccupancy([]);
     }
+    }
+
     async function fetchBedsMaybe() {
         try {
             const data = await http<{ data: Bed[] } | Bed[]>('/api/beds');
@@ -555,6 +554,15 @@ export default function BedStaysPage() {
                                     <button className="px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors" type="button" onClick={verifyHN}>ตรวจสอบ</button>
                                 </div>
                                 {assign.patient && <div className="mt-2 text-sm text-gray-600">ผู้ป่วย: <span className="font-bold">{assign.patient}</span></div>}
+                                <div className="mt-2">
+                                <button
+                                    type="button"
+                                    className="text-sm text-blue-600 hover:text-blue-700 underline"
+                                    onClick={() => setLookupOpen(true)}
+                                >
+                                    ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
+                                </button>
+                                </div>
                             </label>
 
                             <label>
@@ -782,6 +790,24 @@ export default function BedStaysPage() {
                     </Modal>
                 )}
             </div>
+            <PatientLookupModal
+                open={lookupOpen}
+                onClose={() => setLookupOpen(false)}
+                onSelect={(p) => {
+                    const name = `${p.pname ?? ''}${p.first_name ?? ''} ${p.last_name ?? ''}`
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                    setAssign(a => ({
+                    ...a,
+                    hn: normalizeHN(p.patients_id),
+                    patient: name || normalizeHN(p.patients_id),
+                    verified: true,          // ✅ ถือว่าตรวจสอบแล้วเพราะเลือกจากระบบ
+                    }));
+                    setLookupOpen(false);
+                    toast.fire({ icon: 'success', title: `เลือกผู้ป่วย: ${name || normalizeHN(p.patients_id)}` });
+                }}
+                />
         </div>
+        
     );
 }

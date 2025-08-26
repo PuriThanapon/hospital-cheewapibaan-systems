@@ -12,22 +12,24 @@ const FILE_FIELDS = [
 
 /** ตัวช่วยเล็ก ๆ */
 const pick = (v) => (v === undefined ? undefined : v);
+const onlyDigits = (s = '') => String(s).replace(/\D/g, '');
 
 /* ==========================
  * Basic queries
  * ========================== */
 exports.getLatestPatientId = async () => {
+  // เผื่ออนาคตมีรูปแบบ HN ไม่เท่ากัน: จัดเรียงด้วยเลขล้วน
   const r = await pool.query(`
     SELECT patients_id
     FROM patients
-    ORDER BY patients_id DESC
+    ORDER BY (regexp_replace(patients_id, '\\D', '', 'g'))::int DESC
     LIMIT 1
   `);
   return r.rows[0]?.patients_id || null;
 };
 
 /* ==========================
- * List / Search
+ * List / Search (หน้า list)
  * ========================== */
 exports.listPatients = async (query) => {
   const page  = Math.max(parseInt(query.page, 10)  || 1, 1);
@@ -62,15 +64,18 @@ exports.listPatients = async (query) => {
   if (admitTo)      { where.push(`p.admittion_date <= $${i++}`); vals.push(admitTo); }
 
   if (q) {
+    // แก้การต่อชื่อให้มีช่องว่างหลังคำนำหน้า และเพิ่ม phone/card เข้าเงื่อนไขค้นหา
     where.push(`(
       p.patients_id ILIKE $${i} OR
-      CONCAT(COALESCE(p.pname,''), COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) ILIKE $${i} OR
+      (COALESCE(p.pname || ' ', '') || COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')) ILIKE $${i} OR
       COALESCE(p.gender,'')         ILIKE $${i} OR
       COALESCE(p.blood_group,'')    ILIKE $${i} OR
       COALESCE(p.bloodgroup_rh,'')  ILIKE $${i} OR
       COALESCE(p.patients_type,'')  ILIKE $${i} OR
       COALESCE(p.disease,'')        ILIKE $${i} OR
-      COALESCE(p.religion,'')       ILIKE $${i}
+      COALESCE(p.religion,'')       ILIKE $${i} OR
+      COALESCE(p.phone_number,'')   ILIKE $${i} OR
+      COALESCE(p.card_id,'')        ILIKE $${i}
     )`);
     vals.push(`%${q}%`);
     i++;
@@ -94,7 +99,7 @@ exports.listPatients = async (query) => {
       p.address, p.nationality, p.religion, p.disease,
       p.status, p.admittion_date,
       -- เฉพาะ flag ว่ามีไฟล์ไหม (ไม่ดึง BYTEA ออกมาเพื่อลด payload)
-      (p.patient_id_card   IS NOT NULL) AS has_patient_id_card,
+      (p.patient_id_card    IS NOT NULL) AS has_patient_id_card,
       (p.house_registration IS NOT NULL) AS has_house_registration,
       (p.patient_photo      IS NOT NULL) AS has_patient_photo,
       (p.relative_id_card   IS NOT NULL) AS has_relative_id_card
@@ -134,7 +139,7 @@ exports.getPatientById = async (patients_id) => {
       p.address, p.nationality, p.religion, p.disease,
       p.status, p.admittion_date, p.card_id, p.weight, p.height,
       p.death_date, p.death_time, p.death_cause, p.management,
-      (p.patient_id_card   IS NOT NULL) AS has_patient_id_card,
+      (p.patient_id_card    IS NOT NULL) AS has_patient_id_card,
       (p.house_registration IS NOT NULL) AS has_house_registration,
       (p.patient_photo      IS NOT NULL) AS has_patient_photo,
       (p.relative_id_card   IS NOT NULL) AS has_relative_id_card
@@ -300,3 +305,81 @@ exports.markDeceased = async (patients_id, { death_date, death_time, death_cause
   );
   return r.rows[0] || { patients_id };
 };
+
+/* ============================================================
+ *  เพิ่มโหมดลืม HN:
+ *    - searchPatients: อินพุตเดียว ค้นหาจาก HN/ชื่อ/เลขบัตร/เบอร์ + ตัวกรอง DOB/แผนก
+ *    - listRecentPatients: รายชื่อล่าสุด (ใช้ last_visit หรือ updated_at)
+ *    - มี fallback อัตโนมัติ ถ้ายังไม่ได้เปิด pg_trgm (similarity / %)
+ * ============================================================ */
+// ✅ ค้นหาแบบ fuzzy: ยอมรับ q สั้นได้ (แม้ 1 ตัว), ใส่ limit กัน scan
+exports.searchPatients = async (query) => {
+  const qRaw = (query.q || '').trim();
+  const dob  = (query.dob || '').trim();        // 'YYYY-MM-DD'
+  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 20, 1), 100);
+
+  const where = [];
+  const vals  = [];
+  let i = 1;
+
+  if (qRaw) {
+    where.push(`(
+      p.patients_id ILIKE $${i} OR
+      (COALESCE(p.pname,'') || COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')) ILIKE $${i} OR
+      COALESCE(p.card_id,'')      ILIKE $${i} OR
+      COALESCE(p.phone_number,'') ILIKE $${i}
+    )`);
+    vals.push(`%${qRaw}%`); i++;
+  }
+  if (dob) {
+    where.push(`p.birthdate = $${i}`); vals.push(dob); i++;
+  }
+  // NOTE: ถ้ายังไม่มีคอลัมน์ department ในตาราง patients ให้ “ไม่” กรอง dept
+
+  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  // จัดอันดับ: exact HN ตรงเป๊ะมาก่อน แล้วค่อย updated ล่าสุด
+  const orderParts = [];
+  if (qRaw) {
+    orderParts.push(`CASE WHEN p.patients_id = $${i} THEN 0 ELSE 1 END`);
+    vals.push(normalizePatientsIdFromQuery(qRaw) || ''); i++;
+  }
+  orderParts.push(`p.updated_at DESC NULLS LAST`);
+  orderParts.push(`p.admittion_date DESC NULLS LAST`);
+  orderParts.push(`p.patients_id DESC`);
+  const orderClause = `ORDER BY ${orderParts.join(', ')}`;
+
+  const sql = `
+    SELECT
+      p.patients_id, p.pname, p.first_name, p.last_name, p.gender, p.birthdate,
+      p.phone_number, p.patients_type, p.blood_group, p.bloodgroup_rh, p.disease,
+      p.admittion_date, p.updated_at
+    FROM patients p
+    ${whereClause}
+    ${orderClause}
+    LIMIT $${i}
+  `;
+  vals.push(limit);
+
+  const { rows } = await pool.query(sql, vals);
+  return rows;
+};
+
+// ✅ รายชื่อผู้ป่วยล่าสุด (ใช้ในโหมด "ลืมทั้งหมด")
+exports.listRecentPatients = async ({ limit = 50, offset = 0 }) => {
+  const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+  const off = Math.max(parseInt(offset, 10) || 0, 0);
+
+  const sql = `
+    SELECT
+      p.patients_id, p.pname, p.first_name, p.last_name, p.gender, p.birthdate,
+      p.phone_number, p.patients_type, p.blood_group, p.bloodgroup_rh, p.disease,
+      p.admittion_date, p.updated_at
+    FROM patients p
+    ORDER BY p.updated_at DESC NULLS LAST, p.admittion_date DESC NULLS LAST, p.patients_id DESC
+    LIMIT $1 OFFSET $2
+  `;
+  const { rows } = await pool.query(sql, [lim, off]);
+  return rows;
+};
+

@@ -1,6 +1,7 @@
 // controllers/patients.controller.js
 const { pool } = require('../config/db');
 const multer = require('multer');
+const model = require('../models/patients.model'); // ✅ ต้องมี
 
 /* ---------------- helpers ---------------- */
 const toPatientsId = (v) => {
@@ -114,13 +115,15 @@ async function listPatients(req, res, next) {
     if (q) {
       where.push(`(
         p.patients_id ILIKE $${i} OR
-        CONCAT(COALESCE(p.pname,''), COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) ILIKE $${i} OR
+        (COALESCE(p.pname || ' ', '') || COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')) ILIKE $${i} OR
         COALESCE(p.gender,'')         ILIKE $${i} OR
         COALESCE(p.blood_group,'')    ILIKE $${i} OR
         COALESCE(p.bloodgroup_rh,'')  ILIKE $${i} OR
         COALESCE(p.patients_type,'')  ILIKE $${i} OR
         COALESCE(p.disease,'')        ILIKE $${i} OR
-        COALESCE(p.religion,'')       ILIKE $${i}
+        COALESCE(p.religion,'')       ILIKE $${i} OR
+        COALESCE(p.phone_number,'')   ILIKE $${i} OR
+        COALESCE(p.card_id,'')        ILIKE $${i}
       )`);
       vals.push(`%${q}%`);
       i++;
@@ -177,7 +180,6 @@ async function getOnePatient(req, res, next) {
     );
     if (!r.rows.length) return res.status(404).json({ message: 'ไม่พบข้อมูลผู้ป่วย' });
     const row = r.rows[0];
-    // ซ่อนตัว BYTEA ออก (กัน payload บวม กรณี schema เดิมมี select *)
     FILE_FIELDS.forEach(f => { delete row[f]; });
     for (const f of FILE_FIELDS) {
       delete row[`${f}_mime`];
@@ -204,7 +206,6 @@ async function downloadPatientFile(req, res, next) {
     if (!row || !row.file) return res.status(404).json({ message: 'ไม่พบไฟล์' });
 
     res.setHeader('Content-Type', row.mime || 'application/octet-stream');
-    const fname = row.name || `${patientId}-${field}`;
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type');
     return res.send(row.file);
   } catch (e) { next(e); }
@@ -219,7 +220,6 @@ async function createPatient(req, res, next) {
 
     const phone_number = b.phone_number ?? b.phone ?? null;
 
-    // ไฟล์จาก multer
     const f = {
       patient_id_card:    fileFrom(req.files, 'patient_id_card'),
       house_registration: fileFrom(req.files, 'house_registration'),
@@ -262,7 +262,7 @@ async function createPatient(req, res, next) {
 
     const r = await pool.query(sql, params);
     const row = r.rows[0];
-    FILE_FIELDS.forEach(ff => { delete row[ff]; }); // กันส่ง BYTEA กลับ
+    FILE_FIELDS.forEach(ff => { delete row[ff]; });
     res.status(201).json({ ...row, hn: row.patients_id });
   } catch (err) { next(err); }
 }
@@ -299,7 +299,6 @@ async function updatePatient(req, res, next) {
     }
     sets.push(`updated_at = NOW()`);
 
-    // ไฟล์ใหม่จาก multer หรือสั่งลบไฟล์
     const f = {
       patient_id_card:    fileFrom(req.files, 'patient_id_card'),
       house_registration: fileFrom(req.files, 'house_registration'),
@@ -374,7 +373,6 @@ async function markDeceased(req, res, next) {
       [patientId, death_date, death_time, death_cause, management || null]
     );
 
-    // ตัวอย่าง: ยกเลิกนัดในอนาคต
     await client.query(
       `DELETE FROM appointment
         WHERE patients_id=$1
@@ -389,13 +387,31 @@ async function markDeceased(req, res, next) {
     const updated = updRows[0];
     return res.json({ message: 'บันทึกการเสียชีวิตสำเร็จ', patient: { ...updated, hn: updated.patients_id } });
   } catch (e) {
-    await pool.query('ROLLBACK').catch(() => {});
+    // ✅ ต้อง rollback บน client ไม่ใช่ pool
+    try { await client.query('ROLLBACK'); } catch {}
     next(e);
   } finally {
     client.release();
   }
 }
 
+/* ---- โหมดลืม HN: delegate ไป model (ต้องมีใน models/patients.model.js) ---- */
+async function search(req, res, next) {
+  try {
+    const rows = await model.searchPatients(req.query);
+    res.json({ data: rows });
+  } catch (e) { next(e); }
+}
+async function recent(req, res, next) {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || 50,10), 200);
+    const offset = parseInt(req.query.offset || 0,10);
+    const rows = await model.listRecentPatients({ limit, offset });
+    res.json({ data: rows });
+  } catch (e) { next(e); }
+}
+
+/* ---- exports แบบเดียว ให้ router.require ไปได้แน่นอน ---- */
 module.exports = {
   // middleware
   uploadPatientFiles,
@@ -408,4 +424,8 @@ module.exports = {
   updatePatient,
   downloadPatientFile,
   markDeceased,
+
+  // lookup (ลืม HN)
+  search,
+  recent,
 };
