@@ -94,6 +94,7 @@ async function listPatients(req, res, next) {
     const religion = req.query.religion || '';
     const admitFrom = req.query.admit_from || '';
     const admitTo = req.query.admit_to || '';
+    const treatAt = req.query.treat_at || '';
     const q = (req.query.q || '').trim();
     const sortName = (req.query.sort_name || '').toLowerCase();
 
@@ -111,6 +112,7 @@ async function listPatients(req, res, next) {
     if (religion) { where.push(`p.religion = $${i++}`); vals.push(religion); }
     if (admitFrom) { where.push(`p.admittion_date >= $${i++}`); vals.push(admitFrom); }
     if (admitTo) { where.push(`p.admittion_date <= $${i++}`); vals.push(admitTo); }
+    if (treatAt) { where.push(`p.treat_at = $${i++}`); vals.push(treatAt); }
 
     if (q) {
       where.push(`(
@@ -140,7 +142,7 @@ async function listPatients(req, res, next) {
       SELECT
         p.patients_id, p.pname, p.first_name, p.last_name, p.gender,
         p.birthdate, p.patients_type, p.blood_group, p.bloodgroup_rh,
-        p.disease, p.status, p.nationality, p.religion, p.admittion_date,
+        p.disease, p.status, p.nationality, p.religion, p.admittion_date, p.treat_at,
         p.phone_number AS phone,
         (p.patient_id_card     IS NOT NULL) AS has_patient_id_card,
         (p.house_registration  IS NOT NULL) AS has_house_registration,
@@ -232,27 +234,33 @@ async function createPatient(req, res, next) {
         patients_id,
         pname, first_name, last_name, card_id, gender, address, birthdate, nationality,
         patients_type, blood_group, bloodgroup_rh, phone_number, height, weight, status,
-        admittion_date, disease, religion,
+        admittion_date, disease, religion, treat_at,
         patient_id_card, patient_id_card_mime, patient_id_card_name,
         house_registration, house_registration_mime, house_registration_name,
         patient_photo, patient_photo_mime, patient_photo_name,
         relative_id_card, relative_id_card_mime, relative_id_card_name
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,
-        $10,$11,$12,$13,$14,$15,$16,
-        COALESCE($17::date, CURRENT_DATE), $18, $19,
-        $20,$21,$22,
-        $23,$24,$25,
-        $26,$27,$28,
-        $29,$30,$31
+        $1,  $2,  $3,  $4,  $5,  $6,  $7,
+        NULLIF($8,'')::date,          -- birthdate (ว่าง = NULL)
+        $9,
+        $10, $11, $12, $13,
+        NULLIF($14,'')::numeric,      -- height (ว่าง = NULL)
+        NULLIF($15,'')::numeric,      -- weight (ว่าง = NULL)
+        COALESCE(NULLIF($16,''), 'active'),               -- status (ว่าง = 'active')
+        COALESCE(NULLIF($17,'')::date, CURRENT_DATE),     -- admittion_date (ว่าง = วันนี้)
+        $18, $19, $20,
+        $21, $22, $23,
+        $24, $25, $26,
+        $27, $28, $29,
+        $30, $31, $32
       )
-      RETURNING *, phone_number AS phone
+      RETURNING *, phone_number AS phone;
     `;
     const params = [
       pid,
       b.pname, b.first_name, b.last_name, b.card_id, b.gender, b.address, b.birthdate, b.nationality,
       b.patients_type, b.blood_group, b.bloodgroup_rh, phone_number, b.height, b.weight, 'มีชีวิต',
-      b.admittion_date, b.disease, b.religion,
+      b.admittion_date, b.disease, b.religion, b.treat_at,
 
       f.patient_id_card?.buffer || null, f.patient_id_card?.mime || null, f.patient_id_card?.name || null,
       f.house_registration?.buffer || null, f.house_registration?.mime || null, f.house_registration?.name || null,
@@ -323,7 +331,7 @@ async function updatePatient(req, res, next) {
       'pname', 'first_name', 'last_name', 'card_id', 'birthdate',
       'gender', 'nationality', 'weight', 'height',
       'patients_type', 'blood_group', 'bloodgroup_rh',
-      'disease', 'address', 'admittion_date', 'religion',
+      'disease', 'address', 'admittion_date', 'religion', 'treat_at',
     ];
 
     for (const key of updatable) {

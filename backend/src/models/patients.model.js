@@ -45,6 +45,7 @@ exports.listPatients = async (query) => {
   const religion     = query.religion || '';
   const admitFrom    = query.admit_from || '';
   const admitTo      = query.admit_to || '';
+  const treat_at     = query.treat_at || '';
   const q            = (query.q || '').trim();
   const sortName     = (query.sort_name || '').toLowerCase(); // asc | desc
 
@@ -96,7 +97,7 @@ exports.listPatients = async (query) => {
     SELECT
       p.patients_id, p.pname, p.first_name, p.last_name, p.gender,
       p.birthdate, p.phone_number, p.patients_type, p.blood_group, p.bloodgroup_rh,
-      p.address, p.nationality, p.religion, p.disease,
+      p.address, p.nationality, p.religion, p.disease, p.treat_at,
       p.status, p.admittion_date,
       -- เฉพาะ flag ว่ามีไฟล์ไหม (ไม่ดึง BYTEA ออกมาเพื่อลด payload)
       (p.patient_id_card    IS NOT NULL) AS has_patient_id_card,
@@ -136,7 +137,7 @@ exports.getPatientById = async (patients_id) => {
     SELECT
       p.patients_id, p.pname, p.first_name, p.last_name, p.gender,
       p.birthdate, p.phone_number, p.patients_type, p.blood_group, p.bloodgroup_rh,
-      p.address, p.nationality, p.religion, p.disease,
+      p.address, p.nationality, p.religion, p.disease, p.treat_at,
       p.status, p.admittion_date, p.card_id, p.weight, p.height,
       p.death_date, p.death_time, p.death_cause, p.management,
       (p.patient_id_card    IS NOT NULL) AS has_patient_id_card,
@@ -197,7 +198,7 @@ exports.createPatient = async (body, fileObjs = {}) => {
     INSERT INTO patients (
       patients_id, pname, first_name, last_name, gender,
       birthdate, phone_number, patients_type, blood_group, bloodgroup_rh,
-      address, nationality, religion, disease, status, admittion_date,
+      address, nationality, religion, disease, status, admittion_date, treat_at,
       card_id, weight, height,
       patient_id_card, patient_id_card_mime, patient_id_card_name,
       house_registration, house_registration_mime, house_registration_name,
@@ -207,12 +208,12 @@ exports.createPatient = async (body, fileObjs = {}) => {
     VALUES (
       $1,$2,$3,$4,$5,
       $6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16,
-      $17,$18,$19,
-      $20,$21,$22,
-      $23,$24,$25,
-      $26,$27,$28,
-      $29,$30,$31
+      $11,$12,$13,$14,$15,$16,$17,
+      $18,$19,$20,
+      $21,$22,$23,
+      $24,$25,$26,
+      $27,$28,$29,
+      $30,$31,$32
     )
     RETURNING patients_id
   `;
@@ -232,7 +233,7 @@ exports.updatePatient = async (patients_id, body = {}, fileObjs = {}) => {
     'pname','first_name','last_name','gender','birthdate',
     'phone_number','patients_type','blood_group','bloodgroup_rh',
     'address','nationality','religion','disease','status',
-    'admittion_date','card_id','weight','height',
+    'admittion_date','card_id','weight','height', 'treat_at',
   ];
 
   for (const key of updatable) {

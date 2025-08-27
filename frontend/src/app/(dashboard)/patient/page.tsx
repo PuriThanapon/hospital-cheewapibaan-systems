@@ -6,7 +6,7 @@ import {
   Search, X, Plus, Pencil, Eye, CalendarPlus, Skull, RefreshCw,
   User, Calendar, FileText, CheckCircle, AlertCircle, Heart,
   Phone, MapPin, Droplets, IdCard,
-  CalendarArrowDown,
+  CalendarArrowDown,MapPinPlusInside,
   CardSim,
 } from 'lucide-react';
 import makeAnimated from 'react-select/animated';
@@ -99,6 +99,10 @@ const statusOptions = [
   { value: 'เสียชีวิต', label: 'เสียชีวิต' },
   { value: 'จำหน่าย', label: 'จำหน่าย' },
 ];
+const treatatOptions = [
+  { value: 'โรงพยาบาล', label: 'โรงพยาบาล'},
+  { value: 'บ้าน', label: 'บ้าน'},
+]
 
 type FileField =
   | 'patient_id_card'
@@ -331,7 +335,7 @@ export default function PatientsPage() {
   // state: query + filters + pagination
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState({
-    gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: ''
+    treat_at: '',gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: ''
   });
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -397,11 +401,11 @@ export default function PatientsPage() {
   }, [qs]);
 
   const clearFilters = () => {
-    setFilters({ gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: '' });
+    setFilters({ treat_at: '',gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: '' });
     setPage(1); setTick(t => t + 1);
   };
   const activeFilterEntries = useMemo(() => Object.entries(filters).filter(([, v]) => !!v), [filters]);
-  const filterLabels = { status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
+  const filterLabels = { treat_at: 'รักษาที่',status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
 
   // actions
   const refresh = () => setTick(t => t + 1);
@@ -712,6 +716,19 @@ export default function PatientsPage() {
       <div className={styles.sectionTitle}>ตัวกรอง</div>
       <div className={styles.filtersBar}>
         <div>
+          <div className={styles.label}>รักษาที่</div>
+          <Select
+            components={animatedComponents}
+            styles={rsx}
+            menuPortalTarget={menuPortalTarget}
+            isClearable
+            placeholder="ทั้งหมด"
+            options={treatatOptions}
+            value={treatatOptions.find(o => o.value === filters.treat_at) ?? null}
+            onChange={(opt) => { setFilters(f => ({ ...f, treat_at: opt?.value || '' })); setPage(1); }}
+          />
+        </div>
+        <div>
           <div className={styles.label}>สถานะผู้ป่วย</div>
           <Select
             components={animatedComponents}
@@ -837,7 +854,7 @@ export default function PatientsPage() {
               <th className={styles.th}>อายุ</th>
               <th className={styles.th}>กรุ๊ปเลือด</th>
               <th className={styles.th}>ประเภท</th>
-              <th className={styles.th}>โรคประจำตัว</th>
+              <th className={styles.th}>รักษาที่</th>
               <th className={styles.th}>สถานะ</th>
               <th className={styles.th}>การทำงาน</th>
             </tr>
@@ -851,7 +868,7 @@ export default function PatientsPage() {
                 <td className={styles.td}>{calculateAgeFromBirthdate(r.birthdate || '-')}</td>
                 <td className={styles.td}>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</td>
                 <td className={styles.td}>{r.patients_type || '-'}</td>
-                <td className={styles.td}>{r.disease || '-'}</td>
+                <td className={styles.td}>{r.treat_at || '-'}</td>
                 <td className={styles.td}><Pill alive={r.status !== 'เสียชีวิต'} /></td>
                 <td className={styles.td}>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1291,6 +1308,13 @@ export default function PatientsPage() {
                     <span className="font-semibold text-gray-700">ประเภทผู้ป่วย</span>
                   </div>
                   <div className="text-gray-900 text-lg">{verifyData.patients_type || '-'}</div>
+                </div>
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPinPlusInside size={14} className="text-blue-600" />
+                    <span className="font-semibold text-gray-700">รักษาที่</span>
+                  </div>
+                  <div className="text-gray-900 text-lg">{verifyData.treat_at || '-'}</div>
                 </div>
                 <div className="md:col-span-2 p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl border border-yellow-200">
                   <div className="flex items-center gap-2 mb-2">

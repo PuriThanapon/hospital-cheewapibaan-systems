@@ -245,11 +245,11 @@ function EventCalendarInner() {
       // ถ้าไม่มีนัดที่ยังไม่ถึงเวลา → แสดง 3 รายการแรกของวันนี้แทน
       return upcoming.length ? upcoming : list.slice(0, 3);
     }
-    return list.slice(0, 3);
+    return list.slice(0, 5);
   }, [monthEvents, selectedKey]);
 
   return (
-    <div className="bg-white rounded-md p-4">
+    <div className="bg-white rounded-2xl h-full p-4">
       <Calendar
         onChange={onChange}
         value={value}
@@ -267,7 +267,7 @@ function EventCalendarInner() {
 
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-semibold my-4">
-          {selectedKey === toYMD(new Date()) ? "3 รายการใกล้ถึงวันนี้" : "การนัดหมาย (แสดง 3 รายการแรก)"}{" "}
+          {selectedKey === toYMD(new Date()) ? "" : "การนัดหมาย (แสดง 5 รายการแรก)"}{" "}
           •{" "}
           {selectedDate.toLocaleDateString("th-TH", {
             weekday: "long",

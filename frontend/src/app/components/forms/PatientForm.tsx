@@ -84,6 +84,10 @@ const rhOptions = [
   { value: 'Rh+', label: 'Rh+' },
   { value: 'Rh-', label: 'Rh-' },
 ];
+const treatatOptions = [
+  { value: 'โรงพยาบาล', label: 'โรงพยาบาล' },
+  { value: 'บ้าน', label: 'บ้าน' },
+];
 
 /* ---------------- Validation (เฉพาะ 7 ช่อง) ---------------- */
 const FIELD_META = {
@@ -94,6 +98,7 @@ const FIELD_META = {
   blood_group:   { label: 'กรุ๊ปเลือด',      focusName: 'blood_group' },
   bloodgroup_rh: { label: 'ประเภท Rh',       focusName: 'bloodgroup_rh' },
   disease:       { label: 'โรคประจำตัว',     focusName: 'disease' },
+  treat_at:       { label: 'รักษาที่',     focusName: 'treat_at' },
 };
 const DEFAULT_REQUIRED = Object.keys(FIELD_META);
 
@@ -476,6 +481,30 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               value={v.blood_group && v.bloodgroup_rh ? `${v.blood_group}${v.bloodgroup_rh}` : ''}
               readOnly
               placeholder="เช่น A Rh+"
+            />
+          </InputField>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <InputField label="รักษาที่" required error={errors.treat_at}>
+            <Select
+              components={animatedComponents}
+              styles={{
+                ...ortherrsx,
+                menuPortal: (base) => ({ ...base, zIndex: 12050 }),
+                menu:       (base) => ({ ...base, zIndex: 12050 }),
+              }}
+              menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+              menuPosition="fixed"
+              menuShouldBlockScroll
+              isSearchable={false}
+              isClearable={false}
+              placeholder="-- เลือกสถานที่รักษา --"
+              options={treatatOptions}
+              value={treatatOptions.find((o) => o.value === v.treat_at) ?? null}
+              onChange={(opt) => onChange({ ...v, treat_at: opt?.value ?? '' })}
+              name="treat_at"
+              onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
             />
           </InputField>
         </div>
