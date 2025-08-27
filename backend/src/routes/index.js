@@ -46,7 +46,8 @@ router.use('/careplans', require('./careplan.routes'));
 router.use('/drug-codes', drugCodesRoutes);  // /api/drug-codes
 router.use('/drug_codes', drugCodesRoutes);  // /api/drug_codes  (alias)
 router.use('/allergies', allergiesRoutes);
-
+router.use('/treatment-plans', require('./treatmentPlans.routes'));
+router.use('/treatmentPlans', require('./treatmentPlans.routes'));
 // endpoints เฉพาะกิจ
 router.get('/patients/:id/home-needs/latest', homeNeedsController.latestForPatient);
 router.patch('/patients/:id/deceased',        deathController.aliasMarkFromPatients);

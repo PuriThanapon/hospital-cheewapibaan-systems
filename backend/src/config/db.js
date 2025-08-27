@@ -9,5 +9,5 @@ password: process.env.DB_PASSWORD,
 database: process.env.DB_NAME,
 });
 
-
-module.exports = { pool };
+const query = (text, params) => pool.query(text, params);
+module.exports = { pool , query };

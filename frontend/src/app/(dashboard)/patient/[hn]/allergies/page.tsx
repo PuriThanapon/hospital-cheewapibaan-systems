@@ -13,8 +13,8 @@ type Outcome = 'recovered' | 'improving' | 'unchanged' | 'worsened' | 'death';
 type PatientType = 'OPD' | 'IPD' | 'ER' | 'HOME' | 'UNKNOWN';
 
 type AllergyForm = {
-  report_date: string;
-  onset_date: string;
+  report_date: string;   // YYYY-MM-DD
+  onset_date: string;    // YYYY-MM-DD
   substance: string;
   custom_substance?: string;
   reaction: string;
@@ -54,14 +54,13 @@ type DrugCode = {
   note?: string | null;
 };
 
-/* ---------- Fallback drug names (ใช้เมื่อโหลดจาก DB ไม่สำเร็จ) ---------- */
+/* ---------- Fallback drug names ---------- */
 const FALLBACK_DRUGS = [
   'PARACETAMOL','IBUPROFEN','AMOXICILLIN','CLARITHROMYCIN','METRONIDAZOLE',
   'PENICILLIN V','ASPIRIN','TRIMETHOPRIM/SULFAMETHOXAZOLE','CLINDAMYCIN',
   'AZITHROMYCIN','CIPROFLOXACIN','LEVOFLOXACIN','CEPHALEXIN','CEFTRIAXONE',
   'DOXYCYCLINE','ERYTHROMYCIN','NAPROXEN','DICLOFENAC','MORPHINE','CODEINE',
-  'PREDNISOLONE','OMEPRAZOLE','RANITIDINE','METFORMIN','INSULIN REGULAR',
-  'อื่น ๆ',
+  'PREDNISOLONE','OMEPRAZOLE','RANITIDINE','METFORMIN','INSULIN REGULAR','อื่น ๆ',
 ];
 
 const SEVERITY_OPTIONS: { value: Severity; label: string }[] = [
@@ -122,7 +121,6 @@ async function api<T = any>(path: string, options: RequestInit = {}): Promise<T>
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     cache: 'no-store',
   });
-
   const ct = res.headers.get('content-type') || '';
   const isJson = ct.includes('application/json');
 
@@ -139,7 +137,6 @@ async function api<T = any>(path: string, options: RequestInit = {}): Promise<T>
     } catch {}
     throw new Error(msg);
   }
-
   if (res.status === 204) return undefined as T;
   if (!isJson) return (await res.text()) as unknown as T;
   try { return (await res.json()) as T; } catch { return undefined as T; }
@@ -158,6 +155,16 @@ async function withLoading<T>(label: string, fn: () => Promise<T>): Promise<T> {
 const onlyDigits24 = (s: string) => (s || '').replace(/\D/g, '').slice(0, 24);
 const format24Groups = (digits: string) => (digits || '').replace(/(\d{4})(?=\d)/g, '$1 ').trim();
 
+/* ---------- Date helper (วันอย่างเดียว) ---------- */
+const fmtDate = (v?: string | null) => {
+  if (!v) return '-';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return v;
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
 /* ---------- Page ---------- */
 export default function AllergyPage() {
   const { hn } = useParams<{ hn: string }>();
@@ -171,11 +178,13 @@ export default function AllergyPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [errMsg, setErrMsg] = useState<string>('');
 
-  // รายการยาจากฐานข้อมูล เพื่อใส่ใน <select>
+  // รายการยา + map ชื่อยา → รายการ DrugCode เพื่อเติมรหัสอัตโนมัติ
   const [drugOptions, setDrugOptions] = useState<string[]>([]);
   const [drugLoading, setDrugLoading] = useState<boolean>(true);
+  const [drugList, setDrugList] = useState<DrugCode[]>([]);
+  const nameMapRef = useRef<Map<string, DrugCode[]>>(new Map());
 
-  // ⬇️ แผนที่ code24 -> รายละเอียดยา (ไว้โชว์ในหน้ารายการ)
+  // รายละเอียดรหัสสำหรับหน้ารายการ
   const [drugByCode, setDrugByCode] = useState<Record<string, DrugCode | null>>({});
   const [drugLookupLoading, setDrugLookupLoading] = useState(false);
 
@@ -196,7 +205,7 @@ export default function AllergyPage() {
 
   const [errors, setErrors] = useState<Partial<Record<keyof AllergyForm, string>>>({});
 
-  /* ---------- โหลดรายการแพ้ยาของผู้ป่วย ---------- */
+  /* ---------- Load items ---------- */
   useEffect(() => {
     let alive = true;
     setErrMsg('');
@@ -215,7 +224,7 @@ export default function AllergyPage() {
     return () => { alive = false; };
   }, [patients_id]);
 
-  /* ---------- โหลดตัวเลือกยาจาก DB ---------- */
+  /* ---------- Load drug options + build name map ---------- */
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -228,7 +237,19 @@ export default function AllergyPage() {
           list = res?.data || [];
         }
         const names = Array.from(new Set(list.map(d => (d.generic_name || '').trim()).filter(Boolean))).sort();
+
+        // สร้าง map ชื่อ → รายการรหัส (กันกรณีชื่อเดียวหลายรหัส)
+        const mp = new Map<string, DrugCode[]>();
+        for (const d of list) {
+          const k = (d.generic_name || '').trim().toUpperCase();
+          if (!k) continue;
+          if (!mp.has(k)) mp.set(k, []);
+          mp.get(k)!.push(d);
+        }
+
         if (!alive) return;
+        nameMapRef.current = mp;
+        setDrugList(list);
         setDrugOptions([...names, 'อื่น ๆ']);
       } catch {
         if (!alive) return;
@@ -246,6 +267,21 @@ export default function AllergyPage() {
       if (prev.includes(name)) return prev;
       const withoutOther = prev.filter(v => v !== 'อื่น ๆ');
       return [...withoutOther, name].sort().concat('อื่น ๆ');
+    });
+  }
+
+  /* ---------- เลือกยาแล้วเติมรหัส 24 อัตโนมัติ ---------- */
+  function onSubstanceChange(val: string) {
+    setForm(prev => {
+      const next = { ...prev, substance: val };
+      if (val === 'อื่น ๆ') return { ...next, custom_substance: '', thai24_code: '' };
+      const arr = nameMapRef.current.get(val.toUpperCase()) || [];
+      const chosen = arr.find(x => !!x.code_24) || arr[0];
+      return {
+        ...next,
+        custom_substance: '',
+        thai24_code: chosen?.code_24 ? onlyDigits24(chosen.code_24) : ''
+      };
     });
   }
 
@@ -303,6 +339,7 @@ export default function AllergyPage() {
       ...form,
       substance: normalizedSubstance,
       thai24_code: onlyDigits24(form.thai24_code) || null,
+      onset_date: form.onset_date || null, // ส่งเป็นวันล้วน
     };
 
     setLoading(true);
@@ -367,10 +404,11 @@ export default function AllergyPage() {
   function onEdit(item: AllergyRow) {
     ensureDrugInOptions(item.substance);
     const inList = drugOptions.includes(item.substance);
+
     setEditingId(item.allergy_id);
     setForm({
-      report_date: item.report_date || todayISO(),
-      onset_date: item.onset_date || '',
+      report_date: item.report_date ? fmtDate(item.report_date) : todayISO(),
+      onset_date: item.onset_date ? fmtDate(item.onset_date) : '',
       substance: inList ? item.substance : 'อื่น ๆ',
       custom_substance: inList ? '' : item.substance,
       reaction: item.reaction || '',
@@ -386,7 +424,7 @@ export default function AllergyPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /* ---------- Thai24 auto-fill (debounce + cache + abort) ---------- */
+  /* ---------- Thai24 auto-fill (จากการพิมพ์/ค้นหา) ---------- */
   const thai24Digits = onlyDigits24(form.thai24_code);
   const thai24Display = format24Groups(thai24Digits);
   const thai24Len = thai24Digits.length;
@@ -436,15 +474,11 @@ export default function AllergyPage() {
     return () => { controller.abort(); clearTimeout(t); };
   }, [thai24OK, thai24Digits]);
 
-  /* ---------- ดึงรายละเอียดรหัส 24 สำหรับ "หน้ารายการ" ---------- */
+  /* ---------- Lookup drug info for list ---------- */
   useEffect(() => {
     let alive = true;
     const codes = Array.from(
-      new Set(
-        items
-          .map(it => onlyDigits24(it.thai24_code || ''))
-          .filter(c => c.length === 24)
-      )
+      new Set(items.map(it => onlyDigits24(it.thai24_code || '')).filter(c => c.length === 24))
     );
 
     const toFetch = codes.filter(c => !(c in drugByCode));
@@ -456,7 +490,6 @@ export default function AllergyPage() {
         const results = await Promise.all(
           toFetch.map(async (code) => {
             try {
-              // ใช้พารามิเตอร์ code_24 ให้ค้นหาแบบเป๊ะ
               const res = await api<{ data: DrugCode[] }>(`/api/drug_codes?code_24=${code}&limit=1`);
               const item = res?.data?.[0] || null;
               return [code, item] as const;
@@ -544,12 +577,25 @@ export default function AllergyPage() {
     });
   }
 
+  /* ---------- ดึงรายละเอียดรหัสซ้ำเฉพาะรายการ ---------- */
+  async function refetchCodeInfo(code: string) {
+    try {
+      const res = await withLoading('กำลังดึงรายละเอียดรหัส...', () =>
+        api<{ data: DrugCode[] }>(`/api/drug_codes?code_24=${code}&limit=1`)
+      );
+      const info = res?.data?.[0] || null;
+      setDrugByCode(prev => ({ ...prev, [code]: info }));
+    } catch {
+      toast.fire({ icon: 'error', title: 'ดึงรายละเอียดไม่สำเร็จ' });
+    }
+  }
+
   /* ---------- UI ---------- */
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <div className={styles.title}>หน้าเก็บการแพ้ยา</div>
+          <div className={styles.title}>💊 หน้าเก็บการแพ้ยา</div>
           <div className={styles.subtitle}>
             HN: <b>{patients_id}</b> • ผู้ป่วย: <b>{patient_name}</b>
           </div>
@@ -578,22 +624,20 @@ export default function AllergyPage() {
 
             <div className={styles.field}>
               <label>ยาที่แพ้ (ชื่อสามัญ)</label>
-              <select
-                value={form.substance}
-                onChange={(e) => setForm({ ...form, substance: e.target.value })}
-                disabled={drugLoading}
-                title={drugLoading ? 'กำลังโหลดรายการยา...' : ''}
-              >
-                <option value="">{drugLoading ? '— กำลังโหลด —' : '— เลือกยา —'}</option>
-                {drugOptions.map((d) => (<option key={d} value={d}>{d}</option>))}
-              </select>
+              <div className={styles.withPrefix}>
+                <span className={styles.pillIcon} aria-hidden>💊</span>
+                <select
+                  value={form.substance}
+                  onChange={(e) => onSubstanceChange(e.target.value)}
+                  disabled={drugLoading}
+                  title={drugLoading ? 'กำลังโหลดรายการยา...' : ''}
+                >
+                  <option value="">{drugLoading ? '— กำลังโหลด —' : '— เลือกยา —'}</option>
+                  {drugOptions.map((d) => (<option key={d} value={d}>{d}</option>))}
+                </select>
+              </div>
               {form.substance === 'อื่น ๆ' && (
-                <input
-                  className={styles.mt8}
-                  placeholder="ระบุชื่อสามัญ"
-                  value={form.custom_substance}
-                  onChange={(e) => setForm({ ...form, custom_substance: e.target.value })}
-                />
+                <input className={styles.mt8} placeholder="ระบุชื่อสามัญ" value={form.custom_substance} onChange={(e) => setForm({ ...form, custom_substance: e.target.value })} />
               )}
               {(errors.substance || errors.custom_substance) && (
                 <small className={styles.error}>{errors.substance || errors.custom_substance}</small>
@@ -652,22 +696,19 @@ export default function AllergyPage() {
             {/* Thai24 + Search button */}
             <div className={styles.field}>
               <label>รหัสมาตรฐาน (24 หลัก) ของยาที่แพ้</label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className={styles.row}>
                 <input
                   placeholder="เช่น 0000 0000 0000 0000 0000 0000"
                   value={thai24Display}
                   onChange={(e) => onThai24Change(e.target.value)}
                   inputMode="numeric"
                   autoComplete="off"
-                  style={{ flex: 1 }}
                 />
-                <button type="button" className={`${styles.btn}`} onClick={openThai24Search} title="ค้นหารหัส/ชื่อยา">
-                  ค้นหา
-                </button>
+                <button type="button" className={`${styles.btn}`} onClick={openThai24Search} title="ค้นหารหัส/ชื่อยา">ค้นหา</button>
               </div>
-              <div id="thai24-hint" style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <progress max={24} value={thai24Len} style={{ width: 140, height: 8 }} />
-                <span style={{ fontSize: 12, color: thai24Len === 0 ? '#666' : thai24OK ? '#0b8b4b' : '#b54747', fontWeight: 600 }}>
+              <div className={styles.hintRow}>
+                <progress max={24} value={thai24Len} />
+                <span className={thai24OK ? styles.ok : thai24Len ? styles.warn : styles.muted}>
                   {thai24Len}/24 หลัก {thai24OK ? '✓ ครบ' : thai24Len > 0 ? '(ยังไม่ครบ)' : ''}
                 </span>
               </div>
@@ -698,58 +739,103 @@ export default function AllergyPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>วันที่รายงาน</th>
-                    <th>ยา (ชื่อสามัญ)</th>
+                    <th>วันที่</th>
+                    <th>ยา</th>
                     <th>อาการที่แพ้</th>
                     <th>ความร้ายแรง</th>
-                    <th>สาเหตุการเกิด</th>
-                    <th>ความสัมพันธ์</th>
-                    <th>ผลหลังเหตุการณ์</th>
-                    <th>ประเภทผู้ป่วย</th>
                     <th>รหัส 24 หลัก</th>
                     <th>จัดการ</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {items.map((it) => {
                     const code = onlyDigits24(it.thai24_code || '');
                     const info = code ? drugByCode[code] : undefined;
+
+                    const causalityLabel = CAUSALITY_OPTIONS.find(s => s.value === it.causality)?.label || it.causality || '-';
+                    const outcomeLabel = OUTCOME_OPTIONS.find(s => s.value === it.outcome)?.label || it.outcome || '-';
+                    const ptypeLabel = PATIENT_TYPES.find(p => p.value === it.patient_type)?.label || it.patient_type || '-';
+                    const metaTooltip = [
+                      it.system_affected || '-',
+                      `ความสัมพันธ์: ${causalityLabel}`,
+                      `ผลหลังเหตุการณ์: ${outcomeLabel}`,
+                      `ประเภทผู้ป่วย: ${ptypeLabel}`,
+                    ].join(' • ');
+
+                    const drugCell = (
+                      <div className={styles.drugCell} title={metaTooltip}>
+                        <div className={styles.drugMain}>
+                          <span className={styles.pillIcon} aria-hidden>💊</span>
+                          <span className={styles.drugName}>{it.substance}</span>
+                          {info?.atc_code ? <span className={styles.atcTag}>{info.atc_code}</span> : null}
+                        </div>
+                        {info?.generic_name && info.generic_name !== it.substance ? (
+                          <div className={styles.drugSub}>DB: {info.generic_name}</div>
+                        ) : null}
+                      </div>
+                    );
+
+                    const codeCell = code ? (
+                      <div className={styles.codeInline}>
+                        <code>{format24Groups(code)}</code>
+                        <button
+                          type="button"
+                          className={styles.linkBtn}
+                          onClick={() => navigator.clipboard.writeText(code)}
+                          title="คัดลอกรหัส"
+                        >
+                          คัดลอก
+                        </button>
+
+                        {/* รายละเอียดรหัส (กดดูเพิ่มเติม) */}
+                        {info === undefined && drugLookupLoading ? (
+                          <span className={styles.codeMeta}>กำลังดึงข้อมูล…</span>
+                        ) : info === null ? (
+                          <button className={styles.linkBtn} onClick={() => refetchCodeInfo(code)}>ดึงรายละเอียด</button>
+                        ) : info ? (
+                          <details style={{ marginTop: 2 }}>
+                            <summary className={styles.linkBtn}>รายละเอียด</summary>
+                            <div className={styles.codeMeta}>
+                              <div><b>DB:</b> {info.generic_name}</div>
+                              <div><b>ATC:</b> {info.atc_code || '-'}</div>
+                              {info.synonyms?.length ? (
+                                <div><b>พ้อง:</b> {info.synonyms.join(', ')}</div>
+                              ) : null}
+                            </div>
+                          </details>
+                        ) : null}
+                      </div>
+                    ) : ('-');
+
                     return (
                       <tr key={it.allergy_id}>
-                        <td>{it.report_date || '-'}</td>
-                        <td>{it.substance}</td>
-                        <td title={it.reaction || ''}>{it.reaction || '-'}</td>
-                        <td>{SEVERITY_OPTIONS.find(s => s.value === it.severity)?.label || '-'}</td>
-                        <td>{it.system_affected || '-'}</td>
-                        <td>{CAUSALITY_OPTIONS.find(s => s.value === it.causality)?.label || '-'}</td>
-                        <td>{OUTCOME_OPTIONS.find(s => s.value === it.outcome)?.label || '-'}</td>
-                        <td>{PATIENT_TYPES.find(p => p.value === it.patient_type)?.label || '-'}</td>
-                        <td>
-                          {code ? (
-                            <div>
-                              <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>
-                                {format24Groups(code)}
-                              </div>
-                              <div style={{ fontSize: 12, color: '#57606a', marginTop: 2, lineHeight: 1.3 }}>
-                                {info === undefined && code && drugLookupLoading ? 'กำลังดึงข้อมูล...' : null}
-                                {info === null && 'ไม่พบในฐานรหัส'}
-                                {info && (
-                                  <>
-                                    <div><b>DB:</b> {info.generic_name}</div>
-                                    {info.atc_code ? <div><b>ATC:</b> {info.atc_code}</div> : null}
-                                    {info.synonyms?.length ? (
-                                      <div>
-                                        <b>พ้อง:</b> {info.synonyms.slice(0, 4).join(', ')}{info.synonyms.length > 4 ? '…' : ''}
-                                      </div>
-                                    ) : null}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            '-'
-                          )}
+                        <td className={styles.dateStack} suppressHydrationWarning>
+                          <div className={styles.dateMain}>{fmtDate(it.report_date)}</div>
+                          <div className={styles.dateSub}>อาการ: {fmtDate(it.onset_date)}</div>
                         </td>
+
+                        <td>{drugCell}</td>
+
+                        <td className={styles.ellipsis} title={it.reaction || ''}>
+                          {it.reaction || '-'}
+                        </td>
+
+                        <td>
+                          <span
+                            className={`${styles.sev} ${
+                              it.severity === 'mild' ? styles.sevMild
+                              : it.severity === 'moderate' ? styles.sevModerate
+                              : it.severity === 'severe' ? styles.sevSevere
+                              : styles.sevUnknown
+                            }`}
+                          >
+                            {SEVERITY_OPTIONS.find(s => s.value === it.severity)?.label || '-'}
+                          </span>
+                        </td>
+
+                        <td>{codeCell}</td>
+
                         <td className={styles.cellActions}>
                           <button className={`${styles.btn} ${styles.btnSmall}`} onClick={() => onEdit(it)}>แก้ไข</button>
                           <button className={`${styles.btn} ${styles.btnSmall} ${styles.btnDanger}`} onClick={() => onDelete(it.allergy_id)}>ลบ</button>
