@@ -117,7 +117,7 @@ function buildAppointmentsFlex(rows, label) {
 }
 
 // 🕕 ทุกวัน 06:00
-cron.schedule("*/1 * * * *", async () => {
+cron.schedule("0 6 * * *", async () => {
     try {
        const today = todayISOInTH(); 
 

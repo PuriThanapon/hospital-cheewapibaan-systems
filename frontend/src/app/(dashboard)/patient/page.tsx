@@ -872,6 +872,15 @@ export default function PatientsPage() {
                     >
                       <FileText size={14} /> ประวัติ
                     </Link>
+                    <Link
+                      href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
+                        `${r.pname || ''}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
+                      )
+                        }`}
+                      className={`${styles.btn} ${styles.btnSm}`}
+                    >
+                      <AlertCircle size={14} /> แพ้ยา
+                    </Link>
                     {/* ✅ ปุ่มไปหน้าวินิจฉัย */}
                     <Link
                       href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}

@@ -1,32 +1,39 @@
+// src/app.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-require("./scheduler/appointments");
+require('./scheduler/appointments');
+
+const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
-app.use(cors());
 
-// 1) ⬅️ ต้อง mount LINE webhook ก่อน parsers ทุกตัว
-app.use('/api/line', require('./routes/line.routes')); // ใช้ express.raw() ภายในไฟล์นี้แล้ว
+// พื้นฐาน
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
-// 2) parsers สำหรับ route อื่น ๆ
-app.use(express.json());
+// CORS (จะอ่านจาก .env ถ้าตั้ง CORS_ORIGIN ไว้)
+const ALLOW_ORIGIN = process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors(ALLOW_ORIGIN?.length ? { origin: ALLOW_ORIGIN, credentials: true } : {}));
+
+// 1) LINE webhook ต้องมาก่อน parsers
+app.use('/api/line', require('./routes/line.routes'));
+
+// 2) parsers ทั่วไป
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 3) รวมทุก route อื่นไว้ใต้ /api (ยกเว้น /api/line/webhook ที่แยกไว้แล้ว)
+// 3) รวม sub-routes ทั้งหมด
 app.use('/api', require('./routes'));
 
-// 404
-app.use((req, res) => {
-  res.status(404).json({ message: 'Not Found' });
-});
+// healthcheck
+app.get('/healthz', (req, res) => res.status(200).json({ ok: true }));
 
-// error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  if (res.headersSent) return next(err);
-  res.status(500).json({ message: err?.message || 'Internal Server Error' });
-});
+// 404
+app.use((req, res) => res.status(404).json({ message: 'Not Found' }));
+
+// error handler กลาง
+app.use(errorHandler);
 
 // start
 const PORT = process.env.PORT || 5000;
