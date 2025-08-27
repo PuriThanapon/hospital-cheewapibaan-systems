@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import DatePickerField from '@/app/components/DatePicker';
 import TimePicker from '@/app/components/TimePicker';
 import PatientLookupModal from '../modals/PatientLookupModal';
@@ -7,7 +7,6 @@ import PatientLookupModal from '../modals/PatientLookupModal';
 type Status = 'pending' | 'done' | 'cancelled';
 
 export type AppointmentFormValue = {
-  // ฟิลด์ฝั่ง appointments
   patient?: string;
   hn?: string;
   phone?: string;
@@ -16,7 +15,7 @@ export type AppointmentFormValue = {
   end?: string;    // HH:mm
   type?: string;   // 'home' | 'hospital'
   place?: string;
-  hospital_address?: string; // << เพิ่ม
+  hospital_address?: string;
   status?: Status;
   note?: string;
 };
@@ -25,7 +24,7 @@ type Props = {
   value: AppointmentFormValue;
   onChange: (v: AppointmentFormValue) => void;
   errors?: Partial<Record<keyof AppointmentFormValue, string>>;
-  TYPE_OPTIONS: string[];   // ควรมีค่าอย่างน้อย ['home','hospital']
+  TYPE_OPTIONS: string[];
   PLACE_OPTIONS: string[];
   className?: string;
 };
@@ -90,26 +89,11 @@ function calcAgeFromBirthdate(birthdate?: string) {
   return years > 0 ? `${years} ปี` : `${months} เดือน`;
 }
 
-/* --------------- Smart fetch patient --------------- */
-async function fetchPatientSmart(raw: string) {
-  const hn = normalizeHN(raw);
-  const num = toNumericId(raw);
-  const attempts = [
-    `/api/patients/${encodeURIComponent(hn)}`,
-    num ? `/api/patients/${encodeURIComponent(num)}` : null,
-  ].filter(Boolean) as string[];
-
-  let lastErr: any = null;
-  for (const url of attempts) {
-    try {
-      const res = await http(url);
-      const patient = unwrapPatient(res);
-      if (patient) return patient;
-    } catch (e: any) {
-      lastErr = e;
-    }
-  }
-  throw lastErr || new Error('ไม่พบข้อมูลผู้ป่วย');
+/* คืนค่า "วันนี้" เป็นรูปแบบ YYYY-MM-DD (local-safe) */
+function todayISO(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /* ------------------------------ Component ------------------------------ */
@@ -123,6 +107,27 @@ export default function AppointmentForm({
   const hnInputRef = useRef<HTMLInputElement | null>(null);
   const hospitalInputRef = useRef<HTMLInputElement | null>(null);
 
+  /* ตั้งค่า default date เป็นวันนี้เสมอ เมื่อยังไม่มีค่า */
+  useEffect(() => {
+    if (!value?.date) {
+      onChange({ ...value, date: todayISO() });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value?.date]);
+
+  /* กัน scroll/arrow ทำให้เดือน/วันเปลี่ยนโดยไม่ตั้งใจ */
+  const handleWheelBlock: React.WheelEventHandler<HTMLDivElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const handleKeyBlock: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    const k = e.key;
+    if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'PageUp' || k === 'PageDown') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   const handleVerify = async () => {
     const raw = value.hn || '';
     if (!raw.trim()) {
@@ -133,7 +138,7 @@ export default function AppointmentForm({
     setVerifyLoading(true);
     setVerifyErr('');
     setPatientInfo(null);
-    
+
     try {
       const p = await fetchPatientSmart(raw);
       setPatientInfo(p);
@@ -143,7 +148,7 @@ export default function AppointmentForm({
         .trim();
 
       const tVal = TYPE_VALUE_FROM_LABEL(value.type);
-      const addrRaw = getPatientAddressRaw(p); // ที่อยู่วัตถุแบบ "ดิบ"
+      const addrRaw = getPatientAddressRaw(p);
 
       const newVal = {
         ...value,
@@ -157,7 +162,6 @@ export default function AppointmentForm({
 
       onChange(newVal);
 
-      // ถ้าเป็นบ้านผู้ป่วย → โหลดรายการของใช้ครั้งก่อน
       if (tVal === 'home' && newVal.hn) {
         fetchLatestNeeds(newVal.hn);
       }
@@ -166,8 +170,8 @@ export default function AppointmentForm({
     } finally {
       setVerifyLoading(false);
     }
-
   };
+
   const TYPE_VALUE_FROM_LABEL = (label?: string) =>
     label === 'โรงพยาบาล' ? 'hospital'
     : label === 'บ้านผู้ป่วย' ? 'home'
@@ -175,7 +179,7 @@ export default function AppointmentForm({
 
   function getPatientAddressRaw(p: any): string {
     const v =
-      p?.address ??           // ← คุณบอกว่ามีฟิลด์นี้
+      p?.address ??
       p?.address_full ??
       p?.home_address ??
       p?.address_text ??
@@ -198,44 +202,23 @@ export default function AppointmentForm({
     }
   }, []);
 
-  /* เมื่อสลับประเภท ให้ล้าง/ตั้งค่าอัตโนมัติให้สอดคล้อง back-end */
   useEffect(() => {
     const t = TYPE_VALUE_FROM_LABEL(value.type);
     if (t === 'home') {
-      const addrRaw = getPatientAddressRaw(patientInfo); // ดึงที่อยู่ “ดิบ”
+      const addrRaw = getPatientAddressRaw(patientInfo);
       const hasUserTyped = value.place && value.place !== 'บ้านผู้ป่วย';
       onChange({
         ...value,
         place: hasUserTyped ? value.place : (addrRaw || 'บ้านผู้ป่วย'),
-        hospital_address: '', // เคลียร์ช่อง รพ. เมื่อสลับเป็นบ้าน
+        hospital_address: '',
       });
-      if (value.hn) fetchLatestNeeds(value.hn); // ← โหลดรายการของใช้ครั้งก่อน
+      if (value.hn) fetchLatestNeeds(value.hn);
     } else if (t === 'hospital') {
       onChange({ ...value, place: '', hospital_address: value.hospital_address || '' });
       setTimeout(() => hospitalInputRef.current?.focus(), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.type, patientInfo]);
-
-  function pickPatientFromLookup(p: {
-    patients_id: string;
-    pname?: string; first_name?: string; last_name?: string;
-    phone_number?: string;
-  }) {
-    const name = [p.pname, p.first_name, p.last_name]
-      .filter(Boolean).join(' ').replace(/\s/g, ' ').trim();
-    const hn = normalizeHN(p.patients_id || '');
-    const next = {
-      ...form,
-      patient: name || hn,
-      hn,
-      phone: p.phone_number || form.phone,
-    };
-    setForm(next);
-    setErrors(validate(next));
-    setLookupOpen(false);
-    toast.fire({ icon: 'success', title: `เลือกผู้ป่วย: ${name || hn}` });
-  }
 
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}>
@@ -273,7 +256,6 @@ export default function AppointmentForm({
           open={lookupOpen}
           onClose={() => setLookupOpen(false)}
           onSelect={(p) => {
-            // สร้างชื่อเต็ม
             const name = [p.pname, p.first_name, p.last_name]
               .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 
@@ -281,25 +263,21 @@ export default function AppointmentForm({
             const tVal = TYPE_VALUE_FROM_LABEL(value.type);
             const addrRaw = getPatientAddressRaw(p);
 
-            // อัปเดตค่าในฟอร์มผ่าน onChange
-            const next = {
+            const next: AppointmentFormValue = {
               ...value,
               hn,
               patient: name || hn,
               phone: p.phone_number || value.phone || '',
             };
 
-            // ถ้าเป็น "บ้านผู้ป่วย" ให้ช่วยเติมที่อยู่อัตโนมัติ (ถ้ายังว่าง/เป็นค่าดีฟอลต์)
             if (tVal === 'home') {
               const hasUserTyped = value.place && value.place !== 'บ้านผู้ป่วย';
               next.place = hasUserTyped ? value.place : (addrRaw || 'บ้านผู้ป่วย');
             }
 
             onChange(next);
-            setPatientInfo(p);        // เก็บไว้โชว์การ์ดข้อมูลผู้ป่วย
-            setLookupOpen(false);
+            setPatientInfo(p);
 
-            // โหลด "สิ่งที่ต้องเตรียมจากครั้งก่อน" ถ้าเป็นเยี่ยมบ้าน
             if (tVal === 'home' && hn) {
               fetchLatestNeeds(hn);
             }
@@ -326,7 +304,6 @@ export default function AppointmentForm({
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4">
             {(() => {
               const p = patientInfo;
-              const fullname = `${p.pname ?? ''}${p.first_name ?? ''} ${p.last_name ?? ''}`.replace(/\s+/g, ' ').trim() || '-';
               const ageText =
                 p.age != null && p.age !== ''
                   ? `${p.age} ปี`
@@ -363,13 +340,21 @@ export default function AppointmentForm({
         </div>
       )}
 
-      {/* วันที่ */}
+      {/* วันที่ — กัน scroll + block arrow; ใส่ min วันนี้ */}
       <label className="sm:col-span-2">
         <div className="mb-1 text-sm text-gray-700">วันที่</div>
-        <DatePickerField
-          value={value.date || ''}
-          onChange={(d: string) => onChange({ ...value, date: d })}
-        />
+        <div
+          onWheel={handleWheelBlock}
+          onKeyDown={handleKeyBlock}
+          style={{ touchAction: 'manipulation' }}
+        >
+          <DatePickerField
+            value={value.date || ''}
+            onChange={(d: string) => onChange({ ...value, date: d })}
+            /* ถ้าคอมโพเนนต์รองรับ prop นี้ ให้เปิดใช้งานได้เลย */
+            min={todayISO() as any}
+          />
+        </div>
         {errors?.date && <div className="mt-1 text-xs text-red-600">{errors.date}</div>}
       </label>
 
@@ -408,7 +393,7 @@ export default function AppointmentForm({
         {errors?.type && <div className="mt-1 text-xs text-red-600">{errors.type}</div>}
       </label>
 
-      {/* สถานที่ / ที่อยู่โรงพยาบาล (แสดงตามประเภท) */}
+      {/* สถานที่ / ที่อยู่โรงพยาบาล */}
       {TYPE_VALUE_FROM_LABEL(value.type) === 'hospital' ? (
         <label>
           <div className="mb-1 text-sm text-gray-700">ชื่อ/ที่อยู่โรงพยาบาล</div>
@@ -423,7 +408,7 @@ export default function AppointmentForm({
           <div className="mt-1 text-xs text-gray-500">* ไม่จำเป็นต้องเลือก “สถานที่” ด้านล่างเมื่อเป็นโรงพยาบาล</div>
         </label>
       ) : (
-         <label className="sm:col-span-2">
+        <label className="sm:col-span-2">
           <div className="mb-1 text-sm text-gray-700">ที่อยู่บ้านผู้ป่วย</div>
           <textarea
             rows={2}
@@ -497,8 +482,27 @@ export default function AppointmentForm({
         />
       </label>
     </div>
-    
-
-    
   );
+}
+
+/* --------------- Smart fetch patient --------------- */
+async function fetchPatientSmart(raw: string) {
+  const hn = normalizeHN(raw);
+  const num = toNumericId(raw);
+  const attempts = [
+    `/api/patients/${encodeURIComponent(hn)}`,
+    num ? `/api/patients/${encodeURIComponent(num)}` : null,
+  ].filter(Boolean) as string[];
+
+  let lastErr: any = null;
+  for (const url of attempts) {
+    try {
+      const res = await http(url);
+      const patient = unwrapPatient(res);
+      if (patient) return patient;
+    } catch (e: any) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('ไม่พบข้อมูลผู้ป่วย');
 }

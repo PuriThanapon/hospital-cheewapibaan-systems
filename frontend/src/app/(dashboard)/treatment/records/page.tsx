@@ -1142,15 +1142,6 @@ export default function TreatmentsListPage() {
         }
       >
         <TreatmentForm ref={addFormRef} value={draft} onChange={setDraft} />
-        <div className="mt-2">
-          <button
-            type="button"
-            className="text-sm text-blue-600 hover:text-blue-700 underline"
-            onClick={() => setLookupFor('add')}
-          >
-            ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
-          </button>
-        </div>
       </Modal>
 
       {/* Detail Treatment Modal */}
@@ -1494,15 +1485,6 @@ export default function TreatmentsListPage() {
         {editDraft && (
           <>
             <TreatmentForm ref={editFormRef} value={editDraft} onChange={setEditDraft} />
-            <div className="mt-2">
-              <button
-                type="button"
-                className="text-sm text-blue-600 hover:text-blue-700 underline"
-                onClick={() => setLookupFor('edit')}
-              >
-                ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
-              </button>
-            </div>
           </>
         )}
       </Modal>
