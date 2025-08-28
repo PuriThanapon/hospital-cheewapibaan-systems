@@ -1,5 +1,5 @@
-/* ==========================================================================
-   Enhanced Medical Theme for Allergy Management
+/* ========================================================================== 
+   Enhanced Medical Theme for Allergy Management (Single CSS)
    ========================================================================== */
 
 .page {
@@ -11,22 +11,22 @@
   --muted: #64748b;
   --line: #e2e8f0;
   --line-light: #f1f5f9;
-  
-  /* Medical color palette */
+
+  /* medical palette */
   --medical-primary: #0891b2;
   --medical-primary-light: #0284c7;
   --medical-primary-dark: #0e7490;
   --medical-accent: #06b6d4;
-  
-  /* Severity colors */
+
+  /* severity */
   --severity-mild: #10b981;
   --severity-mild-bg: #d1fae5;
   --severity-moderate: #f59e0b;
   --severity-moderate-bg: #fef3c7;
   --severity-severe: #ef4444;
   --severity-severe-bg: #fee2e2;
-  
-  /* Alert colors */
+
+  /* alerts */
   --alert-info: #3b82f6;
   --alert-info-bg: #dbeafe;
   --alert-warning: #f59e0b;
@@ -35,7 +35,7 @@
   --alert-danger-bg: #fee2e2;
   --alert-success: #10b981;
   --alert-success-bg: #d1fae5;
-  
+
   --radius: 16px;
   --radius-sm: 8px;
   --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -50,10 +50,7 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
-/* ==========================================================================
-   Header & Navigation
-   ========================================================================== */
-
+/* Header */
 .header {
   display: flex;
   flex-wrap: wrap;
@@ -67,7 +64,6 @@
   box-shadow: var(--shadow);
   border: 1px solid var(--line);
 }
-
 .title {
   font-size: 28px;
   font-weight: 700;
@@ -76,785 +72,282 @@
   align-items: center;
   gap: 12px;
 }
-
-.title::before {
-  content: "⚕️";
-  font-size: 32px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-}
-
-.subtitle {
-  color: var(--text-secondary);
-  margin-top: 8px;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.subtitle b {
-  color: var(--medical-primary);
-  font-weight: 600;
-}
+.title::before { content: "⚕️"; font-size: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.1)); }
+.subtitle { color: var(--text-secondary); margin-top: 8px; font-size: 15px; font-weight: 500; }
+.subtitle b { color: var(--medical-primary); font-weight: 600; }
 
 .tabs {
-  display: flex;
-  gap: 4px;
-  background: var(--line-light);
-  padding: 6px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
+  display: flex; gap: 4px; background: var(--line-light);
+  padding: 6px; border-radius: 12px; border: 1px solid var(--line);
 }
-
 .tab {
-  border: none;
-  background: transparent;
-  padding: 12px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-secondary);
-  position: relative;
-  overflow: hidden;
+  border: none; background: transparent; padding: 12px 20px; border-radius: 8px;
+  cursor: pointer; transition: all .2s cubic-bezier(.4,0,.2,1);
+  font-weight: 600; font-size: 14px; color: var(--text-secondary);
+  position: relative; overflow: hidden;
 }
+.tabActive { background: var(--medical-primary); color: #fff; box-shadow: 0 4px 12px rgba(8,145,178,.3); transform: translateY(-1px); }
+.tab:hover:not(.tabActive) { background: #fff; color: var(--medical-primary); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
 
-.tab::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--medical-primary);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: -1;
+/* Banners */
+.bannerError{
+  background: var(--alert-danger-bg); border: 1px solid var(--alert-danger);
+  border-left: 4px solid var(--alert-danger); color: var(--alert-danger);
+  padding: 16px 20px; border-radius: var(--radius-sm); margin-bottom: 24px;
+  display: flex; align-items: center; gap: 12px; font-weight: 500;
 }
+.bannerError::before{ content:"⚠️"; font-size: 20px; }
 
-.tabActive {
-  background: var(--medical-primary);
-  color: white;
-  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
-  transform: translateY(-1px);
-}
-
-.tab:hover:not(.tabActive) {
-  background: white;
-  color: var(--medical-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* ==========================================================================
-   Alert Banners
-   ========================================================================== */
-
-.bannerError {
-  background: var(--alert-danger-bg);
-  border: 1px solid var(--alert-danger);
-  border-left: 4px solid var(--alert-danger);
-  color: var(--alert-danger);
-  padding: 16px 20px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-weight: 500;
-}
-
-.bannerError::before {
-  content: "⚠️";
-  font-size: 20px;
-}
-
-/* ==========================================================================
-   Cards & Form Layout
-   ========================================================================== */
-
+/* Card & Form */
 .card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 32px;
-  box-shadow: var(--shadow);
-  position: relative;
-  overflow: hidden;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 32px; box-shadow: var(--shadow); position: relative; overflow: hidden;
 }
+.card::before { content: ""; position: absolute; top:0; left:0; right:0; height:4px;
+  background: linear-gradient(90deg, var(--medical-primary), var(--medical-accent)); }
 
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--medical-primary), var(--medical-accent));
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 24px 32px; }
+.field { display: flex; flex-direction: column; position: relative; }
+.field label { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
+.field:has(input[type="date"]) label::before { content:"📅"; font-size:14px; }
+.field:has(select) label::before { content:"📋"; font-size:14px; }
+.field:has(textarea) label::before { content:"📝"; font-size:14px; }
+.field input[type='date'], .field input, .field select, .field textarea{
+  border: 2px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px;
+  font-size: 14px; outline: none; background: var(--card); transition: all .2s ease; font-family: inherit;
 }
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px 32px;
+.field input:focus, .field select:focus, .field textarea:focus{
+  border-color: var(--medical-primary); box-shadow: 0 0 0 4px rgba(8,145,178,.1); transform: translateY(-1px);
 }
+.field textarea{ resize: vertical; min-height: 100px; }
+.mt8{ margin-top: 12px; }
+.error{ color: var(--alert-danger); margin-top: 8px; font-size: 12px; font-weight: 500; display:flex; align-items:center; gap:6px; }
+.error::before{ content:"❌"; font-size:12px; }
+.hint{ margin-top:8px; color:var(--muted); font-size:12px; }
+.actions{ display:flex; gap:16px; align-items:center; justify-content:flex-end; margin-top:24px; padding-top:24px; border-top:1px solid var(--line-light); }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  position: relative;
+/* Form controls */
+.withPrefix{ display:flex; align-items:center; gap:12px; position:relative; }
+.withPrefix select{ flex:1; }
+.pillIcon{ font-size:20px; line-height:1; filter: drop-shadow(0 2px 4px rgba(0,0,0,.1)); }
+.row{ display:flex; gap:12px; align-items:center; }
+.row input{ flex:1; }
+.hintRow{ display:flex; gap:12px; align-items:center; margin-top:12px; padding:12px 16px; background:var(--line-light); border-radius: var(--radius-sm); border:1px solid var(--line); }
+.hintRow progress{ width:180px; height:6px; border-radius:3px; background: var(--line); }
+.hintRow progress::-webkit-progress-bar{ background: var(--line); border-radius:3px; }
+.hintRow progress::-webkit-progress-value{ background: var(--medical-primary); border-radius:3px; }
+.ok{ color: var(--alert-success); font-weight: 600; font-size: 12px; display:flex; align-items:center; gap:4px; }
+.ok::before{ content:"✅"; font-size:12px; }
+.warn{ color: var(--alert-warning); font-weight: 600; font-size: 12px; display:flex; align-items:center; gap:4px; }
+.warn::before{ content:"⚠️"; font-size:12px; }
+.muted{ color: var(--muted); font-size: 12px; }
+
+/* Buttons */
+.btn{
+  border: 2px solid var(--line); background: var(--card);
+  padding: 12px 20px; border-radius: var(--radius-sm);
+  cursor: pointer; font-weight: 600; font-size: 14px;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+  display: inline-flex; align-items: center; gap: 8px;
+  position: relative; overflow: hidden;
 }
+.btn::before{ content:""; position:absolute; top:50%; left:50%; width:0; height:0; border-radius:50%; background: rgba(255,255,255,.3); transition: all .3s ease; transform: translate(-50%,-50%); }
+.btn:active::before{ width:300px; height:300px; }
+.btn:hover{ transform: translateY(-2px); box-shadow: var(--shadow); }
+.btnPrimary{ background: var(--medical-primary); color:#fff; border-color: var(--medical-primary); box-shadow: 0 4px 12px rgba(8,145,178,.3); }
+.btnPrimary:hover{ background: var(--medical-primary-light); box-shadow: 0 6px 16px rgba(8,145,178,.4); }
+.btnPrimary:disabled{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
+.btnDanger{ color:#fff; background: var(--alert-danger); border-color: var(--alert-danger); box-shadow: 0 4px 12px rgba(239,68,68,.3); }
+.btnDanger:hover{ background:#dc2626; box-shadow: 0 6px 16px rgba(239,68,68,.4); }
+.btnSmall{ padding: 8px 12px; font-size: 12.5px; min-width: 72px; text-align: center; }
 
-.field label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Medical icons for different field types */
-.field:has(input[type="date"]) label::before {
-  content: "📅";
-  font-size: 14px;
-}
-
-.field:has(select) label::before {
-  content: "📋";
-  font-size: 14px;
-}
-
-.field:has(textarea) label::before {
-  content: "📝";
-  font-size: 14px;
-}
-
-.field input[type='date'],
-.field input,
-.field select,
-.field textarea {
-  border: 2px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
-  font-size: 14px;
-  outline: none;
-  background: var(--card);
-  transition: all 0.2s ease;
-  font-family: inherit;
-}
-
-.field input:focus,
-.field select:focus,
-.field textarea:focus {
-  border-color: var(--medical-primary);
-  box-shadow: 0 0 0 4px rgba(8, 145, 178, 0.1);
-  transform: translateY(-1px);
-}
-
-.field textarea {
-  resize: vertical;
-  min-height: 100px;
-}
-
-.mt8 {
-  margin-top: 12px;
-}
-
-.error {
-  color: var(--alert-danger);
-  margin-top: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.error::before {
-  content: "❌";
-  font-size: 12px;
-}
-
-.hint {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.actions {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: flex-end;
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid var(--line-light);
-}
-
-/* ==========================================================================
-   Enhanced Form Controls
-   ========================================================================== */
-
-.withPrefix {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-}
-
-.withPrefix select {
-  flex: 1;
-}
-
-.pillIcon {
-  font-size: 20px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-}
-
-.row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.row input {
-  flex: 1;
-}
-
-.hintRow {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: var(--line-light);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-}
-
-.hintRow progress {
-  width: 180px;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--line);
-}
-
-.hintRow progress::-webkit-progress-bar {
-  background: var(--line);
-  border-radius: 3px;
-}
-
-.hintRow progress::-webkit-progress-value {
-  background: var(--medical-primary);
-  border-radius: 3px;
-}
-
-.ok {
-  color: var(--alert-success);
-  font-weight: 600;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.ok::before {
-  content: "✅";
-  font-size: 12px;
-}
-
-.warn {
-  color: var(--alert-warning);
-  font-weight: 600;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.warn::before {
-  content: "⚠️";
-  font-size: 12px;
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* ==========================================================================
-   Enhanced Buttons
-   ========================================================================== */
-
-.btn {
-  border: 2px solid var(--line);
-  background: var(--card);
-  padding: 12px 20px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  overflow: hidden;
-}
-
-.btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  transition: all 0.3s ease;
-  transform: translate(-50%, -50%);
-}
-
-.btn:active::before {
-  width: 300px;
-  height: 300px;
-}
-
-.btn:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow);
-}
-
-.btnPrimary {
-  background: var(--medical-primary);
-  color: white;
-  border-color: var(--medical-primary);
-  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
-}
-
-.btnPrimary:hover {
-  background: var(--medical-primary-light);
-  box-shadow: 0 6px 16px rgba(8, 145, 178, 0.4);
-}
-
-.btnPrimary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.btnDanger {
-  color: white;
-  background: var(--alert-danger);
-  border-color: var(--alert-danger);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.btnDanger:hover {
-  background: #dc2626;
-  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
-}
-
-.btnSmall {
-  padding: 8px 12px;
-  font-size: 12px;
-  min-width: 60px;
-  text-align: center;
-}
-
-/* ==========================================================================
-   Enhanced Table Design
-   ========================================================================== */
-
-.empty {
-  color: var(--muted);
-  text-align: center;
-  padding: 60px 24px;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.empty::before {
-  content: "🏥";
-  display: block;
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.tableWrap {
-  overflow: auto;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  border: 1px solid var(--line);
-  background: var(--card);
-}
-
-.table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  min-width: 900px;
-}
-
-.table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 20px 16px;
-  text-align: left;
-  vertical-align: middle;
-  font-weight: 700;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: var(--card-secondary);
-  border-bottom: 2px solid var(--medical-primary);
+/* ปุ่ม “ตรวจสอบรายละเอียด” ให้เห็นคำครบ */
+.btnInfo{
   color: var(--medical-primary-dark);
-}
-
-.table tbody td {
-  padding: 20px 16px;
-  text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid var(--line-light);
-  transition: all 0.2s ease;
-}
-
-.table tbody tr {
-  transition: all 0.2s ease;
-}
-
-.table tbody tr:hover {
-  background: var(--line-light);
-  box-shadow: inset 0 0 0 1px var(--medical-primary);
-}
-
-.table tbody tr:hover td {
-  background: transparent;
-}
-
-/* Column widths */
-.table th:nth-last-child(2),
-.table td:nth-last-child(2) {
-  width: 320px;
-}
-
-.table th:last-child,
-.table td:last-child {
-  width: 140px;
-  text-align: right;
-  vertical-align: middle;
+  background: #e6f6fb;
+  border-color: var(--medical-primary);
+  box-shadow: 0 2px 8px rgba(8,145,178,.18);
   white-space: nowrap;
-}
-
-.cellActions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-/* ==========================================================================
-   Medical Data Display Components
-   ========================================================================== */
-
-.dateStack {
-  min-width: 150px;
-}
-
-.dateMain {
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--text);
-}
-
-.dateSub {
-  color: var(--text-secondary);
-  font-size: 12px;
-  margin-top: 4px;
-  font-weight: 500;
-}
-
-.ellipsis {
-  max-width: 28ch;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Enhanced drug display */
-.drugCell {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.drugMain {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.drugName {
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.3px;
-  color: var(--text);
-}
-
-.drugSub {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 2px 8px;
-  background: var(--line-light);
-  border-radius: 4px;
-  border: 1px solid var(--line);
-}
-
-.atcTag {
-  display: inline-flex;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: var(--medical-primary);
-  color: white;
-  box-shadow: 0 2px 4px rgba(8, 145, 178, 0.2);
-}
-
-/* Enhanced severity indicators */
-.sev {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  width: max-content;
   padding: 8px 12px;
+  font-size: 12.5px;
+}
+.btnInfo:hover{
+  background: var(--medical-primary);
+  color: #fff;
+  border-color: var(--medical-primary-dark);
+  box-shadow: 0 4px 12px rgba(8,145,178,.35);
+}
+
+/* Link-style small button */
+.linkBtn{
+  background: #eef7ff;
+  border: 1px solid var(--medical-primary);
+  color: var(--medical-primary-dark);
+  padding: 6px 10px;
   border-radius: 8px;
-  font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  border: 2px solid;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.sevMild {
-  background: var(--severity-mild-bg);
-  color: var(--severity-mild);
-  border-color: var(--severity-mild);
-}
-
-.sevMild::before {
-  content: "🟢";
-  font-size: 10px;
-}
-
-.sevModerate {
-  background: var(--severity-moderate-bg);
-  color: var(--severity-moderate);
-  border-color: var(--severity-moderate);
-}
-
-.sevModerate::before {
-  content: "🟡";
-  font-size: 10px;
-}
-
-.sevSevere {
-  background: var(--severity-severe-bg);
-  color: var(--severity-severe);
-  border-color: var(--severity-severe);
-}
-
-.sevSevere::before {
-  content: "🔴";
-  font-size: 10px;
-}
-
-.sevUnknown {
-  background: var(--line-light);
-  color: var(--text-secondary);
-  border-color: var(--line);
-}
-
-.sevUnknown::before {
-  content: "❓";
-  font-size: 10px;
-}
-
-/* Enhanced code display */
-.codeInline {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.codeInline code {
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  background: var(--line-light);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px 10px;
   font-size: 11px;
-  color: var(--medical-primary-dark);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.codeMeta {
-  font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--card-secondary);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px 10px;
-  max-width: 280px;
-}
-
-.codeMeta div {
-  margin: 2px 0;
-}
-
-.linkBtn {
-  background: none;
-  border: none;
-  padding: 4px 8px;
-  color: var(--medical-primary);
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  transition: all .2s ease;
+}
+.linkBtn:hover{ background: var(--medical-primary); color:#fff; transform: translateY(-1px); }
+.linkBtn:focus-visible{ outline-offset:2px; outline:2px solid var(--medical-primary); }
+
+/* Empty state */
+.empty{ color: var(--muted); text-align:center; padding:60px 24px; font-size:16px; font-weight:500; }
+.empty::before{ content:"🏥"; display:block; font-size:48px; margin-bottom:16px; opacity:.5; }
+
+/* Table wrapper */
+.tableWrap{
+  overflow:auto; border-radius: var(--radius); box-shadow: var(--shadow);
+  border: 2px solid var(--medical-primary-dark); background: var(--card);
 }
 
-.linkBtn:hover {
-  background: var(--medical-primary);
-  color: white;
-  transform: scale(1.05);
+/* Table */
+.table{ width:100%; border-collapse: separate; border-spacing:0; min-width: 900px; }
+.table thead th{
+  position: sticky; top:0; z-index:10; padding:20px 16px; text-align:left; vertical-align:middle;
+  font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:.5px;
+  background: var(--card-secondary); color: var(--medical-primary-dark);
+  border-top: 3px solid var(--medical-primary-dark);
+  border-bottom: 3px solid var(--medical-primary-dark);
+}
+.table thead th:not(:last-child),
+.table tbody td:not(:last-child){ border-right: 1px solid var(--line); }
+
+.table tbody td{
+  padding:20px 16px; text-align:left; vertical-align: top;
+  border-bottom:1px solid var(--line-light); transition: all .2s ease;
+}
+.table tbody tr{ transition: all .2s ease; }
+.table tbody tr + tr td{ border-top: 1px solid var(--line); }
+.table tbody tr:hover{ background: var(--line-light); box-shadow: inset 0 0 0 1px var(--medical-primary); }
+.table tbody tr:hover td{ background: transparent; }
+
+.cellActions{
+  display:flex; gap:8px; align-items:center; justify-content:flex-end;
+  flex-wrap: wrap; row-gap: 8px;
 }
 
-.linkBtn:focus-visible {
-  outline-offset: 2px;
-  outline: 2px solid var(--medical-primary);
+/* Column widths (desktop) – ลดวันที่/ยา ให้ไม่ชน */
+.table thead th:nth-child(1),
+.table tbody td:nth-child(1){ width: 140px; }  /* วันที่ */
+.table thead th:nth-child(2),
+.table tbody td:nth-child(2){ width: 220px; }  /* ยา */
+.table thead th:nth-child(6),
+.table tbody td:nth-child(6){ width: 260px; }  /* ปุ่ม */
+
+/* Data display */
+.dateStack{ min-width: 140px; }
+.dateMain{ font-weight:700; font-size:14px; color: var(--text); }
+.dateSub{ color: var(--text-secondary); font-size:11px; margin-top:4px; font-weight:500; }
+
+.ellipsis{ max-width: 28ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.drugCell{ display:flex; flex-direction: column; gap: 8px; }
+.drugMain{ display:flex; align-items:center; gap: 8px; }
+.drugName{
+  font-weight:700; font-size:14px; letter-spacing:.3px; color: var(--text);
+  max-width: 20ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.drugSub{ color: var(--text-secondary); font-size:12px; font-weight:500; padding:2px 8px; background: var(--line-light); border-radius:4px; border:1px solid var(--line); }
+.atcTag{ display:inline-flex; align-items:center; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; padding:4px 8px; border-radius:6px; background: var(--medical-primary); color:#fff; box-shadow:0 2px 4px rgba(8,145,178,.2); }
+
+/* Severity / Outcome badges */
+.sev{ display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; border:2px solid; box-shadow:0 2px 4px rgba(0,0,0,.1); }
+.sevMild{ background: var(--severity-mild-bg); color: var(--severity-mild); border-color: var(--severity-mild); }
+.sevMild::before{ content:"🟢"; font-size:10px; }
+.sevModerate{ background: var(--severity-moderate-bg); color: var(--severity-moderate); border-color: var(--severity-moderate); }
+.sevModerate::before{ content:"🟡"; font-size:10px; }
+.sevSevere{ background: var(--severity-severe-bg); color: var(--severity-severe); border-color: var(--severity-severe); }
+.sevSevere::before{ content:"🔴"; font-size:10px; }
+.sevUnknown{ background: var(--line-light); color: var(--text-secondary); border-color: var(--line); }
+.sevUnknown::before{ content:"❓"; font-size:10px; }
+
+/* Code display (ถ้ายังมีใช้ในที่อื่น) */
+.codeInline{ display:flex; flex-direction: column; gap:8px; align-items:flex-start; }
+.codeInline code{
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-variant-numeric: tabular-nums; font-weight:600; letter-spacing:.5px;
+  background: var(--line-light); border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:10.8px; color: var(--medical-primary-dark);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.05);
+}
+.codeMeta{ font-size:11px; color: var(--text-secondary); background: var(--card-secondary); border:1px solid var(--line); border-radius:6px; padding:8px 10px; max-width: 280px; }
+.codeMeta div{ margin:2px 0; }
+
+/* Utilities */
+.colSpan2{ grid-column: span 2 / span 2; }
+:where(button, input, select, textarea):focus-visible{ outline:none; box-shadow: 0 0 0 3px rgba(8,145,178,.3); border-color: var(--medical-primary); }
+
+/* ===================== SweetAlert Detail – Auto layout (no class needed) ===================== */
+:global(.swal2-popup){ border-radius: 16px; padding: 18px 18px 22px; }
+:global(.swal2-title){ margin: 8px 0 12px; font-size: 22px; font-weight: 800; letter-spacing: .2px; color:#0f172a; }
+:global(.swal2-html-container){
+  margin: 0 !important; padding: 0 4px; max-height: 70vh; overflow: auto; text-align: left;
 }
 
-/* ==========================================================================
-   Utility Classes
-   ========================================================================== */
-
-.colSpan2 {
-  grid-column: span 2 / span 2;
+/* จัดคอลัมน์ label:value สำหรับโครงสร้างที่สร้างจาก viewDetails() เดิม */
+:global(.swal2-html-container > div){
+  display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; row-gap: 12px; line-height: 1.55;
+}
+:global(.swal2-html-container > div > div){
+  display: flex; align-items: baseline; gap: 10px; padding: 2px 0;
+}
+:global(.swal2-html-container > div > div > b){
+  flex: 0 0 160px; color: #475569; font-size: 12.5px; font-weight: 700;
+}
+/* บรรทัดที่มีค่าหลายบรรทัด → ทำเป็นกล่อง */
+:global(.swal2-html-container > div > div:has(> div)){
+  display: block;
+}
+:global(.swal2-html-container > div > div:has(> div) > b){
+  display: block; margin-bottom: 6px;
+}
+:global(.swal2-html-container > div > div:has(> div) > div){
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; line-height: 1.55;
+}
+/* เส้นคั่นส่วนข้อมูล */
+:global(.swal2-html-container hr){
+  grid-column: 1 / -1; border: none; border-top: 1px dashed #e2e8f0; margin: 10px 0 6px;
+}
+/* หัวข้อย่อยเดี่ยว */
+:global(.swal2-html-container b:only-child){
+  display: block; color:#0e7490; font-size: 13px; letter-spacing:.2px; margin: 2px 0 2px;
+}
+/* ปุ่มปิดใน Swal ให้ชัดขึ้น */
+:global(.swal2-actions .swal2-confirm){
+  padding: 8px 18px !important; border-radius: 10px !important; font-weight: 700 !important;
 }
 
-/* Focus ring enhancements */
-:where(button, input, select, textarea):focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.3);
-  border-color: var(--medical-primary);
+/* มือถือ: ซ้อนเป็นคอลัมน์เดียว */
+@media (max-width: 640px){
+  :global(.swal2-html-container > div){ grid-template-columns: 1fr; }
+  :global(.swal2-html-container > div > div > b){ flex-basis: 140px; }
 }
 
-/* ==========================================================================
-   Responsive Design
-   ========================================================================== */
-
-@media (max-width: 1024px) {
-  .page {
-    padding: 16px;
-  }
-  
-  .header {
-    padding: 20px 24px;
-    margin-bottom: 24px;
-  }
-  
-  .card {
-    padding: 24px;
-  }
+/* ================================ Responsive ================================ */
+@media (max-width: 1024px){
+  .page{ padding:16px; }
+  .header{ padding:20px 24px; margin-bottom:24px; }
+  .card{ padding:24px; }
 }
+@media (max-width: 860px){
+  .grid{ grid-template-columns: 1fr; gap: 20px; }
+  .colSpan2{ grid-column: auto; }
+  .header{ flex-direction: column; align-items:flex-start; gap:16px; }
+  .tabs{ width:100%; justify-content: space-around; }
+  .tab{ flex:1; text-align:center; }
+  .ellipsis{ max-width: 20ch; }
 
-@media (max-width: 860px) {
-  .grid { 
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-  
-  .colSpan2 { 
-    grid-column: auto; 
-  }
-  
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-  
-  .tabs {
-    width: 100%;
-    justify-content: space-around;
-  }
-  
-  .tab {
-    flex: 1;
-    text-align: center;
-  }
-  
-  .ellipsis { 
-    max-width: 20ch; 
-  }
-  
-  .table th:nth-last-child(2),
-  .table td:nth-last-child(2) { 
-    width: 280px; 
-  }
-  
-  .table th:last-child,
-  .table td:last-child { 
-    width: 110px; 
-  }
-  
-  .actions {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .actions .btn {
-    width: 100%;
-    justify-content: center;
-  }
+  .table thead th:nth-child(6),
+  .table tbody td:nth-child(6){ width: 180px; }
 }
-
-@media (max-width: 640px) {
-  .page {
-    padding: 12px;
-  }
-  
-  .header {
-    padding: 16px 20px;
-  }
-  
-  .card {
-    padding: 20px;
-  }
-  
-  .title {
-    font-size: 24px;
-  }
-  
-  .table {
-    min-width: 600px;
-  }
-  
-  .btnSmall {
-    padding: 6px 10px;
-    font-size: 11px;
-  }
+@media (max-width: 640px){
+  .page{ padding:12px; }
+  .header{ padding:16px 20px; }
+  .card{ padding:20px; }
+  .title{ font-size:24px; }
+  .table{ min-width: 600px; }
+  .btnSmall{ padding:6px 10px; font-size:11px; }
 }
