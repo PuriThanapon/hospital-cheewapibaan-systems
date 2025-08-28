@@ -170,6 +170,9 @@ const toLabel = <T extends string>(arr: { value: T; label: string }[], v?: T | s
 const esc = (s?: any) =>
   String(s ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[m]);
 
+/* ---------- Required helpers ---------- */
+const req = (s?: string | null) => !!(s && s.toString().trim());
+
 /* ======================================================================= */
 
 export default function AllergyPage() {
@@ -288,18 +291,22 @@ export default function AllergyPage() {
   /* ---------- Validate ---------- */
   function validate(f: AllergyForm) {
     const e: Partial<Record<keyof AllergyForm, string>> = {};
-    if (!f.report_date) e.report_date = 'กรุณาเลือกวันที่มีรายงาน';
-    if (!f.substance) e.substance = 'กรุณาเลือกยาที่แพ้';
-    if (f.substance === 'อื่น ๆ' && !f.custom_substance?.trim()) e.custom_substance = 'ระบุชื่อสามัญของยา';
-    if (!f.severity) e.severity = 'เลือกความร้ายแรง';
-    if (!f.system_affected) e.system_affected = 'เลือกระบบอวัยวะที่ได้รับผล';
-    if (!f.causality) e.causality = 'เลือกระดับความสัมพันธ์';
-    if (!f.outcome) e.outcome = 'เลือกผลที่เกิดขึ้นภายหลัง';
-    if (!f.patient_type) e.patient_type = 'เลือกประเภทผู้ป่วย';
-    if (f.thai24_code) {
-      const digits = onlyDigits24(f.thai24_code);
-      if (digits.length !== 24) e.thai24_code = 'ต้องเป็นตัวเลข 24 หลัก';
-    }
+
+    if (!req(f.report_date))      e.report_date = 'กรุณาเลือกวันที่มีรายงาน';
+    if (!req(f.onset_date))       e.onset_date = 'กรุณาเลือกวันที่มีอาการ';
+    if (!req(f.substance))        e.substance = 'กรุณาเลือกยาที่แพ้';
+    if (f.substance === 'อื่น ๆ' && !req(f.custom_substance))
+                                  e.custom_substance = 'ระบุชื่อสามัญของยา';
+    if (!req(f.reaction))         e.reaction = 'ระบุอาการที่แพ้';
+    if (!req(f.severity))         e.severity = 'เลือกความร้ายแรง';
+    if (!req(f.system_affected))  e.system_affected = 'เลือกระบบอวัยวะที่ได้รับผล';
+    if (!req(f.causality))        e.causality = 'เลือกระดับความสัมพันธ์';
+    if (!req(f.outcome))          e.outcome = 'เลือกผลที่เกิดขึ้นภายหลัง';
+    if (!req(f.patient_type))     e.patient_type = 'เลือกประเภทผู้ป่วย';
+
+    const digits = onlyDigits24(f.thai24_code);
+    if (digits.length !== 24)     e.thai24_code = 'กรอกรหัสมาตรฐาน 24 หลักให้ครบ';
+
     return e;
   }
 
@@ -325,7 +332,21 @@ export default function AllergyPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const err = validate(form);
+
+    // Clean values before validate/send
+    const cleaned: AllergyForm = {
+      ...form,
+      report_date: (form.report_date || '').trim(),
+      onset_date:  (form.onset_date  || '').trim(),
+      substance:   (form.substance   || '').trim(),
+      custom_substance: form.substance === 'อื่น ๆ' ? (form.custom_substance || '').trim() : '',
+      reaction:    (form.reaction    || '').trim(),
+      system_affected: (form.system_affected || '').trim(),
+      thai24_code: onlyDigits24(form.thai24_code),
+      note:        (form.note || '').trim(),
+    };
+
+    const err = validate(cleaned);
     setErrors(err);
     if (Object.keys(err).length) {
       const firstMsg = Object.values(err)[0] as string;
@@ -333,13 +354,14 @@ export default function AllergyPage() {
       return;
     }
 
-    const normalizedSubstance = form.substance === 'อื่น ๆ' ? (form.custom_substance || '').trim() : form.substance;
+    const normalizedSubstance =
+      cleaned.substance === 'อื่น ๆ' ? cleaned.custom_substance! : cleaned.substance;
 
     const body = {
-      ...form,
+      ...cleaned,
       substance: normalizedSubstance,
-      thai24_code: onlyDigits24(form.thai24_code) || null,
-      onset_date: form.onset_date || null,
+      thai24_code: onlyDigits24(cleaned.thai24_code),
+      onset_date: cleaned.onset_date,
     };
 
     setLoading(true);
@@ -508,7 +530,7 @@ export default function AllergyPage() {
     return () => { alive = false; };
   }, [items, drugByCode]);
 
-  /* ---------- SEARCH MODAL (คืนค่าให้ปุ่มค้นหา) ---------- */
+  /* ---------- SEARCH MODAL ---------- */
   async function openThai24Search() {
     abortRef.current?.abort();
 
@@ -658,13 +680,24 @@ export default function AllergyPage() {
           <form onSubmit={onSubmit} className={styles.grid}>
             <div className={styles.field}>
               <label>วันที่มีรายงาน</label>
-              <input type="date" value={form.report_date} onChange={(e) => setForm({ ...form, report_date: e.target.value })} />
+              <input
+                type="date"
+                required
+                value={form.report_date}
+                onChange={(e) => setForm({ ...form, report_date: e.target.value })}
+              />
               {errors.report_date && <small className={styles.error}>{errors.report_date}</small>}
             </div>
 
             <div className={styles.field}>
               <label>วันที่มีอาการ</label>
-              <input type="date" value={form.onset_date} onChange={(e) => setForm({ ...form, onset_date: e.target.value })} />
+              <input
+                type="date"
+                required
+                value={form.onset_date}
+                onChange={(e) => setForm({ ...form, onset_date: e.target.value })}
+              />
+              {errors.onset_date && <small className={styles.error}>{errors.onset_date}</small>}
             </div>
 
             <div className={styles.field}>
@@ -672,6 +705,7 @@ export default function AllergyPage() {
               <div className={styles.withPrefix}>
                 <span className={styles.pillIcon} aria-hidden>💊</span>
                 <select
+                  required
                   value={form.substance}
                   onChange={(e) => onSubstanceChange(e.target.value)}
                   disabled={drugLoading}
@@ -682,7 +716,13 @@ export default function AllergyPage() {
                 </select>
               </div>
               {form.substance === 'อื่น ๆ' && (
-                <input className={styles.mt8} placeholder="ระบุชื่อสามัญ" value={form.custom_substance} onChange={(e) => setForm({ ...form, custom_substance: e.target.value })} />
+                <input
+                  className={styles.mt8}
+                  placeholder="ระบุชื่อสามัญ"
+                  required
+                  value={form.custom_substance}
+                  onChange={(e) => setForm({ ...form, custom_substance: e.target.value })}
+                />
               )}
               {(errors.substance || errors.custom_substance) && (
                 <small className={styles.error}>{errors.substance || errors.custom_substance}</small>
@@ -691,12 +731,18 @@ export default function AllergyPage() {
 
             <div className={styles.field}>
               <label>อาการที่แพ้</label>
-              <input placeholder="เช่น ผื่น คัน หายใจลำบาก ช็อก ฯลฯ" value={form.reaction} onChange={(e) => setForm({ ...form, reaction: e.target.value })} />
+              <input
+                required
+                placeholder="เช่น ผื่น คัน หายใจลำบาก ช็อก ฯลฯ"
+                value={form.reaction}
+                onChange={(e) => setForm({ ...form, reaction: e.target.value })}
+              />
+              {errors.reaction && <small className={styles.error}>{errors.reaction}</small>}
             </div>
 
             <div className={styles.field}>
               <label>ความร้ายแรง</label>
-              <select value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value as Severity })}>
+              <select required value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value as Severity })}>
                 <option value="">— เลือกความร้ายแรง —</option>
                 {SEVERITY_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
@@ -705,7 +751,7 @@ export default function AllergyPage() {
 
             <div className={styles.field}>
               <label>สาเหตุการเกิด (ระบบที่ได้รับผล)</label>
-              <select value={form.system_affected} onChange={(e) => setForm({ ...form, system_affected: e.target.value })}>
+              <select required value={form.system_affected} onChange={(e) => setForm({ ...form, system_affected: e.target.value })}>
                 <option value="">— เลือกระบบ —</option>
                 {SYSTEM_AFFECTED_OPTIONS.map((o) => (<option key={o} value={o}>{o}</option>))}
               </select>
@@ -714,7 +760,7 @@ export default function AllergyPage() {
 
             <div className={styles.field}>
               <label>ระดับความสัมพันธ์</label>
-              <select value={form.causality} onChange={(e) => setForm({ ...form, causality: e.target.value as Causality })}>
+              <select required value={form.causality} onChange={(e) => setForm({ ...form, causality: e.target.value as Causality })}>
                 <option value="">— เลือกความสัมพันธ์ —</option>
                 {CAUSALITY_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
@@ -723,7 +769,7 @@ export default function AllergyPage() {
 
             <div className={styles.field}>
               <label>ผลที่เกิดขึ้นภายหลัง</label>
-              <select value={form.outcome} onChange={(e) => setForm({ ...form, outcome: e.target.value as Outcome })}>
+              <select required value={form.outcome} onChange={(e) => setForm({ ...form, outcome: e.target.value as Outcome })}>
                 <option value="">— เลือกผล —</option>
                 {OUTCOME_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
@@ -732,7 +778,7 @@ export default function AllergyPage() {
 
             <div className={styles.field}>
               <label>ประเภทผู้ป่วย</label>
-              <select value={form.patient_type} onChange={(e) => setForm({ ...form, patient_type: e.target.value as PatientType })}>
+              <select required value={form.patient_type} onChange={(e) => setForm({ ...form, patient_type: e.target.value as PatientType })}>
                 {PATIENT_TYPES.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
               {errors.patient_type && <small className={styles.error}>{errors.patient_type}</small>}
@@ -743,6 +789,7 @@ export default function AllergyPage() {
               <label>รหัสมาตรฐาน (24 หลัก) ของยาที่แพ้</label>
               <div className={styles.row}>
                 <input
+                  required
                   placeholder="เช่น 0000 0000 0000 0000 0000 0000"
                   value={thai24Display}
                   onChange={(e) => onThai24Change(e.target.value)}
@@ -762,7 +809,12 @@ export default function AllergyPage() {
 
             <div className={`${styles.field} ${styles.colSpan2}`}>
               <label>หมายเหตุ</label>
-              <textarea rows={3} placeholder="บันทึกเพิ่มเติม เช่น แพทย์ผู้รายงาน สถานที่ ฯลฯ" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+              <textarea
+                rows={3}
+                placeholder="บันทึกเพิ่มเติม เช่น แพทย์ผู้รายงาน สถานที่ ฯลฯ"
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+              />
             </div>
 
             <div className={`${styles.actions} ${styles.colSpan2}`}>
@@ -789,9 +841,7 @@ export default function AllergyPage() {
                     <th style={{ width: 220 }}>ยา</th>
                     <th>อาการที่แพ้</th>
                     <th>ความร้ายแรง</th>
-                    {/* เปลี่ยนเป็นผลที่เกิดขึ้นภายหลัง */}
                     <th>ผลที่เกิดขึ้นภายหลัง</th>
-                    {/* เผื่อพื้นที่ปุ่มให้พอ */}
                     <th style={{ width: 260 }}>จัดการ</th>
                   </tr>
                 </thead>
@@ -849,7 +899,6 @@ export default function AllergyPage() {
                           </span>
                         </td>
 
-                        {/* Outcome column */}
                         <td>
                           <span className={`${styles.sev} ${outcomeClass}`}>
                             {outcomeLabel}
@@ -861,7 +910,7 @@ export default function AllergyPage() {
                             type="button"
                             className={`${styles.btn} ${styles.btnSmall} ${styles.btnInfo}`}
                             onClick={() => viewDetails(it)}
-                            style={{ whiteSpace: 'normal' }}  // ให้ขึ้นบรรทัดใหม่ได้
+                            style={{ whiteSpace: 'normal' }}
                           >
                             ตรวจสอบรายละเอียด
                           </button>
