@@ -122,7 +122,7 @@ export default function TreatmentPlansListPage() {
   }, [filterHN, filterName]);
 
   return (
-    <div className="min-h-screen p-4 md:p-8 lg:p-10 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen p-4 bg-[#f7f7fb] rounded-2xl">
       <div className="mx-auto max-w-7xl">
         {/* Header with enhanced styling */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 p-6 bg-white/70 backdrop-blur-sm rounded-3xl shadow-lg border border-white/20">
@@ -244,7 +244,7 @@ export default function TreatmentPlansListPage() {
                     <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">HN / ชื่อผู้ป่วย</th>
                     <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">หัวเรื่อง</th>
                     <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">รูปแบบ</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">สถานที่</th>
+                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">สถานที่รักษา</th>
                     <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">การทำงาน</th>
                   </tr>
                 </thead>

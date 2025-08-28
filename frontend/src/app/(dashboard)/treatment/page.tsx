@@ -61,13 +61,6 @@ export default function TreatmentHubPage() {
                 >
                   ไปที่หน้าแผนการรักษา <ArrowRight className="w-4 h-4" />
                 </Link>
-                {/* (ทางเลือก) ปุ่มสร้างใหม่ */}
-                <Link
-                  href="/treatment/plans/new"
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-colors"
-                >
-                  สร้างแผนใหม่
-                </Link>
               </div>
             </div>
           </div>

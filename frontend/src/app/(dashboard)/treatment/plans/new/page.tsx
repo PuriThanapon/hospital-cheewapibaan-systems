@@ -75,7 +75,7 @@ export default function NewTreatmentPlanPage() {
   };
 
   return (
-    <div className="min-h-screen p-6 md:p-10 bg-[#f7f7fb]">
+    <div className="min-h-screen p-6 md:p-10 bg-[#f7f7fb] rounded-2xl">
       <div className="mx-auto max-w-5xl">
         <div className="flex items-center justify-between mb-6">
           <div>
