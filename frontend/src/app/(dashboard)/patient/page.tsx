@@ -27,7 +27,6 @@ import { uploadPatientFiles } from '@/app/lib/uploadPatientFiles';
 import BaselineForm, { Baseline } from '@/app/components/forms/BaselineForm';
 import { hasBaselineData } from '@/app/lib/baseline'; // ถ้าคุณวาง util ตามตัวอย่าง
 
-
 type Status = 'pending' | 'done' | 'cancelled';
 // react-select (SSR safe)
 const Select = dynamic(() => import('react-select'), { ssr: false });
@@ -150,6 +149,34 @@ async function http(url, options: any = {}) {
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) return res.json();
   return res.text();
+}
+
+/** ---------- Helper: เติมจำนวนการแพ้ยาให้แต่ละแถว ---------- */
+async function hydrateAllergyCounts(list: any[]) {
+  const ids = list.map((r: any) => r.patients_id).filter(Boolean);
+  if (!ids.length) return list;
+
+  // พยายามเรียก endpoint รวมก่อน (ถ้ามี)
+  try {
+    const res = await http(`/api/allergies/count-by-patients?ids=${encodeURIComponent(ids.join(','))}`);
+    const counts = (res as any)?.counts || {};
+    return list.map((r: any) => ({ ...r, allergy_count: Number(counts[r.patients_id] || 0) }));
+  } catch {
+    // ถ้าไม่มี/พัง → สำรอง เรียกทีละ HN
+    const pairs = await Promise.all(
+      ids.map(async (id: string) => {
+        try {
+          const r = await http(`/api/patients/${encodeURIComponent(id)}/allergies?countOnly=1`);
+          const c = (r as any)?.count ?? (Array.isArray((r as any)?.data) ? (r as any).data.length : 0);
+          return [id, Number(c)] as const;
+        } catch {
+          return [id, 0] as const;
+        }
+      })
+    );
+    const map = Object.fromEntries(pairs);
+    return list.map((r: any) => ({ ...r, allergy_count: Number(map[r.patients_id] || 0) }));
+  }
 }
 
 function buildPatientFormData(values: Record<string, any>) {
@@ -435,17 +462,26 @@ export default function PatientsPage() {
     return p.toString();
   }, [query, filters, page, limit, tick]);
 
-  // fetch list
+  // fetch list (แนบ/เติมจำนวนแพ้ยา)
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
     const t = setTimeout(async () => {
       setLoading(true); setErrMsg('');
       try {
-        const data = await http(`/api/patients?${qs}`, { signal: controller.signal });
+        // ขอให้ backend แนบ allergy_count มาด้วย ถ้าไม่รองรับ เดี๋ยวเติมเอง
+        const data = await http(`/api/patients?${qs}&withAllergyCount=1`, { signal: controller.signal });
         if (!alive) return;
-        setRows(data.data || []);
-        setTotal(data.totalCount || 0);
+
+        let list = (data as any)?.data || [];
+        const hasCountsAlready = list.some((r: any) => 'allergy_count' in r || 'has_allergy' in r || 'allergies_count' in r);
+
+        if (!hasCountsAlready && list.length) {
+          try { list = await hydrateAllergyCounts(list); } catch {}
+        }
+
+        setRows(list);
+        setTotal((data as any)?.totalCount || 0);
       } catch (e) {
         if (!alive) return;
         if ((e as any).name !== 'AbortError') {
@@ -723,8 +759,6 @@ export default function PatientsPage() {
     }
   };
 
-
-
   // ✅ ฟังก์ชันลบผู้ป่วย (purge อัตโนมัติฝั่งแบ็กเอนด์)
   const handleDelete = async (patients_id: string) => {
     const { isConfirmed } = await $swal.fire({
@@ -956,66 +990,95 @@ export default function PatientsPage() {
             </tr>
           </thead>
           <tbody>
-            {(orderedRows || []).map((r: any) => (
-              <tr key={r.patients_id}>
-                <td className={styles.td}><span className={styles.mono}>{r.patients_id}</span></td>
-                <td className={styles.td}>{r.pname || ''}{r.first_name} {r.last_name}</td>
-                <td className={styles.td}>{r.gender || '-'}</td>
-                <td className={styles.td}>{calculateAgeFromBirthdate(r.birthdate || '-')}</td>
-                <td className={styles.td}>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</td>
-                <td className={styles.td}>{r.patients_type || '-'}</td>
-                <td className={styles.td}>{r.treat_at || '-'}</td>
-                <td className={styles.td}><Pill alive={r.status !== 'เสียชีวิต'} /></td>
-                <td className={styles.td}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleVerify(r.patients_id)}>
-                      <Eye size={14} /> ตรวจสอบ
-                    </button>
-                    <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenEdit(r.patients_id)}>
-                      <Pencil size={14} /> แก้ไข
-                    </button>
-                    {r.status !== 'เสียชีวิต' && (
-                      <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenAppt(r.patients_id)}>
-                        <CalendarPlus size={14} /> เพิ่มนัด
-                      </button>
-                    )}
-                    <Link
-                      href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`}
-                      className={`${styles.btn} ${styles.btnSm}`}
-                    >
-                      <FileText size={14} /> ประวัติ
-                    </Link>
-                    <Link
-                      href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
-                        `${r.pname || ''}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
-                      )}`}
-                      className={`${styles.btn} ${styles.btnSm}`}
-                    >
-                      <AlertCircle size={14} /> แพ้ยา
-                    </Link>
-                    <Link
-                      href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
-                      className={`${styles.btn} ${styles.btnSm}`}
-                    >
-                      <FileText size={14} /> โรคประจำตัว
-                    </Link>
-                    {r.status !== 'เสียชีวิต' && (
-                      <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenDeceased(r.patients_id)}>
-                        <Skull size={14} /> เสียชีวิต
-                      </button>
-                    )}
-                    <button
-                      className={`${styles.btn} ${styles.btnSm} ${styles.btnDanger}`}
-                      onClick={() => handleDelete(r.patients_id)}
-                    >
-                      <Trash2 size={14} /> ลบ
-                    </button>
+            {(orderedRows || []).map((r: any) => {
+              const allergyCount = Number((r as any).allergy_count ?? (r as any).allergies_count ?? 0);
+              const hasAllergy = (r as any).has_allergy === true || allergyCount > 0;
 
+              // สไตล์ปุ่มแพ้ยา (inline เพื่อลดการแก้ไฟล์ CSS)
+              const allergyBtnStyle: React.CSSProperties = hasAllergy
+                ? { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' }
+                : { background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb' };
 
-                  </div>
-                </td>
-              </tr>
-            ))}
+              return (
+                <tr key={r.patients_id}>
+                  <td className={styles.td}><span className={styles.mono}>{r.patients_id}</span></td>
+                  <td className={styles.td}>
+                    {r.pname || ''}{r.first_name} {r.last_name}
+                    {hasAllergy && (
+                      <span
+                        title={`แพ้ยา ${allergyCount} รายการ`}
+                        style={{
+                          display: 'inline-block',
+                          width: 8,
+                          height: 8,
+                          marginLeft: 6,
+                          verticalAlign: 'middle',
+                          borderRadius: 9999,
+                          background: '#ef4444'
+                        }}
+                      />
+                    )}
+                  </td>
+                  <td className={styles.td}>{r.gender || '-'}</td>
+                  <td className={styles.td}>{calculateAgeFromBirthdate(r.birthdate || '-')}</td>
+                  <td className={styles.td}>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</td>
+                  <td className={styles.td}>{r.patients_type || '-'}</td>
+                  <td className={styles.td}>{r.treat_at || '-'}</td>
+                  <td className={styles.td}><Pill alive={r.status !== 'เสียชีวิต'} /></td>
+                  <td className={styles.td}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleVerify(r.patients_id)}>
+                        <Eye size={14} /> ตรวจสอบ
+                      </button>
+                      <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenEdit(r.patients_id)}>
+                        <Pencil size={14} /> แก้ไข
+                      </button>
+                      {r.status !== 'เสียชีวิต' && (
+                        <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenAppt(r.patients_id)}>
+                          <CalendarPlus size={14} /> เพิ่มนัด
+                        </button>
+                      )}
+                      <Link
+                        href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`}
+                        className={`${styles.btn} ${styles.btnSm}`}
+                      >
+                        <FileText size={14} /> ประวัติ
+                      </Link>
+
+                      {/* ปุ่มแพ้ยา: สี/จำนวนตาม hasAllergy */}
+                      <Link
+                        href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
+                          `${r.pname || ''}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
+                        )}`}
+                        className={`${styles.btn} ${styles.btnSm}`}
+                        style={allergyBtnStyle}
+                        title={hasAllergy ? `แพ้ยา ${allergyCount} รายการ` : 'ไม่มีข้อมูลแพ้ยา'}
+                      >
+                        <AlertCircle size={14} /> แพ้ยา{hasAllergy ? ` (${allergyCount})` : ''}
+                      </Link>
+
+                      <Link
+                        href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
+                        className={`${styles.btn} ${styles.btnSm}`}
+                      >
+                        <FileText size={14} /> โรคประจำตัว
+                      </Link>
+                      {r.status !== 'เสียชีวิต' && (
+                        <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenDeceased(r.patients_id)}>
+                          <Skull size={14} /> เสียชีวิต
+                        </button>
+                      )}
+                      <button
+                        className={`${styles.btn} ${styles.btnSm} ${styles.btnDanger}`}
+                        onClick={() => handleDelete(r.patients_id)}
+                      >
+                        <Trash2 size={14} /> ลบ
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {!loading && rows.length === 0 && (
               <tr><td className={styles.td} colSpan={10}>ไม่พบข้อมูลตามเงื่อนไข</td></tr>
             )}
