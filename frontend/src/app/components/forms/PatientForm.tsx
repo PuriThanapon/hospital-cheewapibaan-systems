@@ -31,29 +31,51 @@ const animatedComponents = makeAnimated();
 const Select = dynamic(() => import('react-select'), { ssr: false });
 const menuPortalTarget = typeof window !== 'undefined' ? document.body : undefined;
 
+// Updated Select styles with medical theme
 const rsx = {
   control: (base, state) => ({
     ...base,
     minHeight: 32,
-    borderRadius: 10,
-    borderColor: state.isFocused ? '#60a5fa' : '#e5e7eb',
-    boxShadow: state.isFocused ? '0 0 0 3px rgba(59,130,246,.25)' : 'none',
-    ':hover': { borderColor: '#60a5fa' },
-    color: '#000000',
+    borderRadius: 8,
+    borderColor: state.isFocused ? '#005A50' : '#d1d5db',
+    borderWidth: 2,
+    boxShadow: state.isFocused ? '0 0 0 3px rgba(0,90,80,0.1)' : 'none',
+    ':hover': { borderColor: '#005A50' },
+    color: '#374151',
+    backgroundColor: '#ffffff',
   }),
-  menuPortal: (base) => ({ ...base, color: '#000000', zIndex: 9999 }),
+  menuPortal: (base) => ({ ...base, color: '#374151', zIndex: 9999 }),
+  option: (base, state) => ({
+    ...base,
+    backgroundColor: state.isSelected ? '#005A50' : state.isFocused ? '#f0fdf4' : 'white',
+    color: state.isSelected ? 'white' : '#374151',
+    ':hover': {
+      backgroundColor: state.isSelected ? '#005A50' : '#ecfdf5',
+    },
+  }),
 };
+
 const ortherrsx = {
   control: (base, state) => ({
     ...base,
     minHeight: 46,
-    borderRadius: 10,
-    borderColor: state.isFocused ? '#60a5fa' : '#e5e7eb',
-    boxShadow: state.isFocused ? '0 0 0 3px rgba(59,130,246,.25)' : 'none',
-    ':hover': { borderColor: '#60a5fa' },
-    color: '#000000',
+    borderRadius: 8,
+    borderColor: state.isFocused ? '#005A50' : '#d1d5db',
+    borderWidth: 2,
+    boxShadow: state.isFocused ? '0 0 0 3px rgba(0,90,80,0.1)' : 'none',
+    ':hover': { borderColor: '#005A50' },
+    color: '#374151',
+    backgroundColor: '#ffffff',
   }),
-  menuPortal: (base) => ({ ...base, color: '#000000', zIndex: 9999 }),
+  menuPortal: (base) => ({ ...base, color: '#374151', zIndex: 9999 }),
+  option: (base, state) => ({
+    ...base,
+    backgroundColor: state.isSelected ? '#005A50' : state.isFocused ? '#f0fdf4' : 'white',
+    color: state.isSelected ? 'white' : '#374151',
+    ':hover': {
+      backgroundColor: state.isSelected ? '#005A50' : '#ecfdf5',
+    },
+  }),
 };
 
 /* ---------------- Select options ---------------- */
@@ -108,8 +130,6 @@ const DOC_OPTIONS = [
   { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ',                accept: 'image/*,.pdf' },
   { key: 'patient_photo',      label: 'รูปถ่ายผู้ป่วย (สภาพปัจจุบัน)',                accept: 'image/*' },
   { key: 'relative_id_card',   label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์',   accept: 'image/*,.pdf' },
-
-  // ใหม่
   { key: 'assistance_letter',  label: 'หนังสือขอความอนุเคราะห์',                     accept: 'image/*,.pdf' },
   { key: 'power_of_attorney',  label: 'หนังสือมอบอำนาจ / หนังสือรับรองบุคคลไร้ญาติ',  accept: 'image/*,.pdf' },
   { key: 'homeless_certificate', label: 'หนังสือรับรองบุคคลไร้ที่พึ่ง',                accept: 'image/*,.pdf' },
@@ -188,7 +208,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     onChange({ ...v, [key]: file ?? null });
   };
 
-  // “เอกสารอื่นๆ” : [{ label, file }]
+  // "เอกสารอื่นๆ" : [{ label, file }]
   const otherDocs: Array<{ label?: string; file?: File | null }> = v.other_docs || [];
   const setOtherDocs = (list: any[]) => onChange({ ...v, other_docs: list });
 
@@ -216,7 +236,6 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   // Expose ให้ parent ใช้งาน
   useImperativeHandle(ref, () => ({
     validate: () => {
@@ -227,6 +246,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           title: 'กรอกข้อมูลไม่ครบ',
           html: `<div style="text-align:left">${res.issues.map(i => `<div>${i}</div>`).join('')}</div>`,
           confirmButtonText: 'ตกลง',
+          confirmButtonColor: '#005A50',
         }).then(() => {
           if (res.firstFocusName) {
             const el = document.querySelector(`[name="${res.firstFocusName}"]`);
@@ -241,17 +261,27 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
   }));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 bg-gray-50 p-6">
+      {/* Header */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-[#005A50] mb-2">แบบฟอร์มข้อมูลผู้ป่วย</h1>
+        <p className="text-gray-600">Patient Information Form</p>
+        <div className="w-24 h-1 bg-[#005A50] mx-auto mt-4 rounded"></div>
+      </div>
+
       {/* ข้อมูลพื้นฐาน */}
-      <div className="bg-blue-100 p-6 rounded-xl border border-blue-200">
-        <h3 className="text-lg font-bold text-blue-800 mb-6 flex items-center gap-2">
-          <FileText size={20} />
+      <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+        <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
+          <div className="p-2 bg-[#005A50] rounded-lg">
+            <FileText size={20} className="text-white" />
+          </div>
           ข้อมูลพื้นฐาน
+          <span className="text-sm font-normal text-gray-500 ml-auto">Basic Information</span>
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <InputField label="HN (รหัสผู้ป่วย)" required icon={<User size={16} />}>
             <input
-              className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 bg-gray-100 text-gray-600 font-mono text-sm focus:outline-none cursor-not-allowed"
+              className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 bg-gray-50 text-gray-600 font-mono text-sm focus:outline-none cursor-not-allowed transition-colors"
               value={v.patients_id || ''}
               readOnly
               placeholder="Auto-generated"
@@ -291,10 +321,13 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
       </div>
 
       {/* ข้อมูลส่วนตัว */}
-      <div className="bg-green-100 p-6 rounded-xl border border-green-200">
-        <h3 className="text-lg font-bold text-green-800 mb-6 flex items-center gap-2">
-          <User size={20} />
+      <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+        <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
+          <div className="p-2 bg-[#005A50] rounded-lg">
+            <User size={20} className="text-white" />
+          </div>
           ข้อมูลส่วนตัว
+          <span className="text-sm font-normal text-gray-500 ml-auto">Personal Information</span>
         </h3>
 
         {/* เลขบัตรประชาชน */}
@@ -303,7 +336,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
             <InputField label="เลขบัตรประชาชน" required error={errors.card_id}>
               <input
                 name="card_id"
-                className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
+                className="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200 font-mono tracking-wide"
                 value={v.card_id || ''}
                 onChange={handleCardIdChange}
                 placeholder="1-1234-12345-12-1"
@@ -342,7 +375,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="ชื่อ" required error={errors.first_name}>
             <input
               name="first_name"
-              className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
+              className="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200"
               value={v.first_name || ''}
               onChange={set('first_name')}
               placeholder="ชื่อจริง"
@@ -353,7 +386,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="นามสกุล" required error={errors.last_name}>
             <input
               name="last_name"
-              className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
+              className="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200"
               value={v.last_name || ''}
               onChange={set('last_name')}
               placeholder="นามสกุล"
@@ -392,7 +425,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
 
           <InputField label="อายุ">
             <input
-              className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 bg-gray-100 text-gray-600 cursor-not-allowed"
+              className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-gray-300 text-gray-600 cursor-not-allowed font-medium"
               value={calculateAge(v.birthdate)}
               readOnly
               placeholder="คำนวณจากวันเกิด"
@@ -402,7 +435,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="โทรศัพท์" error={errors.phone} icon={<Phone size={16} />}>
             <input
               name="phone"
-              className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
+              className="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200 font-mono"
               value={v.phone || ''}
               onChange={handlePhoneNumberChange}
               placeholder="0XX-XXX-XXXX"
@@ -415,10 +448,10 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
 
         {/* น้ำหนัก + ส่วนสูง */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-          <InputField label="น้ำหนัก" error={errors.weight}>
+          <InputField label="น้ำหนัก (กิโลกรัม)" error={errors.weight}>
             <input
               name="weight"
-              className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
+              className="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200"
               value={v.weight || ''}
               onChange={set('weight')}
               placeholder="XX"
@@ -427,10 +460,10 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
             />
           </InputField>
 
-          <InputField label="ส่วนสูง" error={errors.height}>
+          <InputField label="ส่วนสูง (เซนติเมตร)" error={errors.height}>
             <input
               name="height"
-              className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
+              className="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200"
               value={v.height || ''}
               onChange={set('height')}
               placeholder="XXX"
@@ -440,41 +473,38 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           </InputField>
         </div>
 
-        {/* เชื้อชาติ + ศาสนา + ที่อยู่ */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-          <div className="md:col-span-2">
-            <InputField label="เชื้อชาติ" error={errors.nationality}>
-              <input
-                name="nationality"
-                className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
-                value={v.nationality || ''}
-                onChange={set('nationality')}
-                placeholder="เช่น ไทย ลาว พม่า"
-                maxLength={20}
-                autoComplete="country-name"
-              />
-            </InputField>
-          </div>
-          <div className="md:col-span-2">
-            <InputField label="ศาสนา" error={errors.religion}>
-              <input
-                name="religion"
-                className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
-                value={v.religion || ''}
-                onChange={set('religion')}
-                placeholder="เช่น พุทธ คริส อิสลาม "
-                maxLength={20}
-                autoComplete="off"
-              />
-            </InputField>
-          </div>
+        {/* เชื้อชาติ + ศาสนา */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <InputField label="เชื้อชาติ" error={errors.nationality}>
+            <input
+              name="nationality"
+              className="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200"
+              value={v.nationality || ''}
+              onChange={set('nationality')}
+              placeholder="เช่น ไทย ลาว พม่า"
+              maxLength={20}
+              autoComplete="country-name"
+            />
+          </InputField>
+          
+          <InputField label="ศาสนา" error={errors.religion}>
+            <input
+              name="religion"
+              className="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200"
+              value={v.religion || ''}
+              onChange={set('religion')}
+              placeholder="เช่น พุทธ คริส อิสลาม"
+              maxLength={20}
+              autoComplete="off"
+            />
+          </InputField>
         </div>
 
         <div className="mt-6">
           <InputField label="ที่อยู่" error={errors.address} icon={<MapPin size={16} />}>
             <textarea
               name="address"
-              className="w-full px-4 py-4 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 resize-none"
+              className="w-full px-4 py-4 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200 resize-none"
               value={v.address || ''}
               onChange={(e) => onChange({ ...v, address: e.target.value })}
               placeholder="บ้านเลขที่, ถนน, ตำบล, อำเภอ, จังหวัด, รหัสไปรษณีย์"
@@ -486,10 +516,13 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
       </div>
 
       {/* ข้อมูลทางการแพทย์ */}
-      <div className="bg-red-100 p-6 rounded-xl border border-red-200">
-        <h3 className="text-lg font-bold text-red-800 mb-6 flex items-center gap-2">
-          <Droplets size={20} />
+      <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+        <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
+          <div className="p-2 bg-[#005A50] rounded-lg">
+            <Droplets size={20} className="text-white" />
+          </div>
           ข้อมูลทางการแพทย์
+          <span className="text-sm font-normal text-gray-500 ml-auto">Medical Information</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -539,7 +572,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
 
           <InputField label="กรุ๊ปเลือดเต็ม">
             <input
-              className="w-full px-4 py-2 rounded-lg bg-[#ffffff] border-1 border-gray-400 bg-gray-100 text-gray-600 font-bold cursor-not-allowed"
+              className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-gray-300 text-gray-700 font-bold cursor-not-allowed text-center text-lg"
               value={v.blood_group && v.bloodgroup_rh ? `${v.blood_group}${v.bloodgroup_rh}` : ''}
               readOnly
               placeholder="เช่น A Rh+"
@@ -547,8 +580,8 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           </InputField>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <InputField label="รักษาที่" required error={errors.treat_at}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+          <InputField label="รักษาที่" required error={errors.treat_at}>
             <Select
               components={animatedComponents}
               styles={{
@@ -575,43 +608,52 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="โรคประจำตัว / ประวัติการแพทย์" required error={errors.disease} icon={<FileText size={16} />}>
             <textarea
               name="disease"
-              className="w-full px-4 py-4 rounded-lg bg-[#ffffff] border-1 border-gray-400 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all duration-200 resize-none"
+              className="w-full px-4 py-4 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200 resize-none"
               value={v.disease || ''}
               onChange={set('disease')}
               placeholder="ระบุโรคประจำตัว, ประวัติการแพทย์, ยาที่แพ้ หรือข้อมูลสำคัญทางการแพทย์ (ถ้าไม่มี ใส่ -)"
-              rows={3}
+              rows={4}
             />
           </InputField>
         </div>
       </div>
 
-      {/* เก็บสำหรับเอกสารจำเป็น */}
-            {/* เอกสารแนบที่จำเป็น (เลือกก่อน แล้วค่อยอัปโหลด) */}
-      <div className="bg-gray-100 p-6 rounded-xl border border-blue-200">
-        <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
-          <FileUp size={20} />
+      {/* เอกสารแนบที่จำเป็น */}
+      <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+        <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
+          <div className="p-2 bg-[#005A50] rounded-lg">
+            <FileUp size={20} className="text-white" />
+          </div>
           เอกสารแนบที่จำเป็น
+          <span className="text-sm font-normal text-gray-500 ml-auto">Required Documents</span>
         </h3>
 
-        {/* 3.1 กล่องเช็คเลือกเอกสาร */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-6">
+        {/* คำแนะนำ */}
+        <div className="bg-[#005A50]/5 border border-[#005A50]/20 rounded-lg p-4 mb-6">
+          <p className="text-sm text-[#005A50] font-medium">
+            📋 คำแนะนำ: เลือกเช็คเอกสารที่ต้องการแนบ จากนั้นทำการอัปโหลดไฟล์ในช่องที่ปรากฏขึ้น
+          </p>
+        </div>
+
+        {/* กล่องเช็คเลือกเอกสาร */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
           {DOC_OPTIONS.map(({ key, label }) => (
-            <label key={key} className="flex items-center gap-2 p-2 rounded-md bg-white border">
+            <label key={key} className="flex items-start gap-3 p-4 rounded-lg bg-gray-50 border-2 border-gray-200 hover:border-[#005A50]/30 hover:bg-[#005A50]/5 transition-all duration-200 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4"
+                className="w-5 h-5 mt-0.5 text-[#005A50] border-2 border-gray-300 rounded focus:ring-[#005A50] focus:ring-2"
                 checked={!!flags[key]}
                 onChange={(e) => toggleDoc(key, e.target.checked)}
               />
-              <span className="text-sm">{label}</span>
+              <span className="text-sm leading-relaxed text-gray-700">{label}</span>
             </label>
           ))}
 
           {/* เอกสารอื่นๆ */}
-          <label className="flex items-center gap-2 p-2 rounded-md bg-white border">
+          <label className="flex items-start gap-3 p-4 rounded-lg bg-gray-50 border-2 border-gray-200 hover:border-[#005A50]/30 hover:bg-[#005A50]/5 transition-all duration-200 cursor-pointer">
             <input
               type="checkbox"
-              className="w-4 h-4"
+              className="w-5 h-5 mt-0.5 text-[#005A50] border-2 border-gray-300 rounded focus:ring-[#005A50] focus:ring-2"
               checked={!!flags.other}
               onChange={(e) => {
                 const checked = e.target.checked;
@@ -619,85 +661,126 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
                 if (checked && (!otherDocs || otherDocs.length === 0)) addOtherDoc();
               }}
             />
-            <span className="text-sm">เอกสารอื่นๆ (ระบุชื่อเอกสารเอง)</span>
+            <span className="text-sm leading-relaxed text-gray-700">
+              <strong>เอกสารอื่นๆ</strong><br />
+              <span className="text-gray-500">(ระบุชื่อเอกสารเอง)</span>
+            </span>
           </label>
         </div>
 
-        {/* 3.2 ช่องอัปโหลดของรายการที่เช็คไว้ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {DOC_OPTIONS.filter(d => flags[d.key]).map(({ key, label, accept }) => (
-            <div key={key} className="space-y-2">
-              <div className="text-sm font-medium">{`• ${label}`}</div>
-              <input
-                type="file"
-                accept={accept}
-                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                onChange={(e) => setFileFor(key, e.target.files?.[0] || null)}
-              />
-              {v[key] && (
-                <div className="text-xs text-gray-600">
-                  เลือกแล้ว: <span className="font-mono">{fileName(v[key])}</span>
-                  <button
-                    type="button"
-                    className="ml-3 text-red-600 hover:underline"
-                    onClick={() => setFileFor(key, null)}
-                  >
-                    ล้างไฟล์
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* 3.3 เอกสารอื่นๆ (หลายแถว) */}
-        {flags.other && (
-          <div className="mt-6 space-y-3">
-            <div className="text-sm font-semibold text-blue-900">เอกสารอื่นๆ</div>
-            {(otherDocs || []).map((row, idx) => (
-              <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-start bg-white p-3 rounded-lg border">
-                <div className="md:col-span-2">
-                  <div className="text-xs text-gray-600 mb-1">ชื่อเอกสาร</div>
-                  <input
-                    className="w-full px-3 py-2 border rounded-md"
-                    placeholder="เช่น หนังสือรับรองรายได้น้อย"
-                    value={row.label || ''}
-                    onChange={(e) => updateOtherDoc(idx, { label: e.target.value })}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-xs text-gray-600 mb-1">แนบไฟล์</div>
+        {/* ช่องอัปโหลดของรายการที่เช็คไว้ */}
+        {DOC_OPTIONS.filter(d => flags[d.key]).length > 0 && (
+          <div className="space-y-6 mb-8">
+            <h4 className="text-lg font-semibold text-[#005A50] border-l-4 border-[#005A50] pl-4">
+              อัปโหลดเอกสารที่เลือก
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {DOC_OPTIONS.filter(d => flags[d.key]).map(({ key, label, accept }) => (
+                <div key={key} className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                  <div className="text-sm font-semibold text-[#005A50] mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-[#005A50] rounded-full"></div>
+                    {label}
+                  </div>
                   <input
                     type="file"
-                    accept="image/*,.pdf"
-                    className="w-full px-3 py-2 border rounded-md bg-white"
-                    onChange={(e) => updateOtherDoc(idx, { file: e.target.files?.[0] || null })}
+                    accept={accept}
+                    className="w-full px-4 py-3 border-2 border-dashed border-[#005A50]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#005A50] focus:border-[#005A50] bg-white transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-[#005A50] file:text-white hover:file:bg-[#004A43]"
+                    onChange={(e) => setFileFor(key, e.target.files?.[0] || null)}
                   />
-                  {row.file && (
-                    <div className="mt-1 text-xs text-gray-600">
-                      เลือกแล้ว: <span className="font-mono">{fileName(row.file)}</span>
+                  {v[key] && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="text-xs text-green-700 flex items-center justify-between">
+                        <span>✅ เลือกแล้ว: <span className="font-mono font-medium">{fileName(v[key])}</span></span>
+                        <button
+                          type="button"
+                          className="ml-3 text-red-600 hover:text-red-800 hover:underline font-medium"
+                          onClick={() => setFileFor(key, null)}
+                        >
+                          ลบไฟล์
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    className="px-3 py-2 border rounded-md text-red-600 border-red-300 hover:bg-red-50"
-                    onClick={() => removeOtherDoc(idx)}
-                  >
-                    ลบแถว
-                  </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* เอกสารอื่นๆ (หลายแถว) */}
+        {flags.other && (
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold text-[#005A50] border-l-4 border-[#005A50] pl-4">
+              เอกสารอื่นๆ
+            </h4>
+            {(otherDocs || []).map((row, idx) => (
+              <div key={idx} className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">ชื่อเอกสาร</label>
+                    <input
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-[#005A50] focus:ring-2 focus:ring-[#005A50]/10 transition-all"
+                      placeholder="เช่น หนังสือรับรองรายได้น้อย"
+                      value={row.label || ''}
+                      onChange={(e) => updateOtherDoc(idx, { label: e.target.value })}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">แนบไฟล์</label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="w-full px-4 py-3 border-2 border-dashed border-[#005A50]/30 rounded-lg bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-[#005A50] file:text-white hover:file:bg-[#004A43]"
+                      onChange={(e) => updateOtherDoc(idx, { file: e.target.files?.[0] || null })}
+                    />
+                    {row.file && (
+                      <div className="mt-2 text-xs text-green-700 bg-green-50 p-2 rounded">
+                        ✅ เลือกแล้ว: <span className="font-mono">{fileName(row.file)}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      className="w-full px-4 py-3 border-2 border-red-300 rounded-lg text-red-600 hover:bg-red-50 hover:border-red-400 font-medium transition-colors"
+                      onClick={() => removeOtherDoc(idx)}
+                    >
+                      ลบแถว
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
             <div>
               <button
                 type="button"
-                className="px-3 py-2 border rounded-md text-blue-700 border-blue-300 hover:bg-blue-50"
+                className="px-6 py-3 border-2 border-[#005A50] rounded-lg text-[#005A50] hover:bg-[#005A50] hover:text-white font-medium transition-colors flex items-center gap-2"
                 onClick={addOtherDoc}
               >
-                + เพิ่มเอกสารอื่น
+                <span className="text-lg">+</span> เพิ่มเอกสารอื่น
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* สรุปเอกสาร */}
+        {(DOC_OPTIONS.filter(d => flags[d.key]).length > 0 || flags.other) && (
+          <div className="mt-8 p-6 bg-[#005A50]/5 border border-[#005A50]/20 rounded-xl">
+            <h4 className="text-sm font-semibold text-[#005A50] mb-3">📋 เอกสารที่เลือก:</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {DOC_OPTIONS.filter(d => flags[d.key]).map(({ key, label }) => (
+                <div key={key} className="flex items-center gap-2 text-sm">
+                  <span className={`w-2 h-2 rounded-full ${v[key] ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                  <span className={v[key] ? 'text-green-700 font-medium' : 'text-gray-600'}>{label}</span>
+                  {v[key] && <span className="text-green-600 text-xs">✓</span>}
+                </div>
+              ))}
+              {flags.other && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  <span className="text-blue-700 font-medium">เอกสารอื่นๆ ({(otherDocs || []).length} รายการ)</span>
+                </div>
+              )}
             </div>
           </div>
         )}
