@@ -620,3 +620,46 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     font-size: 14px;
     color: #475569;
 }
+
+/* ===== Action groups ===== */
+.actionGroups{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px 16px;
+  align-items:flex-start;
+}
+
+.actionGroup{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+/* กลุ่มทำเครื่องหมาย วางแยกด้วยเส้นคั่น */
+.actionGroupMark{
+  padding-left:14px;
+  margin-left:6px;
+  border-left:1px dashed #e5e7eb;
+}
+
+/* บนจอเล็กให้ขึ้นบรรทัดถัดไปและคั่นด้วยเส้นบนแทน */
+@media (max-width: 640px){
+  .actionGroups{ flex-direction:column; }
+  .actionGroupMark{
+    border-left:0;
+    border-top:1px dashed #e5e7eb;
+    margin-left:0;
+    padding-left:0;
+    padding-top:10px;
+  }
+}
+
+/* เผื่อ cell การดำเนินการให้กว้างพอและห่อบรรทัดได้สวย */
+.actionsCell{
+  min-width: 520px;     /* ปรับตามต้องการ */
+  white-space: normal;
+}
+
+.actionGroupMark { background:#fafafa; border-radius:10px; padding:10px; border:1px dashed #e5e7eb; }
+@media (min-width:641px){ .actionGroupMark{ padding:6px 10px 6px 14px; } }
+

@@ -274,6 +274,9 @@ function TableView({
                   <ActionBtn size="sm" onClick={() => onEdit(r)}>
                     <Edit3 width={14} height={14}/> แก้ไข
                   </ActionBtn>
+                  <ActionBtn size="sm" onClick={() => onHistory(r)}>
+                    <ClipboardList width={14} height={14} /> ประวัติ
+                  </ActionBtn>
                   {r.treatment_type === 'ทำครั้งเดียว' && !r.completed_at && (
                     <ActionBtn size="sm" variant="primary" onClick={() => onComplete(r.treatment_id)}>
                       <CheckCircle width={14} height={14} /> เสร็จสิ้น
@@ -281,9 +284,6 @@ function TableView({
                   )}
                   <ActionBtn size="sm" onClick={() => onDelete(r.treatment_id)}>
                     <Trash2 width={14} height={14} /> ลบ
-                  </ActionBtn>
-                  <ActionBtn size="sm" onClick={() => onHistory(r)}>
-                    <ClipboardList width={14} height={14} /> ประวัติ
                   </ActionBtn>
                 </div>
               </Td>

@@ -43,12 +43,44 @@
 .emgLink { color:#991b1b; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
 
 /* Table */
-.tableWrap { overflow:auto; border:1px solid #e5e7eb; border-radius:16px; background:#fff; }
-.table { width:100%; font-size:14px; border-collapse:collapse; }
-.thead { background:#f1f5f9; }
-.th { text-align:left; padding:12px 16px; font-weight:600; }
-.td { padding:12px 16px; vertical-align:top; border-top:1px solid #e5e7eb; }
-.left { text-align:left; }
+.tableWrap{
+  overflow:auto;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  background:#fff;
+}
+
+/* ใช้ separate เพื่อคุมเส้นราย cell และตัดเส้นซ้ำขอบนอก */
+.table{
+  width:100%;
+  font-size:14px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.thead{ background:#f1f5f9; }
+
+.th, .td{
+  text-align:left;
+  padding:12px 16px;
+  font-weight:600;
+  vertical-align:top;
+  /* เส้นกริดด้านใน */
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* header ให้ตัวหนาเฉพาะหัวตาราง */
+.td{ font-weight: normal; }
+
+/* คอลัมน์สุดท้ายไม่ต้องมีเส้นขวา */
+.table tr > *:last-child{ border-right: 0; }
+
+/* แถวสุดท้ายไม่ต้องมีเส้นล่าง */
+.table tbody tr:last-child > td{ border-bottom: 0; }
+
+.left{ text-align:left; }
+
 
 /* Cards */
 .cards { display:grid; gap:16px; grid-template-columns:1fr; }

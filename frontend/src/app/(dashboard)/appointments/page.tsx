@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import styles from './page.module.css';
 import { CalendarPlus, User, X, Edit3, ClipboardList, Eye, Pencil, CheckCircle, Archive } from 'lucide-react';
 import Modal from '@/app/components/ui/Modal';
-import AppointmentForm, {type AppointmentFormValue} from '@/app/components/forms/AppointmentForm';
+import AppointmentForm, { type AppointmentFormValue } from '@/app/components/forms/AppointmentForm';
 import DatePickerField from '@/app/components/DatePicker';
 import { notifyBadgeInvalidate } from '@/app/components/Navbar';
 import PatientLookupModal from '@/app/components/modals/PatientLookupModal';
@@ -131,7 +131,7 @@ function parseHHmmToMin(t?: string | null) {
 function toHHmm(t?: string | null) {
   if (!t) return '';
   const m = String(t).match(/^(\d{1,2}):(\d{2})/);
-  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : String(t);
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : String(t);
 }
 function normalizeHN(v: string) {
   const digits = v.replace(/\D/g, '');
@@ -141,22 +141,22 @@ function normalizeHN(v: string) {
 
 function StatusBadge({ status }: { status: Status }) {
   const map: Record<Status, { label: string; className: string }> = {
-    pending:   { label: 'รอดำเนินการ', className: styles.badgePending },
-    done:      { label: 'เสร็จสิ้น',   className: styles.badgeDone },
-    cancelled: { label: 'ยกเลิก',      className: styles.badgeCancelled },
+    pending: { label: 'รอดำเนินการ', className: styles.badgePending },
+    done: { label: 'เสร็จสิ้น', className: styles.badgeDone },
+    cancelled: { label: 'ยกเลิก', className: styles.badgeCancelled },
   };
   return <span className={`${styles.badge} ${map[status].className}`}>{map[status].label}</span>;
 }
 
-const TYPE_OPTIONS = ['โรงพยาบาล','บ้านผู้ป่วย'];
+const TYPE_OPTIONS = ['โรงพยาบาล', 'บ้านผู้ป่วย'];
 const PLACE_OPTIONS = ['บ้านผู้ป่วย'];
 
 const TYPE_VALUE_FROM_LABEL = (label?: string) =>
   label === 'โรงพยาบาล' ? 'hospital' :
-  label === 'บ้านผู้ป่วย' ? 'home' : (label || '');
+    label === 'บ้านผู้ป่วย' ? 'home' : (label || '');
 const TYPE_LABEL_FROM_VALUE = (val?: string) =>
   val === 'hospital' ? 'โรงพยาบาล' :
-  val === 'home' ? 'บ้านผู้ป่วย' : (val || '');
+    val === 'home' ? 'บ้านผู้ป่วย' : (val || '');
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const highlight = (text: string, q: string) => {
@@ -171,7 +171,7 @@ const highlight = (text: string, q: string) => {
 function Pager({
   page, pageCount, onPage, start, end, total,
 }: {
-  page: number; pageCount: number; onPage: (p:number)=>void;
+  page: number; pageCount: number; onPage: (p: number) => void;
   start: number; end: number; total: number;
 }) {
   const prev = () => onPage(Math.max(1, page - 1));
@@ -241,10 +241,10 @@ export default function AppointmentsPage() {
   const [to, setTo] = useState('');
   const [view, setView] = useState<'table' | 'cards'>('table');
 
-  const [sortKey, setSortKey] = useState<'datetime'|'created'|'patient'|'hn'|'status'|'type'|'place'>('status');
-  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
+  const [sortKey, setSortKey] = useState<'datetime' | 'created' | 'patient' | 'hn' | 'status' | 'type' | 'place'>('status');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
-  const [lookupOpen, setLookupOpen] = useState(false);  
+  const [lookupOpen, setLookupOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<10 | 25 | 50>(10);
   const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
@@ -265,7 +265,7 @@ export default function AppointmentsPage() {
   const [form, setForm] = useState<AppointmentFormValue>(resetForm());
 
   type FormErrors = Partial<Record<keyof AppointmentFormValue | 'hospital_address', string>>;
-  const REQUIRED: (keyof AppointmentFormValue)[] = ['hn', 'date', 'start', 'end', 'type', ];
+  const REQUIRED: (keyof AppointmentFormValue)[] = ['hn', 'date', 'start', 'end', 'type',];
   function validate(f: Partial<AppointmentFormValue>): FormErrors {
     const e: FormErrors = {};
     const get = (k: keyof AppointmentFormValue) => (f[k]?.toString().trim() ?? '');
@@ -376,11 +376,11 @@ export default function AppointmentsPage() {
     const m = needsModal;
     if (!m.appt) return;
     const cleaned = (m.items || []).filter(x => (x.item || '').trim() !== '');
-    if (cleaned.length === 0) { toast.fire({ icon:'warning', title:'กรอกอย่างน้อย 1 รายการ' }); return; }
+    if (cleaned.length === 0) { toast.fire({ icon: 'warning', title: 'กรอกอย่างน้อย 1 รายการ' }); return; }
 
     setNeedsModal(mm => ({ ...mm, saving: true }));
     try {
-      const apptNumId = Number(m.appt.id.replace(/[^\d]/g,'')) || null;
+      const apptNumId = Number(m.appt.id.replace(/[^\d]/g, '')) || null;
       await http('/api/home_needs', {
         method: 'POST',
         body: JSON.stringify({
@@ -391,11 +391,11 @@ export default function AppointmentsPage() {
           noted_at: m.appt.date,
         }),
       });
-      toast.fire({ icon:'success', title:'บันทึกรายการที่ต้องการแล้ว' });
-      setNeedsModal({ open:false, appt:null, items:[], saving:false });
-    } catch (e:any) {
-      toast.fire({ icon:'error', title: e?.message || 'บันทึกไม่สำเร็จ' });
-      setNeedsModal(mm => ({ ...mm, saving:false }));
+      toast.fire({ icon: 'success', title: 'บันทึกรายการที่ต้องการแล้ว' });
+      setNeedsModal({ open: false, appt: null, items: [], saving: false });
+    } catch (e: any) {
+      toast.fire({ icon: 'error', title: e?.message || 'บันทึกไม่สำเร็จ' });
+      setNeedsModal(mm => ({ ...mm, saving: false }));
     }
   }
   const [needsView, setNeedsView] = useState<{
@@ -476,7 +476,7 @@ export default function AppointmentsPage() {
           body: JSON.stringify({ status: newStatus }),
         }),
         { title: 'กำลังอัปเดตสถานะ...', success: 'อัปเดตสถานะสำเร็จ', error: 'อัปเดตสถานะไม่สำเร็จ' }
-        
+
       );
       await fetchList();
       notifyBadgeInvalidate();
@@ -540,29 +540,29 @@ export default function AppointmentsPage() {
       setOpenRowId(prev => (prev === id ? null : prev));
       setOpenCards(prev => { const n = new Set(prev); n.delete(id); return n; });
       fetchList();
-    } catch {}
+    } catch { }
   }
 
   const startCreate = () => { setEditingId(null); setForm(resetForm()); setErrors({}); setOpen(true); };
   const startEdit = (a: Appointment) => {
-   setEditingId(a.id);
-   setForm({
-     patient: a.patient,
-     hn: a.hn,
-     phone: a.phone,
-     date: a.date,
-     start: a.start,
-     end: a.end,
-     type: a.type,                                                         // "โรงพยาบาล" | "บ้านผู้ป่วย"
-     place: a.type === 'บ้านผู้ป่วย' ? (a.place || 'บ้านผู้ป่วย') : '',
-     hospital_address: a.type === 'โรงพยาบาล' ? (a.hospital_address || a.place || '') : '',
-     status: a.status,
-     note: a.note,
-     department: a.department,
-   });
-   setErrors({});
-   setOpen(true);
- };
+    setEditingId(a.id);
+    setForm({
+      patient: a.patient,
+      hn: a.hn,
+      phone: a.phone,
+      date: a.date,
+      start: a.start,
+      end: a.end,
+      type: a.type,                                                         // "โรงพยาบาล" | "บ้านผู้ป่วย"
+      place: a.type === 'บ้านผู้ป่วย' ? (a.place || 'บ้านผู้ป่วย') : '',
+      hospital_address: a.type === 'โรงพยาบาล' ? (a.hospital_address || a.place || '') : '',
+      status: a.status,
+      note: a.note,
+      department: a.department,
+    });
+    setErrors({});
+    setOpen(true);
+  };
 
   const save = async () => {
     const errs = validate(form); setErrors(errs);
@@ -570,7 +570,7 @@ export default function AppointmentsPage() {
       toast.fire({ icon: 'warning', title: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
       return;
     }
-    
+
 
     const t = TYPE_VALUE_FROM_LABEL(form.type || (form.hospital_address ? 'โรงพยาบาล' : 'บ้านผู้ป่วย'));
     const base = {
@@ -592,13 +592,13 @@ export default function AppointmentsPage() {
       await withLoading(
         () => editingId
           ? http(`/api/appointments/${encodeURIComponent(editingId)}`, {
-              method: 'PATCH',
-              body: JSON.stringify(payload),
-            })
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+          })
           : http(`/api/appointments`, {
-              method: 'POST',
-              body: JSON.stringify({ ...payload }),
-            }),
+            method: 'POST',
+            body: JSON.stringify({ ...payload }),
+          }),
         {
           title: editingId ? 'กำลังบันทึกการแก้ไข...' : 'กำลังบันทึกนัดหมาย...',
           success: editingId ? 'บันทึกการแก้ไขแล้ว' : 'บันทึกนัดหมายแล้ว',
@@ -607,7 +607,7 @@ export default function AppointmentsPage() {
       );
       setOpen(false); setEditingId(null); setForm(resetForm());
       fetchList();
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -660,7 +660,7 @@ export default function AppointmentsPage() {
 
   const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end   = Math.min(totalCount, page * pageSize);
+  const end = Math.min(totalCount, page * pageSize);
 
   return (
     <div className={styles.page}>
@@ -754,7 +754,7 @@ export default function AppointmentsPage() {
             className={styles.select}
             value={pageSize}
             onChange={(e) => {
-              const v = Number(e.target.value) as 10|25|50;
+              const v = Number(e.target.value) as 10 | 25 | 50;
               setPageSize(v);
               toast.fire({ icon: 'info', title: `แสดง ${v} รายการ/หน้า` });
             }}
@@ -808,32 +808,61 @@ export default function AppointmentsPage() {
                     </td>
                     <td><StatusBadge status={a.status} /></td>
                     <td className={styles.actionsCell}>
-                      {a.status === 'pending' && a.type === 'บ้านผู้ป่วย' && (
-                        <button
-                          className={styles.ghost}
-                          type="button"
-                          onClick={() => openNeedsFor(a)}
-                        >
-                          <Archive size={14}/>สิ่งที่ต้องการ
-                        </button>
-                      )}
-                      <button className={styles.ghost} type="button" onClick={() => setHistoryFor({ hn: a.hn, name: a.patient })}><ClipboardList size={14}/>ประวัติ</button>
-                      <button className={styles.ghost} type="button" onClick={() => toggleRow(a.id)} aria-expanded={openRowId === a.id}><Eye size={14}/>{openRowId === a.id ? 'ซ่อน' : 'ตรวจสอบ'}</button>
-                      <button className={styles.ghost} type="button" onClick={() => startEdit(a)}><Pencil size={14}/>แก้ไข</button>
+                      <div className={styles.actionGroups}>
+                        {/* กลุ่มปุ่ม: ดำเนินงาน */}
+                        <div className={styles.actionGroup}>
+                          {a.type === 'บ้านผู้ป่วย' && (
+                            <button
+                              className={styles.ghost}
+                              type="button"
+                              onClick={() => openNeedsFor(a)}
+                            >
+                              <Archive size={14} />สิ่งที่ต้องการ
+                            </button>
+                          )}
+                          <button className={styles.ghost} type="button" onClick={() => setHistoryFor({ hn: a.hn, name: a.patient })}>
+                            <ClipboardList size={14} />ประวัติ
+                          </button>
+                          <button className={styles.ghost} type="button" onClick={() => toggleRow(a.id)} aria-expanded={openRowId === a.id}>
+                            <Eye size={14} />{openRowId === a.id ? 'ซ่อน' : 'ตรวจสอบ'}
+                          </button>
+                          <button className={styles.ghost} type="button" onClick={() => startEdit(a)}>
+                            <Pencil size={14} />แก้ไข
+                          </button>
+                          <button className={styles.danger} type="button" onClick={() => confirmDelete(a.id)}>
+                            ลบ
+                          </button>
+                        </div>
 
-                      {a.type === 'บ้านผู้ป่วย' && (
-                        <button className={styles.ghost} type="button" onClick={() => startNeeds(a)}>
-                          <Edit3 size={14}/> บันทึกสิ่งที่ต้องการ
-                        </button>
-                      )}
-                      {a.status === 'pending' && (
-                        <>
-                          <button className={styles.primary} type="button" onClick={() => handleStatus(a.id, 'done')} disabled={savingId === a.id}><CheckCircle width={14} height={14} />เสร็จสิ้น</button>
-                          <button className={styles.danger} type="button" onClick={() => handleStatus(a.id, 'cancelled')} disabled={savingId === a.id}><X width={14} height={14} />ยกเลิก</button>
-                        </>
-                      )}
-
-                      <button className={styles.danger} type="button" onClick={() => confirmDelete(a.id)}>ลบ</button>
+                        {/* กลุ่มปุ่ม: ทำเครื่องหมาย/บันทึกความต้องการ */}
+                        <div className={`${styles.actionGroup} ${styles.actionGroupMark}`}>
+                          {a.type === 'บ้านผู้ป่วย' && (
+                            <button className={styles.ghost} type="button" onClick={() => startNeeds(a)}>
+                              <Edit3 size={14} />บันทึกสิ่งที่ต้องการ
+                            </button>
+                          )}
+                          {a.status === 'pending' && (
+                            <>
+                              <button
+                                className={styles.primary}
+                                type="button"
+                                onClick={() => handleStatus(a.id, 'done')}
+                                disabled={savingId === a.id}
+                              >
+                                <CheckCircle width={14} height={14} />เสร็จสิ้น
+                              </button>
+                              <button
+                                className={styles.danger}
+                                type="button"
+                                onClick={() => handleStatus(a.id, 'cancelled')}
+                                disabled={savingId === a.id}
+                              >
+                                <X width={14} height={14} />ยกเลิก
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </td>
                   </tr>
                   {openRowId === a.id && (
@@ -849,15 +878,37 @@ export default function AppointmentsPage() {
                         </div>
                         {a.note && (<div className={styles.detailNote}><div className={styles.detailLabel}>หมายเหตุ</div><div>{a.note}</div></div>)}
                         <div className={styles.detailActions}>
-                          <button className={styles.ghost} type="button" onClick={() => setOpenRowId(null)}>ปิดรายละเอียด</button>
-                          <button className={styles.primary} type="button" onClick={() => startEdit(a)}>แก้ไขนัดหมาย</button>
-                          {a.status === 'pending' && (
-                            <>
-                              <button className={styles.primary} type="button" onClick={() => handleStatus(a.id, 'done')} disabled={savingId === a.id}>เสร็จสิ้น</button>
-                              <button className={styles.danger} type="button" onClick={() => handleStatus(a.id, 'cancelled')} disabled={savingId === a.id}>ยกเลิก</button>
-                            </>
-                          )}
-                          <button className={styles.danger} type="button" onClick={() => confirmDelete(a.id)}>ลบ</button>
+                          <div className={styles.actionGroups}>
+                            <div className={styles.actionGroup}>
+                              <button className={styles.ghost} type="button" onClick={() => setOpenRowId(null)}>
+                                ปิดรายละเอียด
+                              </button>
+                              <button className={styles.primary} type="button" onClick={() => startEdit(a)}>
+                                แก้ไขนัดหมาย
+                              </button>
+                              <button className={styles.danger} type="button" onClick={() => confirmDelete(a.id)}>
+                                ลบ
+                              </button>
+                            </div>
+
+                            <div className={`${styles.actionGroup} ${styles.actionGroupMark}`}>
+                              {a.type === 'บ้านผู้ป่วย' && (
+                                <button className={styles.ghost} type="button" onClick={() => startNeeds(a)}>
+                                  <Edit3 size={14} />บันทึกสิ่งที่ต้องการ
+                                </button>
+                              )}
+                              {a.status === 'pending' && (
+                                <>
+                                  <button className={styles.primary} type="button" onClick={() => handleStatus(a.id, 'done')} disabled={savingId === a.id}>
+                                    เสร็จสิ้น
+                                  </button>
+                                  <button className={styles.danger} type="button" onClick={() => handleStatus(a.id, 'cancelled')} disabled={savingId === a.id}>
+                                    ยกเลิก
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </td></tr>
@@ -894,25 +945,45 @@ export default function AppointmentsPage() {
                   </div>
                 )}
                 <div className={styles.cardActions}>
-                  {a.status === 'pending' && a.type === 'บ้านผู้ป่วย' && (
-                    <button
-                      className={styles.ghost}
-                      type="button"
-                      onClick={() => openNeedsFor(a)}
-                    >
-                      <ClipboardList size={14}/>สิ่งที่ต้องการ
-                    </button>
-                  )}
-                  <button className={styles.ghost} type="button" onClick={() => setHistoryFor({ hn: a.hn, name: a.patient })}>ประวัติ</button>
-                  <button className={styles.ghost} type="button" onClick={() => toggleCard(a.id)}>{openCards.has(a.id) ? 'ซ่อน' : 'ดู'}</button>
-                  <button className={styles.ghost} type="button" onClick={() => startEdit(a)}>แก้ไข</button>
-                  {a.status === 'pending' && (
-                    <>
-                      <button className={styles.primary} type="button" onClick={() => handleStatus(a.id, 'done')} disabled={savingId === a.id}>เสร็จสิ้น</button>
-                      <button className={styles.danger} type="button" onClick={() => handleStatus(a.id, 'cancelled')} disabled={savingId === a.id}>ยกเลิก</button>
-                    </>
-                  )}
-                  <button className={styles.danger} type="button" onClick={() => confirmDelete(a.id)}>ลบ</button>
+                  <div className={styles.actionGroups}>
+                    <div className={styles.actionGroup}>
+                      {a.type === 'บ้านผู้ป่วย' && (
+                        <button className={styles.ghost} type="button" onClick={() => openNeedsFor(a)}>
+                          <ClipboardList size={14} />สิ่งที่ต้องการ
+                        </button>
+                      )}
+                      <button className={styles.ghost} type="button" onClick={() => setHistoryFor({ hn: a.hn, name: a.patient })}>
+                        ประวัติ
+                      </button>
+                      <button className={styles.ghost} type="button" onClick={() => toggleCard(a.id)}>
+                        {openCards.has(a.id) ? 'ซ่อน' : 'ดู'}
+                      </button>
+                      <button className={styles.ghost} type="button" onClick={() => startEdit(a)}>
+                        แก้ไข
+                      </button>
+                      <button className={styles.danger} type="button" onClick={() => confirmDelete(a.id)}>
+                        ลบ
+                      </button>
+                    </div>
+
+                    <div className={`${styles.actionGroup} ${styles.actionGroupMark}`}>
+                      {a.type === 'บ้านผู้ป่วย' && (
+                        <button className={styles.ghost} type="button" onClick={() => startNeeds(a)}>
+                          บันทึกสิ่งที่ต้องการ
+                        </button>
+                      )}
+                      {a.status === 'pending' && (
+                        <>
+                          <button className={styles.primary} type="button" onClick={() => handleStatus(a.id, 'done')} disabled={savingId === a.id}>
+                            เสร็จสิ้น
+                          </button>
+                          <button className={styles.danger} type="button" onClick={() => handleStatus(a.id, 'cancelled')} disabled={savingId === a.id}>
+                            ยกเลิก
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -931,7 +1002,7 @@ export default function AppointmentsPage() {
           onConfirm={save}
           title={
             <div className="flex items-center gap-2">
-              {editingId ? <Edit3 size={20} className="text-purple-600"/> : <CalendarPlus size={20} className="text-purple-600"/>}
+              {editingId ? <Edit3 size={20} className="text-purple-600" /> : <CalendarPlus size={20} className="text-purple-600" />}
               <span>{editingId ? 'แก้ไขนัดหมาย' : 'เพิ่มการนัดหมาย'}</span>
             </div>
           }
@@ -949,7 +1020,7 @@ export default function AppointmentsPage() {
                   className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
                   onClick={() => { setOpen(false); setEditingId(null); toast.fire({ icon: 'info', title: 'ยกเลิก' }); }}
                 >
-                  <X size={16}/> ยกเลิก
+                  <X size={16} /> ยกเลิก
                 </button>
                 <button
                   type="button"
@@ -957,7 +1028,7 @@ export default function AppointmentsPage() {
                   onClick={save}
                   disabled={!isValid}
                 >
-                  <CalendarPlus size={16}/> {editingId ? 'บันทึกการแก้ไข' : 'บันทึกนัดหมาย'}
+                  <CalendarPlus size={16} /> {editingId ? 'บันทึกการแก้ไข' : 'บันทึกนัดหมาย'}
                 </button>
               </div>
             </div>
@@ -992,7 +1063,7 @@ export default function AppointmentsPage() {
                 className="px-8 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-lg flex items-center gap-2"
                 onClick={() => setHistoryFor(null)}
               >
-                <X size={16}/> ปิด
+                <X size={16} /> ปิด
               </button>
             </div>
           }
@@ -1066,7 +1137,7 @@ export default function AppointmentsPage() {
         <Modal
           open
           size="lg"
-          onClose={() => setNeedsModal({ open:false, appt:null, items:[], saving:false })}
+          onClose={() => setNeedsModal({ open: false, appt: null, items: [], saving: false })}
           onConfirm={saveNeeds}
           title={
             <div className="flex items-center gap-2">
@@ -1080,10 +1151,10 @@ export default function AppointmentsPage() {
               <button
                 type="button"
                 className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
-                onClick={() => setNeedsModal({ open:false, appt:null, items:[], saving:false })}
+                onClick={() => setNeedsModal({ open: false, appt: null, items: [], saving: false })}
                 disabled={needsModal.saving}
               >
-                <X size={16}/> ยกเลิก
+                <X size={16} /> ยกเลิก
               </button>
               <div className="flex gap-2">
                 <button
@@ -1159,70 +1230,70 @@ export default function AppointmentsPage() {
         </Modal>
       )}
       {needsView.open && needsView.appt && (
-      <Modal
-        open
-        size="lg"
-        onClose={() => setNeedsView({ open:false, loading:false, error:'', appt:null, items:[] })}
-        onConfirm={() => setNeedsView(s => ({ ...s, open:false }))}
-        title={
-          <div className="flex items-center gap-2">
-            <ClipboardList size={20} className="text-amber-600" />
-            <span>สิ่งที่ผู้ป่วยต้องการ (ล่าสุด) — {needsView.appt.patient}</span>
-            <span className="text-gray-500 text-sm">({needsView.appt.hn})</span>
-          </div>
-        }
-        footer={
-          <div className="w-full flex justify-center">
-            <button
-              className="px-8 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              onClick={() => setNeedsView({ open:false, loading:false, error:'', appt:null, items:[] })}
-            >
-              <X size={16}/> ปิด
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          {needsView.loading && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span className="animate-spin inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent" />
-              กำลังโหลด...
+        <Modal
+          open
+          size="lg"
+          onClose={() => setNeedsView({ open: false, loading: false, error: '', appt: null, items: [] })}
+          onConfirm={() => setNeedsView(s => ({ ...s, open: false }))}
+          title={
+            <div className="flex items-center gap-2">
+              <ClipboardList size={20} className="text-amber-600" />
+              <span>สิ่งที่ผู้ป่วยต้องการ (ล่าสุด) — {needsView.appt.patient}</span>
+              <span className="text-gray-500 text-sm">({needsView.appt.hn})</span>
             </div>
-          )}
-
-          {!needsView.loading && needsView.error && (
-            <div className="text-sm text-red-600">{needsView.error}</div>
-          )}
-
-          {!needsView.loading && !needsView.error && needsView.items.length === 0 && (
-            <div className="text-sm text-gray-500">
-              ยังไม่มีรายการความต้องการจากการเยี่ยมบ้านล่าสุด
+          }
+          footer={
+            <div className="w-full flex justify-center">
+              <button
+                className="px-8 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                onClick={() => setNeedsView({ open: false, loading: false, error: '', appt: null, items: [] })}
+              >
+                <X size={16} /> ปิด
+              </button>
             </div>
-          )}
+          }
+        >
+          <div className="space-y-3">
+            {needsView.loading && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="animate-spin inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-transparent" />
+                กำลังโหลด...
+              </div>
+            )}
 
-          {!needsView.loading && !needsView.error && needsView.items.length > 0 && (
-            <div className="rounded-xl border bg-white p-3">
-              <div className="text-sm text-gray-600 mb-2">รายการสิ่งที่ต้องการ (ล่าสุด)</div>
-              <ul className="divide-y">
-                {needsView.items.map((it, idx) => (
-                  <li key={idx} className="py-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium text-gray-900 break-words">{it.item}</div>
-                        {it.note && <div className="text-sm text-gray-600 break-words">หมายเหตุ: {it.note}</div>}
+            {!needsView.loading && needsView.error && (
+              <div className="text-sm text-red-600">{needsView.error}</div>
+            )}
+
+            {!needsView.loading && !needsView.error && needsView.items.length === 0 && (
+              <div className="text-sm text-gray-500">
+                ยังไม่มีรายการความต้องการจากการเยี่ยมบ้านล่าสุด
+              </div>
+            )}
+
+            {!needsView.loading && !needsView.error && needsView.items.length > 0 && (
+              <div className="rounded-xl border bg-white p-3">
+                <div className="text-sm text-gray-600 mb-2">รายการสิ่งที่ต้องการ (ล่าสุด)</div>
+                <ul className="divide-y">
+                  {needsView.items.map((it, idx) => (
+                    <li key={idx} className="py-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-900 break-words">{it.item}</div>
+                          {it.note && <div className="text-sm text-gray-600 break-words">หมายเหตุ: {it.note}</div>}
+                        </div>
+                        <div className="shrink-0 text-sm text-gray-700">
+                          {it.qty != null && String(it.qty).trim() !== '' ? `× ${it.qty}` : ''}
+                        </div>
                       </div>
-                      <div className="shrink-0 text-sm text-gray-700">
-                        {it.qty != null && String(it.qty).trim() !== '' ? `× ${it.qty}` : ''}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </Modal>
-    )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
