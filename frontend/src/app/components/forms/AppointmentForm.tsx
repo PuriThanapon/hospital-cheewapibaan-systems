@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import DatePickerField from '@/app/components/DatePicker';
-import TimePicker from '@/app/components/TimePicker';
+import MedicalThaiTimePicker from '../TimePicker';
 import PatientLookupModal from '../modals/PatientLookupModal';
 
 type Status = 'pending' | 'done' | 'cancelled';
@@ -102,7 +102,7 @@ export default function AppointmentForm({
   value,
   onChange,
   errors,
-  TYPE_OPTIONS,
+  TYPE_OPTIONS = ['โรงพยาบาล', 'บ้านผู้ป่วย'],
   PLACE_OPTIONS,
   DEPT_OPTIONS = [
     'OPD','IPD','ER','ICU','OR',
@@ -118,6 +118,11 @@ export default function AppointmentForm({
   const [patientInfo, setPatientInfo] = useState<any | null>(null);
   const hnInputRef = useRef<HTMLInputElement | null>(null);
   const hospitalInputRef = useRef<HTMLInputElement | null>(null);
+
+  const LABEL_FROM_VALUE = (v?: string) =>
+    v === 'hospital' ? 'โรงพยาบาล'
+    : v === 'home'   ? 'บ้านผู้ป่วย'
+    : (v || '');
 
   const TYPE_VALUE_FROM_LABEL = (label?: string) =>
     label === 'โรงพยาบาล' ? 'hospital'
@@ -457,7 +462,7 @@ export default function AppointmentForm({
             <div>
               <label className="block">
                 <div className="mb-2 text-sm font-medium text-gray-700">เวลาเริ่ม</div>
-                <TimePicker
+                <MedicalThaiTimePicker
                   value={value.start || ''}
                   onChange={(t: string) => onChange({ ...value, start: t })}
                   mode="select"
@@ -473,7 +478,7 @@ export default function AppointmentForm({
             <div>
               <label className="block">
                 <div className="mb-2 text-sm font-medium text-gray-700">เวลาสิ้นสุด</div>
-                <TimePicker
+                <MedicalThaiTimePicker
                   value={value.end || ''}
                   onChange={(t: string) => onChange({ ...value, end: t })}
                   mode="select"
@@ -508,7 +513,7 @@ export default function AppointmentForm({
                       ? 'border-red-300 focus:border-red-500 focus:ring-red-100' 
                       : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-100'
                   }`}
-                  value={value.type || ''}
+                  value={LABEL_FROM_VALUE(value.type)}
                   onChange={(e) => onChange({ ...value, type: e.target.value })}
                 >
                   <option value="">เลือกประเภทการนัดหมาย</option>

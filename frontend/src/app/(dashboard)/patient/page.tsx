@@ -24,6 +24,9 @@ import type { AppointmentFormValue } from '@/app/components/forms/AppointmentFor
 import Link from 'next/link';
 import { collectSelectedDocs } from '@/app/lib/patientFiles';
 import { uploadPatientFiles } from '@/app/lib/uploadPatientFiles';
+import BaselineForm, { Baseline } from '@/app/components/forms/BaselineForm';
+import { hasBaselineData } from '@/app/lib/baseline'; // ถ้าคุณวาง util ตามตัวอย่าง
+
 
 type Status = 'pending' | 'done' | 'cancelled';
 // react-select (SSR safe)
@@ -328,12 +331,12 @@ async function downloadPatientAttachment(
   }
 }
 
-const EXTRA_DOC_LABELS: Record<string,string> = {
-  assistance_letter:     'หนังสือขอความช่วยเหลือ',
-  power_of_attorney:     'หนังสือมอบอำนาจ/รับรองบุคคลไร้ญาติ',
-  homeless_certificate:  'หนังสือรับรองบุคคลไร้ที่พึ่ง',
-  adl_assessment:        'แบบประเมิน ADL',
-  clinical_summary:      'ประวัติการรักษา (Clinical Summary)',
+const EXTRA_DOC_LABELS: Record<string, string> = {
+  assistance_letter: 'หนังสือขอความช่วยเหลือ',
+  power_of_attorney: 'หนังสือมอบอำนาจ/รับรองบุคคลไร้ญาติ',
+  homeless_certificate: 'หนังสือรับรองบุคคลไร้ที่พึ่ง',
+  adl_assessment: 'แบบประเมิน ADL',
+  clinical_summary: 'ประวัติการรักษา (Clinical Summary)',
   destitute_certificate: 'หนังสือรับรองผู้ยากไร้', // <- คีย์นี้ “ไม่มีใน ALLOWED_TYPES”
 };
 
@@ -354,7 +357,7 @@ async function uploadAllPatientFiles(patients_id: string, formValue: any) {
     const r = await fetch(url, { method: 'POST', body: fd });
     if (!r.ok) {
       let msg = 'อัปโหลดไฟล์ไม่สำเร็จ';
-      try { const j = await r.json(); msg = j.message || msg; } catch {}
+      try { const j = await r.json(); msg = j.message || msg; } catch { }
       throw new Error(`${msg} (${key})`);
     }
   }
@@ -391,6 +394,7 @@ export default function PatientsPage() {
 
   // modals
   const [openAdd, setOpenAdd] = useState(false);
+  const [baselineAdd, setBaselineAdd] = useState<Baseline>({ patients_id: '' });
   const [openEdit, setOpenEdit] = useState<string | null>(null);
   const [openAppt, setOpenAppt] = useState<string | null>(null);
   const [openDeceased, setOpenDeceased] = useState<string | null>(null);
@@ -470,6 +474,7 @@ export default function PatientsPage() {
     try {
       const { nextId } = await http('/api/patients/next-id');
       setAddDraft({ patients_id: nextId, status: 'มีชีวิต' });
+      setBaselineAdd({ patients_id: nextId, reason_in_dept: '', reason_admit: '', bedbound_cause: '', other_history: '' });
       setOpenAdd(true);
     } catch (e) {
       $swal.fire({ icon: 'error', title: 'ดึง HN ถัดไปไม่สำเร็จ', text: (e as any).message || '' });
@@ -492,6 +497,14 @@ export default function PatientsPage() {
 
       const patients_id = (created as any)?.patients_id ?? formValues?.patients_id;
       await uploadAllPatientFiles(patients_id, formValues);
+
+      if (hasBaselineData(baselineAdd)) {
+        const payload = { ...baselineAdd, patients_id };
+        await http(`/api/patients/${encodeURIComponent(patients_id)}/encounters/baseline`, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      }
 
       setOpenAdd(false);
       refresh();
@@ -539,7 +552,7 @@ export default function PatientsPage() {
     }
   };
 
-  const TYPE_OPTIONS = ['ตรวจติดตาม', 'ทำแผล', 'เยี่ยมบ้าน', 'กายภาพบำบัด', 'ติดตามอาการ'];
+  const TYPE_OPTIONS = ['โรงพยาบาล', 'บ้านผู้ป่วย'];
   const PLACE_OPTIONS = ['OPD ชีวาภิบาล', 'ห้องทำแผล 1', 'ห้องทำแผล 2', 'PT Room A', 'บ้านผู้ป่วย'];
 
   const TODAY_TH = () =>

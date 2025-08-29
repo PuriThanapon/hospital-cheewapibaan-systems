@@ -9,6 +9,7 @@ import DatePickerField from '@/app/components/DatePicker';
 import { ClipboardList, Edit3, Plus, Save, User, X, Calendar, Pill, FileText, Activity, ArrowLeft, Stethoscope, Heart } from 'lucide-react';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
+import BaselineForm from '@/app/components/forms/BaselineForm';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
 const join = (p: string) => (p.startsWith('http') ? p : `${API_BASE}${p}`);
@@ -430,6 +431,7 @@ export default function EncountersPage() {
             </div>
           )}
         </section>
+        <BaselineForm value={bl} onChange={setBl} />
       </main>
 
       {/* ===== BASELINE MODAL ===== */}

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Activity } from 'lucide-react';
 
-interface ThaiTimePickerProps {
+interface MedicalThaiTimePickerProps {
   value: string;                          // "HH:mm"
   onChange: (value: string) => void;
   label?: string;
@@ -16,6 +16,7 @@ interface ThaiTimePickerProps {
   size?: 'sm' | 'md' | 'lg';
   mode?: 'select' | 'native';
   minuteStep?: number;
+  medicalContext?: 'appointment' | 'medication' | 'vital-signs' | 'surgery' | 'general';
 }
 
 function pad2(n: number) { return String(n).padStart(2, '0'); }
@@ -28,7 +29,7 @@ function splitHM(v?: string): { h: number; m: number } {
   return { h: hh, m: mm };
 }
 
-const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
+const MedicalThaiTimePicker: React.FC<MedicalThaiTimePickerProps> = ({
   value,
   onChange,
   label,
@@ -43,20 +44,58 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
   size = 'sm',
   mode = 'select',
   minuteStep = 1,
+  medicalContext = 'general',
 }) => {
   const sizeClasses = {
-    sm: 'px-2 py-1.5 text-sm',
-    md: 'px-3 py-2 text-base',
-    lg: 'px-4 py-2 text-lg'
+    sm: 'px-3 py-2 text-sm',
+    md: 'px-4 py-2.5 text-base',
+    lg: 'px-5 py-3 text-lg'
   } as const;
-  const iconSizes = { sm: 12, md: 14, lg: 16 } as const;
+  
+  const iconSizes = { sm: 14, md: 16, lg: 18 } as const;
+
+  // กำหนดสีตามบริบททางการแพทย์
+  const contextColors = {
+    appointment: {
+      focus: 'focus:ring-teal-500 focus:border-teal-500',
+      error: 'border-red-400 focus:ring-red-400 focus:border-red-400 bg-red-50',
+      normal: 'border-slate-300 hover:border-teal-400',
+      icon: 'text-teal-500'
+    },
+    medication: {
+      focus: 'focus:ring-emerald-500 focus:border-emerald-500',
+      error: 'border-red-400 focus:ring-red-400 focus:border-red-400 bg-red-50',
+      normal: 'border-slate-300 hover:border-emerald-400',
+      icon: 'text-emerald-500'
+    },
+    'vital-signs': {
+      focus: 'focus:ring-blue-500 focus:border-blue-500',
+      error: 'border-red-400 focus:ring-red-400 focus:border-red-400 bg-red-50',
+      normal: 'border-slate-300 hover:border-blue-400',
+      icon: 'text-blue-500'
+    },
+    surgery: {
+      focus: 'focus:ring-red-500 focus:border-red-500',
+      error: 'border-red-400 focus:ring-red-400 focus:border-red-400 bg-red-50',
+      normal: 'border-slate-300 hover:border-red-400',
+      icon: 'text-red-500'
+    },
+    general: {
+      focus: 'focus:ring-indigo-500 focus:border-indigo-500',
+      error: 'border-red-400 focus:ring-red-400 focus:border-red-400 bg-red-50',
+      normal: 'border-slate-300 hover:border-indigo-400',
+      icon: 'text-indigo-500'
+    }
+  };
+
+  const colors = contextColors[medicalContext];
 
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
   const minutes = useMemo(() => {
     const step = Math.max(1, Math.min(30, minuteStep));
     const arr: number[] = [];
     for (let m = 0; m < 60; m += step) arr.push(m);
-    // ให้รองรับค่านาทีที่ไม่ลงตัวกับ step
+    // รองรับค่านาทีที่ไม่ลงตัวกับ step
     const { m: curM } = splitHM(value);
     if (Number.isFinite(curM) && !arr.includes(curM)) arr.push(curM);
     return arr.sort((a,b)=>a-b);
@@ -65,11 +104,14 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
   const { h, m } = splitHM(value);
   const isEmpty = !/^\d{1,2}:\d{2}$/.test(value || '');
 
+  // เลือกไอคอนตาม context
+  const IconComponent = medicalContext === 'vital-signs' ? Activity : Clock;
+
   return (
-    <div className={`flex flex-col space-y-1 ${className}`}>
+    <div className={`flex flex-col space-y-1.5 ${className}`}>
       {/* Label */}
       {label && (
-        <label className={`font-medium text-gray-700 ${size === 'sm' ? 'text-sm' : 'text-base'}`}>
+        <label className={`font-semibold text-slate-700 ${size === 'sm' ? 'text-sm' : size === 'md' ? 'text-base' : 'text-lg'}`}>
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -77,15 +119,15 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
 
       {/* ------- โหมดดรอปดาวน์ 24 ชม. ------- */}
       {mode === 'select' ? (
-        <div className="flex gap-2">
-          {/* Hours (มีไอคอนอยู่ในนี้เท่านั้น) */}
-          <div className="relative">
+        <div className="flex gap-3">
+          {/* Hours */}
+          <div className="relative flex-1">
             {showIcon && (
               <span
                 className="pointer-events-none absolute inset-y-0 left-3 flex items-center"
                 aria-hidden="true"
               >
-                <Clock size={iconSizes[size]} className="text-gray-400" />
+                <IconComponent size={iconSizes[size]} className={colors.icon} />
               </span>
             )}
             <select
@@ -98,32 +140,40 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
                 onChange(`${pad2(hh)}:${pad2(Number.isFinite(m) ? m : 0)}`);
               }}
               className={`
-                border rounded-lg transition-all duration-200
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                ${showIcon ? 'pl-10' : 'pl-3'} pr-3
+                w-full border rounded-xl transition-all duration-200 font-medium
+                focus:outline-none focus:ring-2 shadow-sm
+                ${showIcon ? 'pl-10' : 'pl-3'} pr-8
                 ${sizeClasses[size]}
                 ${error
-                  ? 'border-red-500 focus:ring-red-500 focus:border-red-500 bg-red-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? colors.error
+                  : `${colors.normal} ${colors.focus}`
                 }
-                ${disabled ? 'bg-gray-100 cursor-not-allowed text-gray-400 border-gray-200' : 'bg-white'}
+                ${disabled 
+                  ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200' 
+                  : 'bg-white hover:shadow-md'
+                }
               `}
               aria-invalid={error}
               aria-describedby={helperText ? `${name}-help` : undefined}
-              style={{ minWidth: 110 }}
             >
-              <option value="" disabled hidden>{placeholder}</option>
+              <option value="" disabled hidden className="text-slate-400">
+                ชั่วโมง
+              </option>
               {hours.map((hh) => (
-                <option key={hh} value={String(hh)}>{pad2(hh)}</option>
+                <option key={hh} value={String(hh)} className="text-slate-700">
+                  {pad2(hh)} น.
+                </option>
               ))}
             </select>
           </div>
 
           {/* Divider */}
-          <div className="flex items-center px-1 text-gray-400">:</div>
+          <div className="flex items-center px-2">
+            <span className="text-slate-400 font-bold text-lg">:</span>
+          </div>
 
           {/* Minutes */}
-          <div className="relative">
+          <div className="relative flex-1">
             <select
               name={name ? `${name}-minute` : undefined}
               value={isEmpty ? '' : String(m)}
@@ -134,23 +184,29 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
                 onChange(`${pad2(Number.isFinite(h) ? h : 0)}:${pad2(mm)}`);
               }}
               className={`
-                border rounded-lg transition-all duration-200
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                pl-3 pr-3
+                w-full border rounded-xl transition-all duration-200 font-medium
+                focus:outline-none focus:ring-2 shadow-sm
+                pl-3 pr-8
                 ${sizeClasses[size]}
                 ${error
-                  ? 'border-red-500 focus:ring-red-500 focus:border-red-500 bg-red-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? colors.error
+                  : `${colors.normal} ${colors.focus}`
                 }
-                ${disabled ? 'bg-gray-100 cursor-not-allowed text-gray-400 border-gray-200' : 'bg-white'}
+                ${disabled 
+                  ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200' 
+                  : 'bg-white hover:shadow-md'
+                }
               `}
               aria-invalid={error}
               aria-describedby={helperText ? `${name}-help` : undefined}
-              style={{ minWidth: 110 }}
             >
-              <option value="" disabled hidden>{placeholder}</option>
+              <option value="" disabled hidden className="text-slate-400">
+                นาที
+              </option>
               {minutes.map((mm) => (
-                <option key={mm} value={String(mm)}>{pad2(mm)}</option>
+                <option key={mm} value={String(mm)} className="text-slate-700">
+                  {pad2(mm)} น.
+                </option>
               ))}
             </select>
           </div>
@@ -160,7 +216,7 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
         <div className="relative">
           {showIcon && (
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center" aria-hidden="true">
-              <Clock size={iconSizes[size]} className="text-gray-400" />
+              <IconComponent size={iconSizes[size]} className={colors.icon} />
             </span>
           )}
           <input
@@ -173,22 +229,22 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
             required={required}
             min="00:00"
             max="23:59"
-            step={minuteStep * 60}     // step เป็นวินาที
+            step={minuteStep * 60}
             lang="th-TH"
             inputMode="numeric"
             pattern="[0-2][0-9]:[0-5][0-9]"
             className={`
-              w-full border rounded-lg transition-all duration-200
-              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+              w-full border rounded-xl transition-all duration-200 font-medium shadow-sm
+              focus:outline-none focus:ring-2
               ${showIcon ? 'pl-10' : 'pl-3'} pr-3
               ${sizeClasses[size]}
               ${error
-                ? 'border-red-500 focus:ring-red-500 focus:border-red-500 bg-red-50'
-                : 'border-gray-300 hover:border-gray-400'
+                ? colors.error
+                : `${colors.normal} ${colors.focus}`
               }
               ${disabled
-                ? 'bg-gray-100 cursor-not-allowed text-gray-400 border-gray-200'
-                : 'bg-white'
+                ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
+                : 'bg-white hover:shadow-md'
               }
             `}
             aria-invalid={error}
@@ -201,7 +257,7 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
       {helperText && (
         <span
           id={`${name}-help`}
-          className={`text-xs ${error ? 'text-red-500' : 'text-gray-500'}`}
+          className={`text-xs font-medium ${error ? 'text-red-500' : 'text-slate-600'}`}
         >
           {helperText}
         </span>
@@ -210,32 +266,4 @@ const ThaiTimePicker: React.FC<ThaiTimePickerProps> = ({
   );
 };
 
-/* Optional: Wrapper */
-interface InputFieldProps {
-  label: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-  required?: boolean;
-}
-
-export const InputField: React.FC<InputFieldProps> = ({
-  label,
-  icon,
-  children,
-  className = '',
-  required = false
-}) => {
-  return (
-    <div className={`flex flex-col space-y-2 ${className}`}>
-      <div className="flex items-center gap-2 text-gray-700 font-medium">
-        {icon}
-        <span>{label}</span>
-        {required && <span className="text-red-500">*</span>}
-      </div>
-      {children}
-    </div>
-  );
-};
-
-export default ThaiTimePicker;
+export default MedicalThaiTimePicker;

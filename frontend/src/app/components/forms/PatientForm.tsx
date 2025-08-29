@@ -8,6 +8,9 @@ import BirthDatePicker from '@/app/components/BirthDatePicker';
 import dynamic from 'next/dynamic';
 import makeAnimated from 'react-select/animated';
 import Swal from 'sweetalert2';
+import { ClipboardList } from 'lucide-react';
+import BaselineForm from '@/app/components/forms/BaselineForm';
+
 
 /* ---------------- Utils ---------------- */
 function calculateAge(birthdateStr) {
@@ -113,28 +116,28 @@ const treatatOptions = [
 
 /* ---------------- Validation (เฉพาะ 7 ช่อง) ---------------- */
 const FIELD_META = {
-  card_id:       { label: 'เลขบัตรประชาชน', type: 'thaiId', focusName: 'card_id' },
-  first_name:    { label: 'ชื่อ',             focusName: 'first_name' },
-  last_name:     { label: 'นามสกุล',         focusName: 'last_name' },
-  gender:        { label: 'เพศ',             focusName: 'gender' },
-  blood_group:   { label: 'กรุ๊ปเลือด',      focusName: 'blood_group' },
-  bloodgroup_rh: { label: 'ประเภท Rh',       focusName: 'bloodgroup_rh' },
-  disease:       { label: 'โรคประจำตัว',     focusName: 'disease' },
-  treat_at:       { label: 'รักษาที่',     focusName: 'treat_at' },
+  card_id: { label: 'เลขบัตรประชาชน', type: 'thaiId', focusName: 'card_id' },
+  first_name: { label: 'ชื่อ', focusName: 'first_name' },
+  last_name: { label: 'นามสกุล', focusName: 'last_name' },
+  gender: { label: 'เพศ', focusName: 'gender' },
+  blood_group: { label: 'กรุ๊ปเลือด', focusName: 'blood_group' },
+  bloodgroup_rh: { label: 'ประเภท Rh', focusName: 'bloodgroup_rh' },
+  disease: { label: 'โรคประจำตัว', focusName: 'disease' },
+  treat_at: { label: 'รักษาที่', focusName: 'treat_at' },
 };
 const DEFAULT_REQUIRED = Object.keys(FIELD_META);
 
 // รายการเอกสารมาตรฐาน
 const DOC_OPTIONS = [
-  { key: 'patient_id_card',    label: 'สำเนาบัตรประชาชนผู้ป่วย',                     accept: 'image/*,.pdf' },
-  { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ',                accept: 'image/*,.pdf' },
-  { key: 'patient_photo',      label: 'รูปถ่ายผู้ป่วย (สภาพปัจจุบัน)',                accept: 'image/*' },
-  { key: 'relative_id_card',   label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์',   accept: 'image/*,.pdf' },
-  { key: 'assistance_letter',  label: 'หนังสือขอความอนุเคราะห์',                     accept: 'image/*,.pdf' },
-  { key: 'power_of_attorney',  label: 'หนังสือมอบอำนาจ / หนังสือรับรองบุคคลไร้ญาติ',  accept: 'image/*,.pdf' },
-  { key: 'homeless_certificate', label: 'หนังสือรับรองบุคคลไร้ที่พึ่ง',                accept: 'image/*,.pdf' },
-  { key: 'adl_assessment',     label: 'แบบประเมิน ADL',                                 accept: 'image/*,.pdf' },
-  { key: 'clinical_summary',   label: 'ประวัติการรักษา (Clinical Summary)',            accept: 'image/*,.pdf' },
+  { key: 'patient_id_card', label: 'สำเนาบัตรประชาชนผู้ป่วย', accept: 'image/*,.pdf' },
+  { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ', accept: 'image/*,.pdf' },
+  { key: 'patient_photo', label: 'รูปถ่ายผู้ป่วย (สภาพปัจจุบัน)', accept: 'image/*' },
+  { key: 'relative_id_card', label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์', accept: 'image/*,.pdf' },
+  { key: 'assistance_letter', label: 'หนังสือขอความอนุเคราะห์', accept: 'image/*,.pdf' },
+  { key: 'power_of_attorney', label: 'หนังสือมอบอำนาจ / หนังสือรับรองบุคคลไร้ญาติ', accept: 'image/*,.pdf' },
+  { key: 'homeless_certificate', label: 'หนังสือรับรองบุคคลไร้ที่พึ่ง', accept: 'image/*,.pdf' },
+  { key: 'adl_assessment', label: 'แบบประเมิน ADL', accept: 'image/*,.pdf' },
+  { key: 'clinical_summary', label: 'ประวัติการรักษา (Clinical Summary)', accept: 'image/*,.pdf' },
 ];
 
 // ช่วยอ่านชื่อไฟล์สั้น ๆ
@@ -193,7 +196,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     onChange({ ...v, phone: formatted, phone_number: formatted });
   };
 
-    // ----- เอกสารแนบ -----
+  // ----- เอกสารแนบ -----
   const flags = v.docFlags || {}; // { [key: string]: boolean }
 
   const toggleDoc = (key: string, checked: boolean) => {
@@ -302,7 +305,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               styles={{
                 ...rsx,
                 menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu:       (base) => ({ ...base, zIndex: 12050 }),
+                menu: (base) => ({ ...base, zIndex: 12050 }),
               }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
@@ -318,6 +321,31 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
             />
           </InputField>
         </div>
+      </div>
+
+      <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+        <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
+          <div className="p-2 bg-[#005A50] rounded-lg">
+            <ClipboardList size={20} className="text-white" />
+          </div>
+          ประวัติเบื้องต้น
+          <span className="text-sm font-normal text-gray-500 ml-auto">Baseline (optional)</span>
+        </h3>
+
+        <BaselineForm
+          value={{
+            patients_id: v.patients_id || '',
+            reason_in_dept: v.reason_in_dept ?? '',
+            reason_admit: v.reason_admit ?? '',
+            bedbound_cause: v.bedbound_cause ?? '',
+            other_history: v.other_history ?? '',
+          }}
+          onChange={(b) => onChange({ ...v, ...b })}
+        />
+
+        <p className="mt-3 text-xs text-gray-500">
+          * ไม่บังคับ กรอกเท่าที่ทราบในเบื้องต้น ระบบจะบันทึกไปเป็นประวัติเบื้องต้นของผู้ป่วย
+        </p>
       </div>
 
       {/* ข้อมูลส่วนตัว */}
@@ -356,7 +384,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               styles={{
                 ...rsx,
                 menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu:       (base) => ({ ...base, zIndex: 12050 }),
+                menu: (base) => ({ ...base, zIndex: 12050 }),
               }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
@@ -403,7 +431,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               styles={{
                 ...ortherrsx,
                 menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu:       (base) => ({ ...base, zIndex: 12050 }),
+                menu: (base) => ({ ...base, zIndex: 12050 }),
               }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
@@ -486,7 +514,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               autoComplete="country-name"
             />
           </InputField>
-          
+
           <InputField label="ศาสนา" error={errors.religion}>
             <input
               name="religion"
@@ -532,7 +560,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               styles={{
                 ...ortherrsx,
                 menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu:       (base) => ({ ...base, zIndex: 12050 }),
+                menu: (base) => ({ ...base, zIndex: 12050 }),
               }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
@@ -554,7 +582,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               styles={{
                 ...ortherrsx,
                 menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu:       (base) => ({ ...base, zIndex: 12050 }),
+                menu: (base) => ({ ...base, zIndex: 12050 }),
               }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
@@ -587,7 +615,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               styles={{
                 ...ortherrsx,
                 menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu:       (base) => ({ ...base, zIndex: 12050 }),
+                menu: (base) => ({ ...base, zIndex: 12050 }),
               }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
