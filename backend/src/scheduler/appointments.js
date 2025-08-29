@@ -96,6 +96,7 @@ function buildAppointmentFlex(r) {
 
                         { type: "text", text: `⏰ เวลา: ${formatTime(r.start_time)} - ${formatTime(r.end_time)}`, size: "sm" },
                         { type: "text", text: `📍 สถานที่: ${r.place ?? "-"}`, size: "sm" },
+                        { type: "text", text: `📍 สถานที่: ${r.department ?? "-"}`, size: "sm" },
                         { type: "text", text: `📝 หมายเหตุ: ${r.note ?? "-"}`, size: "sm" }
                     ]
                 }
@@ -122,7 +123,7 @@ cron.schedule("0 6 * * *", async () => {
        const today = todayISOInTH(); 
 
         const { rows } = await pool.query(
-            `SELECT a.appointment_date, a.start_time, a.end_time, a.place, a.note,
+            `SELECT a.appointment_date, a.start_time, a.end_time, a.place, a.note, a.department,
               p.patients_id, p.first_name, p.last_name
        FROM appointment a
        JOIN patients p ON a.patients_id = p.patients_id

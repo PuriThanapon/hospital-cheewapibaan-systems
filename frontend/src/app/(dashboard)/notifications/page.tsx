@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bell, Clock, MapPin, Calendar, User, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import { Bell, Clock, MapPin, Calendar, User, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import styles from "./notifications.module.css";
 import dynamic from 'next/dynamic';
 
@@ -14,13 +14,14 @@ type Appointment = {
   date?: string | null;     // "YYYY-MM-DD"
   start?: string | null;    // "HH:MM"
   end?: string | null;      // "HH:MM"
+  hospital_address?: string | null;
+  department?: string | null;
   place?: string | null;
   status?: string | null;   // 'done' | 'pending' | ...
-  type?: string | null;
+  type?: string | null;     // 'hospital' | 'home' | (อื่น ๆ)
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
 
 const joinUrl = (base: string, path: string) => {
   const b = base.replace(/\/$/, '');
@@ -28,16 +29,123 @@ const joinUrl = (base: string, path: string) => {
   return `${b}${p}`;
 };
 
-// คืน "YYYY-MM-DD" ตามโซนเวลาเอเชีย/กรุงเทพฯ (กันเหลื่อมวัน)
+// ----- utils -----
 function todayYMD_TZ(tz = 'Asia/Bangkok') {
-  // sv-SE ให้รูปแบบ 2025-08-25 พอดี
   return new Intl.DateTimeFormat('sv-SE', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
 }
+function onlyHHmm(s?: string | null) {
+  if (!s) return null;
+  const str = String(s);
+  const m = str.match(/^(\d{2}:\d{2})/);
+  return m ? m[1] : str.slice(0, 5);
+}
+function TYPE_VALUE_FROM_LABEL(label?: string | null) {
+  const s = (label ?? '').toString().trim().toLowerCase();
+  if (!s) return '';
+  if (s === 'hospital' || s.includes('โรงพยาบาล') || s.includes('รพ')) return 'hospital';
+  if (s === 'home' || s.includes('บ้าน')) return 'home';
+  return s;
+}
+function TYPE_LABEL_TH(type?: string | null) {
+  const t = TYPE_VALUE_FROM_LABEL(type);
+  if (t === 'hospital') return 'โรงพยาบาล';
+  if (t === 'home') return 'บ้านผู้ป่วย';
+  return type || 'ไม่ระบุประเภท';
+}
+
+// เดา type เมื่อ backend ไม่ชัด
+function inferType(r: any): string {
+  const raw = r.appointment_type ?? r.type ?? r.appointmentType ?? '';
+  const norm = TYPE_VALUE_FROM_LABEL(raw);
+  if (norm) return norm;
+
+  // ถ้ามีสัญญาณเป็นโรงพยาบาล
+  const hospitalAddress = r.hospital_address ?? r.hospital ?? r.hospital_name ?? '';
+  const dept = r.department ?? r.dept ?? r.department_name ?? '';
+  const displayPlace = r.display_place ?? '';
+  if (String(hospitalAddress || dept || '').trim()) return 'hospital';
+  if (String(displayPlace).match(/โรงพยาบาล|^รพ\.?|Hospital/i)) return 'hospital';
+
+  // เป็นบ้าน ถ้ามี home/place/address ลักษณะบ้าน
+  const place = r.place ?? r.home_address ?? r.address ?? '';
+  if (String(place).match(/บ้าน|บ้านผู้ป่วย/i)) return 'home';
+
+  return ''; // ไม่รู้
+}
+
+// -------- mapper: API -> Appointment --------
+function mapRow(r: any): Appointment {
+  return {
+    appointment_id: String(r.appointment_id ?? r.id ?? r.appointment_code ?? ''),
+    pname: r.pname ?? null,
+    first_name: r.first_name ?? null,
+    last_name: r.last_name ?? null,
+    date: r.date ?? r.appointment_date ?? null,
+    start: onlyHHmm(r.start ?? r.start_time ?? null),
+    end: onlyHHmm(r.end ?? r.end_time ?? null),
+
+    // รองรับหลายชื่อฟิลด์
+    hospital_address: r.hospital_address ?? r.hospital ?? r.hospital_name ?? null,
+    department: r.department ?? r.dept ?? r.department_name ?? null,
+
+    // บางระบบยัดข้อความรวมไว้ใน display_place
+    place: r.display_place ?? r.place ?? r.home_address ?? r.address ?? null,
+
+    status: r.status ?? null,
+    type: inferType(r),
+  };
+}
+
+// ข้อความสถานที่ตาม type
+function getLocationText(a: Appointment) {
+  const t = TYPE_VALUE_FROM_LABEL(a.type);
+  const addr = (a.hospital_address || '').trim();
+  const dept = (a.department || '').trim();
+  const place = (a.place || '').trim();
+
+  if (t === 'hospital') {
+    if (addr || dept) return [addr || 'โรงพยาบาล', dept].filter(Boolean).join(' · ');
+    if (place && place !== 'บ้านผู้ป่วย') return place; // บาง backend รวมไว้ใน display_place
+    return 'โรงพยาบาล';
+  }
+  if (t === 'home') {
+    return place || 'บ้านผู้ป่วย';
+  }
+  // ไม่ทราบ type — เอาที่มี
+  return place || addr || 'ไม่ระบุสถานที่';
+}
+
+// ----- status -----
+function normalizeStatus(raw?: string | null) {
+  const s = (raw ?? '').trim().toLowerCase();
+  if (!s) return 'unknown';
+  if (s.includes('pending') || s.includes('รอ') || s === 'นัดหมาย') return 'pending';
+  if (s.includes('done') || s.includes('complete') || s.includes('completed') || s.includes('เสร็จ') || s.includes('สำเร็จ')) return 'done';
+  if (s.includes('cancel') || s.includes('ยกเลิก')) return 'cancelled';
+  return 'other';
+}
+const getStatusConfig = (raw?: string | null) => {
+  const key = normalizeStatus(raw);
+  switch (key) {
+    case 'done':
+      return { icon: CheckCircle, className: 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border border-green-200', dotColor: 'bg-green-500', text: 'เสร็จสิ้น' };
+    case 'pending':
+      return { icon: AlertCircle, className: 'bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border border-amber-200', dotColor: 'bg-amber-500', text: 'รอดำเนินการ' };
+    case 'cancelled':
+      return { icon: AlertCircle, className: 'bg-gradient-to-r from-rose-50 to-red-50 text-red-700 border border-rose-200', dotColor: 'bg-red-500', text: 'ยกเลิก' };
+    default:
+      return { icon: Clock, className: 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-600 border border-gray-200', dotColor: 'bg-gray-400', text: raw || 'ไม่ระบุ' };
+  }
+};
+
+const formatThaiDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return new Intl.DateTimeFormat('th-TH', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  }).format(date);
+};
 
 export default function NotificationsPage() {
   const [list, setList] = useState<Appointment[]>([]);
@@ -46,21 +154,21 @@ export default function NotificationsPage() {
 
   const today = useMemo(() => todayYMD_TZ('Asia/Bangkok'), []);
   
-  // โหลด "นัดวันนี้" จาก timeline (from=to=today)
   useEffect(() => {
     let alive = true;
     (async () => {
       setLoading(true);
       setErr('');
       try {
-        const url = joinUrl(
-          API_BASE,
-          `/api/notification/timeline?from=${encodeURIComponent(today)}&to=${encodeURIComponent(today)}`
-        );
+        const url = joinUrl(API_BASE, `/api/notification/timeline?from=${encodeURIComponent(today)}&to=${encodeURIComponent(today)}`);
         const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         const j = await res.json();
-        if (alive) setList(Array.isArray(j?.data) ? j.data : []);
+        const raw = Array.isArray(j?.data) ? j.data : [];
+        const mapped = raw.map(mapRow);
+        if (alive) setList(mapped);
+        // ช่วยไล่บั๊กได้: ดูหลัง map แล้วค่ามาครบไหม
+        // console.log('mapped timeline sample:', mapped[0]);
       } catch (e: any) {
         if (alive) setErr(e?.message || 'โหลดข้อมูลไม่สำเร็จ');
       } finally {
@@ -70,7 +178,6 @@ export default function NotificationsPage() {
     return () => { alive = false; };
   }, [today]);
 
-  // เรียงตามเวลาเริ่ม (null ไปท้าย)
   const sorted = useMemo(() => {
     return [...list].sort((a, b) => {
       const as = a.start ?? '';
@@ -82,90 +189,12 @@ export default function NotificationsPage() {
     });
   }, [list]);
 
-  // เดิม
-// const getStatusConfig = (status: string) => {
-//   const statusLower = status.toLowerCase();
-//   switch (statusLower) { ... }
-// }
-function normalizeStatus(raw?: string | null) {
-  const s = (raw ?? '').trim().toLowerCase();
-  if (!s) return 'unknown';
-
-  // pending
-  if (
-    s.includes('pending') ||
-    s.includes('รอ') ||            // ครอบคลุม "รอดำเนินการ", "รอคิว", ฯลฯ
-    s === 'นัดหมาย'
-  ) return 'pending';
-
-  // done / completed
-  if (
-    s.includes('done') ||
-    s.includes('complete') ||
-    s.includes('completed') ||
-    s.includes('เสร็จ') ||        // ครอบคลุม "เสร็จสิ้น", "สำเร็จ"
-    s.includes('สำเร็จ')
-  ) return 'done';
-
-  // cancelled
-  if (
-    s.includes('cancel') ||
-    s.includes('ยกเลิก')
-  ) return 'cancelled';
-
-  return 'other';
-}
-// ใหม่
-const getStatusConfig = (raw?: string | null) => {
-  const key = normalizeStatus(raw);
-  switch (key) {
-    case 'done':
-      return {
-        icon: CheckCircle,
-        className: 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border border-green-200',
-        dotColor: 'bg-green-500',
-        text: 'เสร็จสิ้น',
-      };
-    case 'pending':
-      return {
-        icon: AlertCircle,
-        className: 'bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border border-amber-200',
-        dotColor: 'bg-amber-500',
-        text: 'รอดำเนินการ',
-      };
-    case 'cancelled':
-      return {
-        icon: AlertCircle,
-        className: 'bg-gradient-to-r from-rose-50 to-red-50 text-red-700 border border-rose-200',
-        dotColor: 'bg-red-500',
-        text: 'ยกเลิก',
-      };
-    default:
-      return {
-        icon: Clock,
-        className: 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-600 border border-gray-200',
-        dotColor: 'bg-gray-400',
-        text: raw || 'ไม่ระบุ',
-      };
-  }
-};
-
-
-  const formatThaiDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('th-TH', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }).format(date);
-  };
   const stats = useMemo(() => ({
     total: sorted.length,
     done: sorted.filter(a => normalizeStatus(a.status) === 'done').length,
     pending: sorted.filter(a => normalizeStatus(a.status) === 'pending').length,
     cancelled: sorted.filter(a => normalizeStatus(a.status) === 'cancelled').length,
-    }), [sorted]);
+  }), [sorted]);
 
   if (loading) {
     return (
@@ -275,64 +304,64 @@ const getStatusConfig = (raw?: string | null) => {
               <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 via-purple-200 to-cyan-200"></div>
               
               <div className="space-y-6">
-                  {sorted.map((appointment, index) => {
-                    const fullName = `${appointment.pname ?? ''}${appointment.first_name ?? ''} ${appointment.last_name ?? ''}`.trim() || 'ไม่ระบุชื่อ';
-                    const statusConfig = getStatusConfig(appointment.status ?? '');
-                    const StatusIcon = statusConfig.icon;
+                {sorted.map((appointment, index) => {
+                  const fullName = `${appointment.pname ?? ''}${appointment.first_name ?? ''} ${appointment.last_name ?? ''}`.trim() || 'ไม่ระบุชื่อ';
+                  const statusConfig = getStatusConfig(appointment.status ?? '');
+                  const StatusIcon = statusConfig.icon;
 
-                    return (
-                      <div 
-                        key={`${appointment.appointment_id}-${appointment.start ?? ''}`} 
-                        className="relative group"
-                        style={{ 
-                          animation: `slideInUp 0.6s ease-out ${index * 0.1}s both` 
-                        }}
-                      >
-                        {/* Timeline dot */}
-                        <div className={`absolute left-6 w-4 h-4 ${statusConfig.dotColor} rounded-full border-4 border-white shadow-lg group-hover:scale-110 transition-transform duration-200`}></div>
-                        
-                        {/* Card */}
-                        <div className="ml-16 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-6 group-hover:shadow-xl group-hover:bg-white/90 transition-all duration-300">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center space-x-3">
-                              <div className="p-2 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl">
-                                <User className="w-5 h-5 text-indigo-600" />
-                              </div>
-                              <div>
-                                <h3 className="text-lg font-semibold text-gray-900">{fullName}</h3>
-                                <p className="text-sm text-gray-500">{appointment.type ?? 'ไม่ระบุประเภท'}</p>
-                              </div>
+                  const locationText = getLocationText(appointment);
+
+                  return (
+                    <div 
+                      key={`${appointment.appointment_id}-${appointment.start ?? ''}`} 
+                      className="relative group"
+                      style={{ animation: `slideInUp 0.6s ease-out ${index * 0.1}s both` }}
+                    >
+                      {/* Timeline dot */}
+                      <div className={`absolute left-6 w-4 h-4 ${statusConfig.dotColor} rounded-full border-4 border-white shadow-lg group-hover:scale-110 transition-transform duration-200`}></div>
+                      
+                      {/* Card */}
+                      <div className="ml-16 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-6 group-hover:shadow-xl group-hover:bg-white/90 transition-all duration-300">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl">
+                              <User className="w-5 h-5 text-indigo-600" />
                             </div>
-                            
-                            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${statusConfig.className}`}>
-                              <StatusIcon className="w-4 h-4 mr-1.5" />
-                              {statusConfig.text}
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900">{fullName}</h3>
+                              <p className="text-sm text-gray-500">{TYPE_LABEL_TH(appointment.type)}</p>
                             </div>
                           </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div className="flex items-center text-gray-600">
-                              <Clock className="w-4 h-4 mr-2 text-indigo-400" />
-                              <span>
-                                {appointment.start ?? '—'}{appointment.end ? ` - ${appointment.end}` : ''} น.
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center text-gray-600">
-                              <MapPin className="w-4 h-4 mr-2 text-purple-400" />
-                              <span>{appointment.place ?? 'ไม่ระบุสถานที่'}</span>
-                            </div>
+                          
+                          <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${statusConfig.className}`}>
+                            <StatusIcon className="w-4 h-4 mr-1.5" />
+                            {statusConfig.text}
                           </div>
-
-                          {/* Hover effect overlay */}
-                          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div className="flex items-center text-gray-600">
+                            <Clock className="w-4 h-4 mr-2 text-indigo-400" />
+                            <span>
+                              {appointment.start ?? '—'}{appointment.end ? ` - ${appointment.end}` : ''} น.
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center text-gray-600">
+                            <MapPin className="w-4 h-4 mr-2 text-purple-400" />
+                            <span>{locationText}</span>
+                          </div>
+                        </div>
+
+                        {/* Hover effect overlay */}
+                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+          </div>
         )}
       </div>
     </div>

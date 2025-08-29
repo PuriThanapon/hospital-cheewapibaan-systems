@@ -85,6 +85,7 @@ type Appointment = {
   place: string;
   status: Status;
   note?: string;
+  department?: string;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
@@ -205,24 +206,26 @@ type ApiRow = {
   first_name?: string;
   last_name?: string;
   phone_number?: string;
+  department?: string;
 };
 
 function mapRow(r: ApiRow): Appointment {
   const full =
     `${r.pname ?? ''}${r.first_name ?? ''} ${r.last_name ?? ''}`.replace(/\s+/g, ' ').trim();
   return {
-    id: r.appointment_code || (r.appointment_id ? `AP-${String(r.appointment_id).padStart(6,'0')}` : '-'),
+    id: r.appointment_code || (r.appointment_id ? `AP-${String(r.appointment_id).padStart(6, '0')}` : '-'),
     patient: full || r.patients_id,
     hn: r.patients_id,
     phone: r.phone_number || undefined,
     date: r.appointment_date,
     start: toHHmm(r.start_time),
     end: toHHmm(r.end_time),
-    type: TYPE_LABEL_FROM_VALUE(r.appointment_type || ''),               // "โรงพยาบาล" | "บ้านผู้ป่วย"
+    type: TYPE_LABEL_FROM_VALUE(r.appointment_type || ''), // "โรงพยาบาล" | "บ้านผู้ป่วย"
     place: r.display_place || r.place || (r.appointment_type === 'home' ? 'บ้านผู้ป่วย' : ''),
     hospital_address: r.hospital_address || undefined,
     status: r.status,
     note: r.note || undefined,
+    department: r.department || undefined, // ✅ มี department
   };
 }
 
@@ -262,7 +265,7 @@ export default function AppointmentsPage() {
   const [form, setForm] = useState<AppointmentFormValue>(resetForm());
 
   type FormErrors = Partial<Record<keyof AppointmentFormValue | 'hospital_address', string>>;
-  const REQUIRED: (keyof AppointmentFormValue)[] = ['hn', 'date', 'start', 'end', 'type'];
+  const REQUIRED: (keyof AppointmentFormValue)[] = ['hn', 'date', 'start', 'end', 'type', ];
   function validate(f: Partial<AppointmentFormValue>): FormErrors {
     const e: FormErrors = {};
     const get = (k: keyof AppointmentFormValue) => (f[k]?.toString().trim() ?? '');
@@ -273,8 +276,11 @@ export default function AppointmentsPage() {
     const sm = parseHHmmToMin(s);
     const em = parseHHmmToMin(ed);
     if (s && ed && (!isFinite(sm) || !isFinite(em) || em <= sm)) e.end = 'เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม';
+
     const tVal = TYPE_VALUE_FROM_LABEL(get('type'));
     if (tVal === 'hospital' && !get('hospital_address')) e.hospital_address = 'กรอกชื่อ/ที่อยู่โรงพยาบาล';
+    if (tVal === 'hospital' && !get('department')) e.department = 'กรุณาเลือกแผนก'; // ✅ เช็คเฉพาะโรงพยาบาล
+
     if (f.phone && !/^[0-9+\-() ]{6,}$/.test(f.phone)) e.phone = 'รูปแบบเบอร์ไม่ถูกต้อง';
     return e;
   }
@@ -343,8 +349,14 @@ export default function AppointmentsPage() {
   }>({ open: false, appt: null, items: [], saving: false });
 
   function startNeeds(appt: Appointment, preset?: NeedItem[]) {
+    // ❌ ไม่อนุญาตสำหรับโรงพยาบาล
+    if (appt.type === 'โรงพยาบาล') {
+      toast.fire({ icon: 'info', title: 'เมนูนี้ใช้สำหรับการเยี่ยมบ้านเท่านั้น' });
+      return;
+    }
     setNeedsModal({ open: true, appt, items: preset || [], saving: false });
   }
+
 
   function addNeedRow() {
     setNeedsModal(m => ({ ...m, items: [...m.items, { item: '' }] }));
@@ -395,7 +407,11 @@ export default function AppointmentsPage() {
   }>({ open: false, loading: false, error: '', appt: null, items: [] });
 
   async function openNeedsFor(appt: Appointment) {
-    // เปิดโมดัล + โหลดรายการล่าสุดของผู้ป่วยคนนี้
+    // ❌ ไม่อนุญาตสำหรับโรงพยาบาล
+    if (appt.type === 'โรงพยาบาล') {
+      toast.fire({ icon: 'info', title: 'เมนูนี้ใช้สำหรับการเยี่ยมบ้านเท่านั้น' });
+      return;
+    }
     setNeedsView({ open: true, loading: true, error: '', appt, items: [] });
     try {
       const res = await http<{ data?: NeedItem[] }>(
@@ -407,6 +423,7 @@ export default function AppointmentsPage() {
       setNeedsView(v => ({ ...v, loading: false, error: e?.message || 'โหลดไม่สำเร็จ' }));
     }
   }
+
 
   useEffect(() => {
     fetchList();
@@ -472,9 +489,10 @@ export default function AppointmentsPage() {
   async function handleStatus(id: string, newStatus: Status) {
     if (newStatus === 'cancelled') {
       const t = items.find(i => i.id === id);
+      const locText = t ? (t.type === 'โรงพยาบาล' ? (t.hospital_address || '-') : (t.place || 'บ้านผู้ป่วย')) : '';
       const c = await $swal.fire({
         title: 'ยืนยันยกเลิกนัดหมายนี้?',
-        html: `<div style="font-family:inherit;opacity:.85">${t ? `${TH_DATE(t.date)} · ${t.start}–${t.end} · ${t.type} @ ${t.place}` : ''}</div>`,
+        html: `<div style="font-family:inherit;opacity:.85">${t ? `${TH_DATE(t.date)} · ${t.start}–${t.end} · ${t.type} @ ${locText}` : ''}</div>`,
         icon: 'warning',
         showCancelButton: true,
       });
@@ -500,11 +518,12 @@ export default function AppointmentsPage() {
 
   async function confirmDelete(id: string) {
     const t = items.find(i => i.id === id);
+    const locText = t ? (t.type === 'โรงพยาบาล' ? (t.hospital_address || '-') : (t.place || 'บ้านผู้ป่วย')) : '';
     const c = await $swal.fire({
       title: 'ลบนัดหมายนี้หรือไม่?',
       html: `<div style="font-family:inherit">
               <div><code>${t?.id || ''}</code> · ${t?.patient || ''} <span style="opacity:.7">(${t?.hn || ''})</span></div>
-              <div style="opacity:.8">${t ? `${TH_DATE(t.date)} · ${t.start}–${t.end} · ${t.type} @ ${t.place}` : ''}</div>
+              <div style="opacity:.8">${t ? `${TH_DATE(t.date)} · ${t.start}–${t.end} · ${t.type} @ ${locText}` : ''}</div>
              </div>`,
       icon: 'warning',
       showCancelButton: true,
@@ -539,6 +558,7 @@ export default function AppointmentsPage() {
      hospital_address: a.type === 'โรงพยาบาล' ? (a.hospital_address || a.place || '') : '',
      status: a.status,
      note: a.note,
+     department: a.department,
    });
    setErrors({});
    setOpen(true);
@@ -561,6 +581,7 @@ export default function AppointmentsPage() {
       appointment_type: t,                // << home | hospital
       status: (form.status as Status) || 'pending',
       note: (form.note || '').trim() || null,
+      department: t === 'hospital' ? (form.department || '') : null,
     };
     const payload =
       t === 'hospital'
@@ -752,7 +773,7 @@ export default function AppointmentsPage() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>เลขนัด</th><th>ผู้ป่วย</th><th>วัน-เวลา</th><th>ประเภท/สถานที่</th><th>สถานะ</th><th></th>
+                <th>เลขนัด</th><th>ผู้ป่วย</th><th>วัน-เวลา</th><th>ประเภท/สถานที่</th><th>แผนก</th><th>สถานะ</th><th>การดำเนินการ</th>
               </tr>
             </thead>
             <tbody>
@@ -770,11 +791,24 @@ export default function AppointmentsPage() {
                       {TH_DATE(a.date)}<div className={styles.sub}>{a.start}–{a.end}</div>
                     </td>
                     <td className={styles.cellEllipsis}>
-                      {highlight(a.type, q)}<div className={styles.sub}>{highlight(a.place, q)}</div>
+                      {highlight(a.type, q)}
+                      <div className={styles.sub}>
+                        {highlight(
+                          a.type === 'โรงพยาบาล'
+                            ? (a.hospital_address || '-')
+                            : (a.place || 'บ้านผู้ป่วย'),
+                          q
+                        )}
+                      </div>
+                    </td>
+                    <td className={styles.cellEllipsis}>
+                      {a.type === 'โรงพยาบาล'
+                        ? (a.department ? highlight(a.department, q) : '-')
+                        : '-'}
                     </td>
                     <td><StatusBadge status={a.status} /></td>
                     <td className={styles.actionsCell}>
-                      {a.status === 'pending' && (
+                      {a.status === 'pending' && a.type === 'บ้านผู้ป่วย' && (
                         <button
                           className={styles.ghost}
                           type="button"
@@ -803,12 +837,13 @@ export default function AppointmentsPage() {
                     </td>
                   </tr>
                   {openRowId === a.id && (
-                    <tr className={styles.detailRow}><td colSpan={6}>
+                    <tr className={styles.detailRow}><td colSpan={7}>
                       <div className={styles.detailWrap}>
                         <div className={styles.detailGrid}>
                           <div><div className={styles.detailLabel}>วันที่/เวลา</div><div className={styles.detailValue}>{TH_DATE(a.date)} · {a.start}–{a.end}</div></div>
                           <div><div className={styles.detailLabel}>ประเภท</div><div className={styles.detailValue}>{a.type}</div></div>
-                          <div><div className={styles.detailLabel}>สถานที่</div><div className={styles.detailValue}>{a.place}</div></div>
+                          <div><div className={styles.detailLabel}>สถานที่</div><div className={styles.detailValue}>{a.type === 'โรงพยาบาล' ? (a.hospital_address || '-') : (a.place || 'บ้านผู้ป่วย')}</div></div>
+                          <div><div className={styles.detailLabel}>แผนก</div><div className={styles.detailValue}>{a.type === 'โรงพยาบาล' ? (a.department || '-') : '-'}</div></div>
                           <div><div className={styles.detailLabel}>สถานะ</div><div className={styles.detailValue}><StatusBadge status={a.status} /></div></div>
                           {a.phone && (<div><div className={styles.detailLabel}>เบอร์โทร</div><div className={styles.detailValue}>{a.phone}</div></div>)}
                         </div>
@@ -832,7 +867,7 @@ export default function AppointmentsPage() {
 
               {items.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className={styles.emptyCell}>ไม่มีข้อมูลการนัดหมายในช่วงที่เลือก</td>
+                  <td colSpan={7} className={styles.emptyCell}>ไม่มีข้อมูลการนัดหมายในช่วงที่เลือก</td>
                 </tr>
               )}
             </tbody>
@@ -846,7 +881,12 @@ export default function AppointmentsPage() {
                 <div className={styles.cardHeader}><span className={styles.mono}>{a.id}</span><StatusBadge status={a.status} /></div>
                 <div className={styles.cardRow}><strong className={styles.cellEllipsis}>{a.patient}</strong><span className={styles.sub}>{a.hn}</span></div>
                 <div className={styles.cardRow}>{TH_DATE(a.date)} · {a.start}–{a.end}</div>
-                <div className={styles.cardRow}>{a.type} · {a.place}</div>
+                <div className={styles.cardRow}>
+                  {a.type} · {a.type === 'โรงพยาบาล' ? (a.hospital_address || '-') : (a.place || 'บ้านผู้ป่วย')}
+                </div>
+                {a.type === 'โรงพยาบาล' && a.department && (
+                  <div className={styles.cardRow}>แผนก: {a.department}</div>
+                )}
                 {openCards.has(a.id) && (
                   <div className={styles.cardDetail}>
                     {a.phone && (<div className={styles.cardDetailRow}><span className={styles.detailLabel}>เบอร์โทร</span><span>{a.phone}</span></div>)}
@@ -854,7 +894,7 @@ export default function AppointmentsPage() {
                   </div>
                 )}
                 <div className={styles.cardActions}>
-                  {a.status === 'pending' && (
+                  {a.status === 'pending' && a.type === 'บ้านผู้ป่วย' && (
                     <button
                       className={styles.ghost}
                       type="button"
@@ -990,7 +1030,7 @@ export default function AppointmentsPage() {
               <div className="text-sm text-gray-500">ไม่มีประวัติ</div>
             )}
 
-            {/* รายการประวัติ (list แบบอ่านง่าย + responsive) */}
+            {/* รายการประวัติ */}
             {!historyLoading && !historyErr && historyList.length > 0 && (
               <ul className="divide-y divide-gray-200">
                 {historyList.map(h => (
@@ -1001,7 +1041,8 @@ export default function AppointmentsPage() {
                           {TH_DATE(h.date)} · {h.start}–{h.end}
                         </div>
                         <div className="text-[15px] font-medium text-gray-900">
-                          {h.type} · {h.place}
+                          {h.type} · {h.type === 'โรงพยาบาล' ? (h.hospital_address || '-') : (h.place || 'บ้านผู้ป่วย')}
+                          {h.type === 'โรงพยาบาล' && h.department ? ` · ${h.department}` : ''}
                         </div>
                         {h.phone && (
                           <div className="text-sm text-gray-600">โทร: {h.phone}</div>

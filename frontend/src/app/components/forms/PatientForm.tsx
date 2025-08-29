@@ -102,6 +102,24 @@ const FIELD_META = {
 };
 const DEFAULT_REQUIRED = Object.keys(FIELD_META);
 
+// รายการเอกสารมาตรฐาน
+const DOC_OPTIONS = [
+  { key: 'patient_id_card',    label: 'สำเนาบัตรประชาชนผู้ป่วย',                     accept: 'image/*,.pdf' },
+  { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ',                accept: 'image/*,.pdf' },
+  { key: 'patient_photo',      label: 'รูปถ่ายผู้ป่วย (สภาพปัจจุบัน)',                accept: 'image/*' },
+  { key: 'relative_id_card',   label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์',   accept: 'image/*,.pdf' },
+
+  // ใหม่
+  { key: 'assistance_letter',  label: 'หนังสือขอความอนุเคราะห์',                     accept: 'image/*,.pdf' },
+  { key: 'power_of_attorney',  label: 'หนังสือมอบอำนาจ / หนังสือรับรองบุคคลไร้ญาติ',  accept: 'image/*,.pdf' },
+  { key: 'homeless_certificate', label: 'หนังสือรับรองบุคคลไร้ที่พึ่ง',                accept: 'image/*,.pdf' },
+  { key: 'adl_assessment',     label: 'แบบประเมิน ADL',                                 accept: 'image/*,.pdf' },
+  { key: 'clinical_summary',   label: 'ประวัติการรักษา (Clinical Summary)',            accept: 'image/*,.pdf' },
+];
+
+// ช่วยอ่านชื่อไฟล์สั้น ๆ
+const fileName = (f?: File | null) => (f ? f.name : '');
+
 function validatePatientForm(values) {
   const v = values || {};
   const digits = (s) => (s || '').toString().replace(/\D/g, '');
@@ -154,6 +172,50 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     if (value.length > 6) formatted += '-' + value.slice(6, 10);
     onChange({ ...v, phone: formatted, phone_number: formatted });
   };
+
+    // ----- เอกสารแนบ -----
+  const flags = v.docFlags || {}; // { [key: string]: boolean }
+
+  const toggleDoc = (key: string, checked: boolean) => {
+    const nextFlags = { ...flags, [key]: checked };
+    const next: any = { ...v, docFlags: nextFlags };
+    // ถ้ายกเลิกเช็ค -> เคลียร์ไฟล์ทิ้งด้วย
+    if (!checked) next[key] = null;
+    onChange(next);
+  };
+
+  const setFileFor = (key: string, file?: File | null) => {
+    onChange({ ...v, [key]: file ?? null });
+  };
+
+  // “เอกสารอื่นๆ” : [{ label, file }]
+  const otherDocs: Array<{ label?: string; file?: File | null }> = v.other_docs || [];
+  const setOtherDocs = (list: any[]) => onChange({ ...v, other_docs: list });
+
+  const addOtherDoc = () => setOtherDocs([...(otherDocs || []), { label: '', file: null }]);
+  const updateOtherDoc = (idx: number, patch: Partial<{ label: string; file: File | null }>) => {
+    const next = (otherDocs || []).slice();
+    next[idx] = { ...next[idx], ...patch };
+    setOtherDocs(next);
+  };
+  const removeOtherDoc = (idx: number) => {
+    const next = (otherDocs || []).slice();
+    next.splice(idx, 1);
+    setOtherDocs(next);
+  };
+
+  // ออโต้เช็คให้ถ้ามีไฟล์อยู่แล้ว
+  React.useEffect(() => {
+    const filled: any = {};
+    DOC_OPTIONS.forEach(({ key }) => {
+      if (v[key]) filled[key] = true;
+    });
+    if (Object.keys(filled).length > 0) {
+      onChange({ ...v, docFlags: { ...(v.docFlags || {}), ...filled } });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // Expose ให้ parent ใช้งาน
   useImperativeHandle(ref, () => ({
@@ -524,61 +586,121 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
       </div>
 
       {/* เก็บสำหรับเอกสารจำเป็น */}
+            {/* เอกสารแนบที่จำเป็น (เลือกก่อน แล้วค่อยอัปโหลด) */}
       <div className="bg-gray-100 p-6 rounded-xl border border-blue-200">
-        <h3 className="text-lg font-bold text-blue-800 mb-6 flex items-center gap-2">
+        <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
           <FileUp size={20} />
           เอกสารแนบที่จำเป็น
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <InputField label="• สำเนาบัตรประชาชนผู้ป่วย">
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                onChange({ ...v, patient_id_card: file });
-              }}
-            />
-          </InputField>
+        {/* 3.1 กล่องเช็คเลือกเอกสาร */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-6">
+          {DOC_OPTIONS.map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-2 p-2 rounded-md bg-white border">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={!!flags[key]}
+                onChange={(e) => toggleDoc(key, e.target.checked)}
+              />
+              <span className="text-sm">{label}</span>
+            </label>
+          ))}
 
-          <InputField label="• สำเนาทะเบียนบ้านผู้ป่วย/ญาติ">
+          {/* เอกสารอื่นๆ */}
+          <label className="flex items-center gap-2 p-2 rounded-md bg-white border">
             <input
-              type="file"
-              accept="image/*,.pdf"
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              type="checkbox"
+              className="w-4 h-4"
+              checked={!!flags.other}
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                onChange({ ...v, house_registration: file });
+                const checked = e.target.checked;
+                toggleDoc('other', checked);
+                if (checked && (!otherDocs || otherDocs.length === 0)) addOtherDoc();
               }}
             />
-          </InputField>
-
-          <InputField label="• รูปถ่ายผู้ป่วย สภาพปัจจุบัน">
-            <input
-              type="file"
-              accept="image/*"
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                onChange({ ...v, patient_photo: file });
-              }}
-            />
-          </InputField>
-
-          <InputField label="• สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์">
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                onChange({ ...v, relative_id_card: file });
-              }}
-            />
-          </InputField>
+            <span className="text-sm">เอกสารอื่นๆ (ระบุชื่อเอกสารเอง)</span>
+          </label>
         </div>
+
+        {/* 3.2 ช่องอัปโหลดของรายการที่เช็คไว้ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {DOC_OPTIONS.filter(d => flags[d.key]).map(({ key, label, accept }) => (
+            <div key={key} className="space-y-2">
+              <div className="text-sm font-medium">{`• ${label}`}</div>
+              <input
+                type="file"
+                accept={accept}
+                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                onChange={(e) => setFileFor(key, e.target.files?.[0] || null)}
+              />
+              {v[key] && (
+                <div className="text-xs text-gray-600">
+                  เลือกแล้ว: <span className="font-mono">{fileName(v[key])}</span>
+                  <button
+                    type="button"
+                    className="ml-3 text-red-600 hover:underline"
+                    onClick={() => setFileFor(key, null)}
+                  >
+                    ล้างไฟล์
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* 3.3 เอกสารอื่นๆ (หลายแถว) */}
+        {flags.other && (
+          <div className="mt-6 space-y-3">
+            <div className="text-sm font-semibold text-blue-900">เอกสารอื่นๆ</div>
+            {(otherDocs || []).map((row, idx) => (
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-start bg-white p-3 rounded-lg border">
+                <div className="md:col-span-2">
+                  <div className="text-xs text-gray-600 mb-1">ชื่อเอกสาร</div>
+                  <input
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="เช่น หนังสือรับรองรายได้น้อย"
+                    value={row.label || ''}
+                    onChange={(e) => updateOtherDoc(idx, { label: e.target.value })}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <div className="text-xs text-gray-600 mb-1">แนบไฟล์</div>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="w-full px-3 py-2 border rounded-md bg-white"
+                    onChange={(e) => updateOtherDoc(idx, { file: e.target.files?.[0] || null })}
+                  />
+                  {row.file && (
+                    <div className="mt-1 text-xs text-gray-600">
+                      เลือกแล้ว: <span className="font-mono">{fileName(row.file)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    className="px-3 py-2 border rounded-md text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => removeOtherDoc(idx)}
+                  >
+                    ลบแถว
+                  </button>
+                </div>
+              </div>
+            ))}
+            <div>
+              <button
+                type="button"
+                className="px-3 py-2 border rounded-md text-blue-700 border-blue-300 hover:bg-blue-50"
+                onClick={addOtherDoc}
+              >
+                + เพิ่มเอกสารอื่น
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

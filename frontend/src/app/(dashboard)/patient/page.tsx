@@ -331,6 +331,46 @@ async function downloadPatientAttachment(
   }
 }
 
+async function uploadAllPatientFiles(patients_id: string, formValue: any) {
+  if (!patients_id) return;
+
+  // เคสนี้ *ไม่รวม* 4 ไฟล์มาตรฐานที่คุณส่งไปกับ /api/patients อยู่แล้ว
+  const EXTRA_DOC_KEYS = [
+    'assistance_letter',      // หนังสือขอความอนุเคราะห์
+    'power_of_attorney',      // หนังสือมอบอำนาจ (หรือหนังสือรับรองบุคคลไร้ญาติ)
+    'adl_assessment',         // แบบประเมิน ADL
+    'clinical_summary',       // ประวัติการรักษา (clinical summary)
+    'destitute_certificate',  // หนังสือรับรองบุคคลไร้ที่พึ่ง  (ตั้ง key ให้ตรง backend)
+    'homeless_certificate',   // (ถ้ามี key แยกตาม backend)
+  ];
+
+  for (const key of EXTRA_DOC_KEYS) {
+    const f: File | undefined = formValue?.[key];
+    if (!f) continue;
+    const fd = new FormData();
+    fd.append('doc_type', key);
+    fd.append('file', f, f.name);
+    await fetch(`/api/patient-files/${encodeURIComponent(patients_id)}`, {
+      method: 'POST',
+      body: fd, // อย่าตั้ง Content-Type เอง
+    });
+  }
+
+  // เอกสารอื่นๆ แบบหลายไฟล์
+  const others = Array.isArray(formValue?.other_docs) ? formValue.other_docs : [];
+  for (const row of others) {
+    if (!row?.file) continue;
+    const fd = new FormData();
+    fd.append('doc_type', 'other');
+    if (row.label) fd.append('label', row.label);
+    fd.append('file', row.file, row.file.name);
+    await fetch(`/api/patient-files/${encodeURIComponent(patients_id)}`, {
+      method: 'POST',
+      body: fd,
+    });
+  }
+}
+
 export default function PatientsPage() {
   // state: query + filters + pagination
   const [query, setQuery] = useState('');
@@ -433,7 +473,13 @@ export default function PatientsPage() {
       const formValues = addFormRef.current.getValues();
       const formData = buildPatientFormData(formValues);
 
-      await http('/api/patients', { method: 'POST', body: formData });  // ✅ ใช้ http()
+      // ⬇️ บันทึกข้อมูลหลัก + 4 ไฟล์มาตรฐานที่แนบมากับ formData
+      const created = await http('/api/patients', { method: 'POST', body: formData });
+
+      // ⬇️ อัปโหลดไฟล์ "เสริม" ผ่าน /api/patient-files
+      const patients_id = created?.patients_id ?? formValues?.patients_id;
+      await uploadAllPatientFiles(patients_id, formValues);
+
       setOpenAdd(false);
       refresh();
       toast.fire({ icon: 'success', title: 'บันทึกผู้ป่วยเรียบร้อย' });
@@ -441,7 +487,6 @@ export default function PatientsPage() {
       $swal.fire({ icon: 'error', title: 'บันทึกข้อมูลไม่สำเร็จ', text: e.message || '' });
     }
   };
-
 
   const handleOpenEdit = async (patients_id) => {
     setOpenEdit(patients_id);
@@ -466,10 +511,14 @@ export default function PatientsPage() {
       const formValues = editFormRef.current.getValues();
       const formData = buildPatientFormData(formValues);
 
+      // ⬇️ อัปเดตข้อมูลหลัก + 4 ไฟล์มาตรฐาน (ถ้ามี)
       await http(`/api/patients/${encodeURIComponent(openEdit!)}`, {
         method: 'PUT',
-        body: formData,     // ✅ ใช้ http() + FormData
+        body: formData,
       });
+
+      // ⬇️ อัปโหลดไฟล์ "เสริม" ที่ติ๊กเลือก/แนบมาเพิ่ม
+      await uploadAllPatientFiles(openEdit!, formValues);
 
       setOpenEdit(null);
       refresh();
@@ -478,7 +527,6 @@ export default function PatientsPage() {
       $swal.fire({ icon: 'error', title: 'อัปเดตข้อมูลไม่สำเร็จ', text: e.message || '' });
     }
   };
-
 
   const TYPE_OPTIONS = ['ตรวจติดตาม', 'ทำแผล', 'เยี่ยมบ้าน', 'กายภาพบำบัด', 'ติดตามอาการ'];
   const PLACE_OPTIONS = ['OPD ชีวาภิบาล', 'ห้องทำแผล 1', 'ห้องทำแผล 2', 'PT Room A', 'บ้านผู้ป่วย'];

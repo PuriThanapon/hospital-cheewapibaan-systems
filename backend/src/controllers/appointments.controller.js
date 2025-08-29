@@ -1,6 +1,9 @@
 // backend/src/controllers/appointment.controller.js
-// แก้ path ให้ตรงชื่อไฟล์ model ของคุณ (ไม่มี s)
-// ถ้าไฟล์คุณชื่อ appointments.model.js จริง ให้เปลี่ยนบรรทัดนี้กลับไปให้ตรง
+
+// ✅ แก้ path ให้ตรงชื่อไฟล์ model ของคุณ
+// ถ้าไฟล์คุณชื่อ "appointment.model.js" ให้ใช้บรรทัดล่าง:
+// const model = require('../models/appointment.model');
+// ถ้าไฟล์คุณชื่อ "appointments.model.js" (มี s) ให้ใช้บรรทัดนี้แทน:
 const model = require('../models/appointments.model');
 
 function normalizePatientsId(id = '') {
@@ -21,7 +24,7 @@ function toISODateLocal(val) {
   return `${y}-${m}-${day}`;
 }
 
-// ------- ถ้าคุณใช้ endpoint นี้: ต้องมีฟังก์ชัน model.nextAppointmentCode() (ดูด้านล่าง) -------
+// ------- ถ้าคุณใช้ endpoint นี้: ต้องมีฟังก์ชัน model.nextAppointmentCode() -------
 exports.nextId = async (req, res, next) => {
   try {
     const code = await model.nextAppointmentCode();
@@ -35,7 +38,8 @@ exports.list = async (req, res, next) => {
     const result = await model.listAppointments({
       q: (q.q || '').toString().trim(),
       status: (q.status || 'all').toString().trim(),
-      type: (q.type || q.appointment_type || '').toString().trim(),   // << รองรับ filter home|hospital
+      type: (q.type || q.appointment_type || '').toString().trim(),   // home|hospital
+      department: (q.department || '').toString().trim(),             // ✅ filter ตามแผนก
       from: q.from || '',
       to: q.to || '',
       sort: (q.sort || 'datetime').toString().trim(),
@@ -65,21 +69,29 @@ exports.create = async (req, res, next) => {
       start_time: b.start || b.start_time || null,
       end_time: b.end || b.end_time || null,
 
-      // รองรับ 'type' หรือ 'appointment_type', map clinic -> hospital ในชั้น model อีกรอบ
+      // รองรับ 'type' หรือ 'appointment_type' (model จะ normalize อีกชั้น)
       appointment_type: b.type || b.appointment_type || null,
 
-      // บ้านผู้ป่วย => ปล่อยให้เป็น null; โรงพยาบาล => กรอกชื่อ/ที่อยู่
+      // บ้านผู้ป่วย => null; โรงพยาบาล => ต้องกรอก
       hospital_address: b.hospital_address || b.hospital || null,
 
-      place: b.place || null,          // ใช้แสดงผลฝั่ง UI ได้เหมือนเดิม
+      place: b.place || null,
       status: b.status || 'pending',
       note: b.note || null,
+
+      // ✅ ใหม่: department (เฉพาะ hospital)
+      department: b.department ?? null,
     };
 
     if (!payload.patients_id) return res.status(400).json({ message: 'ต้องระบุ patients_id' });
     if (!payload.appointment_date) return res.status(400).json({ message: 'ต้องระบุวันที่นัด' });
     if (!payload.start_time || !payload.end_time) {
       return res.status(400).json({ message: 'ต้องระบุเวลาเริ่มและเวลาสิ้นสุด' });
+    }
+    // ให้ error ชัดเจนตั้งแต่ controller เมื่อเป็น hospital แต่ไม่ส่ง department
+    if ((payload.appointment_type === 'hospital' || (!payload.appointment_type && payload.hospital_address))
+        && !payload.department) {
+      return res.status(400).json({ message: 'กรุณาเลือกแผนก (department) สำหรับนัดโรงพยาบาล' });
     }
 
     const row = await model.createAppointment(payload);
@@ -109,6 +121,14 @@ exports.update = async (req, res, next) => {
     if (b.place !== undefined) update.place = b.place;
     if (b.status !== undefined) update.status = b.status;
     if (b.note !== undefined) update.note = b.note;
+
+    // ✅ ใหม่: รองรับแก้ไข department
+    if (b.department !== undefined) update.department = b.department || null;
+
+    // เสริม error ชัดเจน: ถ้าจะเปลี่ยนเป็น hospital ต้องมี department
+    if ((update.appointment_type === 'hospital' || update.hospital_address) && update.department === null) {
+      return res.status(400).json({ message: 'กรุณาเลือกแผนก (department) สำหรับนัดโรงพยาบาล' });
+    }
 
     const row = await model.updateAppointment(id, update);
     if (!row) return res.status(404).json({ message: 'ไม่พบนัดหมายหรือไม่มีการเปลี่ยนแปลง' });

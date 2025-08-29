@@ -323,7 +323,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   top: 0;
   z-index: 1;
 }
-.actionsCell { text-align: right; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;}
+.actionsCell { text-align: left; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start;}
 
 /* แถวว่างตอนไม่มีข้อมูล */
 .emptyCell {
@@ -372,7 +372,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 }
 .cardHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .cardRow    { display: flex; gap: 8px; align-items: baseline; margin: 4px 0; }
-.cardActions{ margin-top: 10px; display: flex; gap: 8px; justify-content: flex-start; flex-wrap: wrap; }
+.cardActions{ margin-top: 10px; display: flex; gap: 8px; justify-content: flex-start; flex-wrap: wrap;}
 .cardDetail { border-top: 1px dashed var(--line); margin-top: 6px; padding-top: 8px; display: grid; gap: 6px; }
 .cardDetailRow { display: flex; gap: 8px; align-items: flex-start; }
 .cardNote   { background: #f9fafb; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }

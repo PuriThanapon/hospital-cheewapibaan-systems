@@ -12,15 +12,15 @@ async function getAppointmentColumns() {
 }
 const pick = (cols, ...names) => names.find(n => cols.has(n)) || null;
 
-/* ---------- ประกอบ SQL expr โดย "ยึด start_time/end_time เป็นหลัก" ---------- */
+/* ---------- สร้าง expression ให้ทุกคอลัมน์ที่ต้องใช้ ---------- */
 function buildExprs(cols) {
   // id
   const idCol  = pick(cols, 'appointment_id', 'id');
   const idExpr = idCol ? `a.${idCol}::text` : `row_number() over ()::text`;
 
-  // date -> YYYY-MM-DD
+  // date -> YYYY-MM-DD (รองรับ timestamp/timestamptz/date)
   const dateCol = pick(cols, 'appointment_date', 'date', 'start_at', 'start');
-  if (!dateCol) throw new Error('appointment table missing date column (appointment_date/date/start_at)');
+  if (!dateCol) throw new Error('appointment table missing date column (appointment_date/date/start_at/start)');
   const dateExpr = `
     CASE
       WHEN pg_typeof(a.${dateCol}) = 'timestamptz'::regtype
@@ -31,34 +31,62 @@ function buildExprs(cols) {
     END
   `;
 
-  // time (ยึด start_time / end_time เป็นหลัก)
+  // time
   const hasStart = cols.has('start_time');
   const hasEnd   = cols.has('end_time');
   const timeExpr     = hasStart ? `to_char(a.start_time::time,'HH24:MI')` : `NULL::text`;
   const endTimeExpr  = hasEnd   ? `to_char(a.end_time::time,'HH24:MI')`   : `NULL::text`;
   const timeSortExpr = hasStart ? `(a.start_time::time)` : null;
 
-  // ฟิลด์อื่น ๆ จาก appointment (ใส่ a. ให้แน่ + แคสต์เป็น text)
-  const typeExpr   = cols.has('type')               ? `a.type::text`
-                   : cols.has('appointment_type')   ? `a.appointment_type::text`
-                   : cols.has('department')         ? `a.department::text`
-                   : null;
+  // สถานที่บ้าน (place) เท่านั้น — ไม่ fallback เป็น hospital
+  const placeCol = pick(cols, 'place', 'home_address', 'address', 'location');
+  const placeExpr = placeCol ? `a.${placeCol}::text` : null;
 
-  const placeExpr  = cols.has('place')              ? `a.place::text`
-                   : cols.has('hospital_address')   ? `a.hospital_address::text`
-                   : cols.has('location')           ? `a.location::text`
-                   : null;
+  // โรงพยาบาล/แผนก
+  const hospitalCol = pick(cols, 'hospital_address', 'hospital', 'hospital_name');
+  const hospitalExpr = hospitalCol ? `a.${hospitalCol}::text` : null;
 
-  const statusExpr = cols.has('status')             ? `a.status::text`
-                   : cols.has('appointment_status') ? `a.appointment_status::text`
-                   : null;
+  const deptCol = pick(cols, 'department', 'dept', 'department_name');
+  const departmentExpr = deptCol ? `a.${deptCol}::text` : null;
+
+  // status
+  const statusCol  = pick(cols, 'status', 'appointment_status');
+  const statusExpr = statusCol ? `a.${statusCol}::text` : null;
+
+  // type — ใช้ของจริงก่อน, ไม่งั้นเดาจากข้อมูลที่มี
+  let typeExpr = null;
+  if (cols.has('type')) typeExpr = `a.type::text`;
+  else if (cols.has('appointment_type')) typeExpr = `a.appointment_type::text`;
+  else {
+    const hasHospCond =
+      [hospitalExpr, departmentExpr]
+        .filter(Boolean)
+        .map(e => `NULLIF(TRIM(${e}), '') IS NOT NULL`)
+        .join(' OR ') || 'FALSE';
+
+    const homeCond = placeExpr
+      ? `COALESCE(${placeExpr}, '') ILIKE '%บ้าน%'`
+      : 'FALSE';
+
+    typeExpr = `
+      CASE
+        WHEN ${hasHospCond} THEN 'hospital'::text
+        WHEN ${homeCond}    THEN 'home'::text
+        ELSE NULL::text
+      END
+    `;
+  }
 
   const orderBy = [
     `${dateExpr} ASC`,
     timeSortExpr ? `${timeSortExpr} ASC NULLS LAST` : null
   ].filter(Boolean).join(', ');
 
-  return { idExpr, dateExpr, timeExpr, endTimeExpr, typeExpr, placeExpr, statusExpr, orderBy };
+  return {
+    idExpr, dateExpr, timeExpr, endTimeExpr,
+    placeExpr, hospitalExpr, departmentExpr,
+    statusExpr, typeExpr, orderBy
+  };
 }
 
 /* ---------- นัดหมาย "วันนี้" ---------- */
@@ -66,7 +94,11 @@ function buildExprs(cols) {
 exports.getTodayAppointments = async (req, res, next) => {
   try {
     const cols = await getAppointmentColumns();
-    const { idExpr, dateExpr, timeExpr, endTimeExpr, typeExpr, placeExpr, statusExpr, orderBy } = buildExprs(cols);
+    const {
+      idExpr, dateExpr, timeExpr, endTimeExpr,
+      placeExpr, hospitalExpr, departmentExpr,
+      statusExpr, typeExpr, orderBy
+    } = buildExprs(cols);
 
     const sql = `
       WITH tz AS (
@@ -78,9 +110,11 @@ exports.getTodayAppointments = async (req, res, next) => {
         ${dateExpr}    AS date,
         ${timeExpr}    AS start,
         ${endTimeExpr} AS "end",
-        ${placeExpr  ? placeExpr  : `NULL::text`}                           AS place,
+        ${placeExpr      ? placeExpr      : `NULL::text`}                           AS place,
+        ${hospitalExpr   ? hospitalExpr   : `NULL::text`}                           AS hospital_address,
+        ${departmentExpr ? departmentExpr : `NULL::text`}                           AS department,
         ${statusExpr ? `COALESCE(${statusExpr}, 'pending'::text)` : `'pending'::text`} AS status,
-        ${typeExpr   ? typeExpr   : `NULL::text`}                           AS type
+        ${typeExpr   ? typeExpr   : `NULL::text`}                                    AS appointment_type
       FROM appointment a
       LEFT JOIN patients p ON p.patients_id = a.patients_id
       WHERE ${dateExpr} = (SELECT to_char(today,'YYYY-MM-DD') FROM tz)
@@ -96,7 +130,11 @@ exports.getTodayAppointments = async (req, res, next) => {
 exports.getTimelineAppointments = async (req, res, next) => {
   try {
     const cols = await getAppointmentColumns();
-    const { idExpr, dateExpr, timeExpr, endTimeExpr, typeExpr, placeExpr, statusExpr, orderBy } = buildExprs(cols);
+    const {
+      idExpr, dateExpr, timeExpr, endTimeExpr,
+      placeExpr, hospitalExpr, departmentExpr,
+      statusExpr, typeExpr, orderBy
+    } = buildExprs(cols);
 
     const today = new Date();
     const pad = (n) => String(n).padStart(2,'0');
@@ -112,9 +150,11 @@ exports.getTimelineAppointments = async (req, res, next) => {
         ${dateExpr}    AS date,
         ${timeExpr}    AS start,
         ${endTimeExpr} AS "end",
-        ${placeExpr  ? placeExpr  : `NULL::text`}                           AS place,
+        ${placeExpr      ? placeExpr      : `NULL::text`}                           AS place,
+        ${hospitalExpr   ? hospitalExpr   : `NULL::text`}                           AS hospital_address,
+        ${departmentExpr ? departmentExpr : `NULL::text`}                           AS department,
         ${statusExpr ? `COALESCE(${statusExpr}, 'pending'::text)` : `'pending'::text`} AS status,
-        ${typeExpr   ? typeExpr   : `NULL::text`}                           AS type
+        ${typeExpr   ? typeExpr   : `NULL::text`}                                    AS appointment_type
       FROM appointment a
       LEFT JOIN patients p ON p.patients_id = a.patients_id
       WHERE ${dateExpr} BETWEEN $1 AND $2
@@ -125,6 +165,7 @@ exports.getTimelineAppointments = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/* ---------- Today badge (เดิม) ---------- */
 exports.getTodayBadge = async (req, res, next) => {
   try {
     const cols = await getAppointmentColumns();
@@ -154,7 +195,6 @@ exports.getTodayBadge = async (req, res, next) => {
         SELECT (current_timestamp AT TIME ZONE 'Asia/Bangkok')::date AS today
       ),
       day AS (
-        -- ✅ ให้ทั้งสองฝั่งของ COALESCE เป็นชนิด date
         SELECT COALESCE(NULLIF($1,'')::date, (SELECT today FROM tz)) AS ymd
       )
       SELECT
@@ -165,7 +205,6 @@ exports.getTodayBadge = async (req, res, next) => {
       FROM (
         SELECT COALESCE(${statusExpr}, '') AS s
         FROM appointment a
-        -- เปรียบเทียบโดยใช้รูปแบบ YYYY-MM-DD เหมือนกันทั้งสองฝั่ง
         WHERE ${dateExpr} = to_char((SELECT ymd FROM day), 'YYYY-MM-DD')
       ) x;
     `;

@@ -13,11 +13,12 @@ export type AppointmentFormValue = {
   date?: string;   // YYYY-MM-DD
   start?: string;  // HH:mm
   end?: string;    // HH:mm
-  type?: string;   // 'home' | 'hospital'
+  type?: string;   // label ไทย เช่น "โรงพยาบาล" | "บ้านผู้ป่วย"
   place?: string;
   hospital_address?: string;
   status?: Status;
   note?: string;
+  department?: string; // ✅ เพิ่มฟิลด์แผนก
 };
 
 type Props = {
@@ -26,6 +27,7 @@ type Props = {
   errors?: Partial<Record<keyof AppointmentFormValue, string>>;
   TYPE_OPTIONS: string[];
   PLACE_OPTIONS: string[];
+  DEPT_OPTIONS?: string[]; // ✅ ตัวเลือกแผนก (ถ้าไม่ส่งมา จะมีค่า default ด้านล่าง)
   className?: string;
 };
 
@@ -98,7 +100,18 @@ function todayISO(): string {
 
 /* ------------------------------ Component ------------------------------ */
 export default function AppointmentForm({
-  value, onChange, errors, TYPE_OPTIONS, PLACE_OPTIONS, className = '',
+  value,
+  onChange,
+  errors,
+  TYPE_OPTIONS,
+  PLACE_OPTIONS,
+  DEPT_OPTIONS = [
+    'OPD','IPD','ER','ICU','OR',
+    'Medicine','Surgery','Orthopedics','ENT','Ophthalmology',
+    'Dental','Rehab','Pediatrics','OB-GYN','Psychiatry',
+    'Public Health'
+  ],
+  className = '',
 }: Props) {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
@@ -106,6 +119,11 @@ export default function AppointmentForm({
   const [patientInfo, setPatientInfo] = useState<any | null>(null);
   const hnInputRef = useRef<HTMLInputElement | null>(null);
   const hospitalInputRef = useRef<HTMLInputElement | null>(null);
+
+  const TYPE_VALUE_FROM_LABEL = (label?: string) =>
+    label === 'โรงพยาบาล' ? 'hospital'
+    : label === 'บ้านผู้ป่วย' ? 'home'
+    : (label || '');
 
   /* ตั้งค่า default date เป็นวันนี้เสมอ เมื่อยังไม่มีค่า */
   useEffect(() => {
@@ -172,11 +190,6 @@ export default function AppointmentForm({
     }
   };
 
-  const TYPE_VALUE_FROM_LABEL = (label?: string) =>
-    label === 'โรงพยาบาล' ? 'hospital'
-    : label === 'บ้านผู้ป่วย' ? 'home'
-    : (label || '');
-
   function getPatientAddressRaw(p: any): string {
     const v =
       p?.address ??
@@ -202,6 +215,7 @@ export default function AppointmentForm({
     }
   }, []);
 
+  // ✅ เคลียร์/ตั้งค่าฟิลด์ตามประเภท
   useEffect(() => {
     const t = TYPE_VALUE_FROM_LABEL(value.type);
     if (t === 'home') {
@@ -211,14 +225,22 @@ export default function AppointmentForm({
         ...value,
         place: hasUserTyped ? value.place : (addrRaw || 'บ้านผู้ป่วย'),
         hospital_address: '',
+        department: '', // ✅ เปลี่ยนเป็นบ้าน ให้ล้าง department
       });
       if (value.hn) fetchLatestNeeds(value.hn);
     } else if (t === 'hospital') {
-      onChange({ ...value, place: '', hospital_address: value.hospital_address || '' });
+      onChange({
+        ...value,
+        place: '',
+        hospital_address: value.hospital_address || '',
+        department: value.department || '', // คงค่าเดิมไว้ถ้ามี
+      });
       setTimeout(() => hospitalInputRef.current?.focus(), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.type, patientInfo]);
+
+  const isHospital = TYPE_VALUE_FROM_LABEL(value.type) === 'hospital';
 
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}>
@@ -273,6 +295,7 @@ export default function AppointmentForm({
             if (tVal === 'home') {
               const hasUserTyped = value.place && value.place !== 'บ้านผู้ป่วย';
               next.place = hasUserTyped ? value.place : (addrRaw || 'บ้านผู้ป่วย');
+              next.department = ''; // บ้านผู้ป่วย ไม่มี department
             }
 
             onChange(next);
@@ -351,7 +374,6 @@ export default function AppointmentForm({
           <DatePickerField
             value={value.date || ''}
             onChange={(d: string) => onChange({ ...value, date: d })}
-            /* ถ้าคอมโพเนนต์รองรับ prop นี้ ให้เปิดใช้งานได้เลย */
             min={todayISO() as any}
           />
         </div>
@@ -393,20 +415,37 @@ export default function AppointmentForm({
         {errors?.type && <div className="mt-1 text-xs text-red-600">{errors.type}</div>}
       </label>
 
-      {/* สถานที่ / ที่อยู่โรงพยาบาล */}
-      {TYPE_VALUE_FROM_LABEL(value.type) === 'hospital' ? (
-        <label>
-          <div className="mb-1 text-sm text-gray-700">ชื่อ/ที่อยู่โรงพยาบาล</div>
-          <input
-            ref={hospitalInputRef}
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${errors?.hospital_address ? 'border-red-300 focus:ring-red-100' : 'border-gray-300 focus:ring-purple-200'}`}
-            placeholder="เช่น รพ.ตัวอย่าง ชั้น 3 แผนกอายุรกรรม"
-            value={value.hospital_address || ''}
-            onChange={(e) => onChange({ ...value, hospital_address: e.target.value })}
-          />
-          {errors?.hospital_address && <div className="mt-1 text-xs text-red-600">{errors.hospital_address}</div>}
-          <div className="mt-1 text-xs text-gray-500">* ไม่จำเป็นต้องเลือก “สถานที่” ด้านล่างเมื่อเป็นโรงพยาบาล</div>
-        </label>
+      {/* สถานที่ / ที่อยู่โรงพยาบาล + แผนก */}
+      {isHospital ? (
+        <>
+          <label>
+            <div className="mb-1 text-sm text-gray-700">ชื่อ/ที่อยู่โรงพยาบาล</div>
+            <input
+              ref={hospitalInputRef}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${errors?.hospital_address ? 'border-red-300 focus:ring-red-100' : 'border-gray-300 focus:ring-purple-200'}`}
+              placeholder="เช่น รพ.ตัวอย่าง ชั้น 3"
+              value={value.hospital_address || ''}
+              onChange={(e) => onChange({ ...value, hospital_address: e.target.value })}
+            />
+            {errors?.hospital_address && <div className="mt-1 text-xs text-red-600">{errors.hospital_address}</div>}
+            <div className="mt-1 text-xs text-gray-500">* ไม่ต้องกรอก “สถานที่” ด้านล่างเมื่อเป็นโรงพยาบาล</div>
+          </label>
+
+          {/* ✅ ฟิลด์แผนก (แสดงเฉพาะโรงพยาบาล) */}
+          <label>
+            <div className="mb-1 text-sm text-gray-700">แผนก</div>
+            <input
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${errors?.department ? 'border-red-300 focus:ring-red-100' : 'border-gray-300 focus:ring-purple-200'}`}
+              placeholder="เช่น อายุรกรรม / กุมารเวชฯ"
+              value={value.department || ''}
+              onChange={(e) => onChange({ ...value, department: e.target.value })}
+              list="dept-suggestions"
+            />
+            {errors?.department && (
+              <div className="mt-1 text-xs text-red-600">{errors.department}</div>
+            )}
+          </label>
+        </>
       ) : (
         <label className="sm:col-span-2">
           <div className="mb-1 text-sm text-gray-700">ที่อยู่บ้านผู้ป่วย</div>

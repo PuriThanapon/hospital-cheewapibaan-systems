@@ -30,6 +30,7 @@ router
 
 // sub-routers อื่น ๆ
 router.use('/patients', require('./patients.routes'));
+router.use('/patient-files', require('./patient_files.routes'));
 router.use('/treatment', require('./treatment.routes'));
 router.use('/appointments', require('./appointments.routes'));
 router.use('/deaths', require('./deaths.routes'));

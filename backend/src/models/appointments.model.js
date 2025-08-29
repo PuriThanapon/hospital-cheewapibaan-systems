@@ -9,9 +9,9 @@ const CODE_PAD = 6;
 
 const codeFromId = (id) => `${CODE_PREFIX}${String(id).padStart(CODE_PAD, '0')}`;
 exports.nextAppointmentCode = async () => {
-  const { rows } = await pool.query(`SELECT COALESCE(MAX(appointment_id),0)+1 AS next_id FROM appointment`);
+  const { rows } = await pool.query(`SELECT COALESCE(MAX(appointment_id),0)+1 AS next_id FROM ${ATBL}`);
   const nextId = rows?.[0]?.next_id || 1;
-  return `AP-${String(nextId).padStart(6, '0')}`;
+  return `${CODE_PREFIX}${String(nextId).padStart(CODE_PAD, '0')}`;
 };
 const idFromCode = (code) => {
   const n = parseInt(String(code).replace(/[^\d]/g, ''), 10);
@@ -34,7 +34,6 @@ function buildOrder(sort = 'status', dir = 'asc') {
           ELSE 4
         END ${d},
         a.appointment_date ASC, a.start_time ASC, a.appointment_id ASC`;
-
     case 'created':
       return `ORDER BY a.created_at ${d}, a.appointment_id ${d}`;
     case 'patient':
@@ -44,8 +43,9 @@ function buildOrder(sort = 'status', dir = 'asc') {
     case 'type':
       return `ORDER BY a.appointment_type ${d}, a.appointment_id ${d}`;
     case 'place':
-      // ใช้ hospital_address เป็นหลัก ถ้าเป็น home ให้ fallback เป็น a.place (หรือค่าว่าง)
       return `ORDER BY COALESCE(a.hospital_address, a.place, '') ${d}, a.appointment_id ${d}`;
+    case 'department':
+      return `ORDER BY COALESCE(a.department,'') ${d}, a.appointment_id ${d}`; // << add
     case 'datetime':
     default:
       return `ORDER BY a.appointment_date ${d}, a.start_time ${d}, a.appointment_id ${d}`;
@@ -69,20 +69,32 @@ async function hasOverlap({ patients_id, date, start, end, excludeId = null }) {
   return rows.length > 0;
 }
 
-/** map/validate home|hospital กับ hospital_address (กันเพี้ยนตั้งแต่ชั้น model) */
+/** map/validate home|hospital + hospital_address + department */
 function normalizeTypeAndAddress(input) {
   const out = { ...input };
 
-  // รับ backward compat: 'clinic' => 'hospital'
+  // backward compat
   if (out.appointment_type === 'clinic') out.appointment_type = 'hospital';
 
-  // เดา type จาก hospital_address ถ้าไม่ส่งมา
+  // infer type
   if (!out.appointment_type) {
     out.appointment_type = out.hospital_address ? 'hospital' : 'home';
   }
 
+  // time sanity
+  if (out.start_time && out.end_time && out.start_time > out.end_time) {
+    const e = new Error('เวลาเริ่มต้องไม่เกินเวลาสิ้นสุด');
+    e.status = 400;
+    throw e;
+  }
+
+  // legacy appointment_time
+  if (!out.appointment_time && out.start_time) out.appointment_time = out.start_time;
+
+  // normalize + rule for department
   if (out.appointment_type === 'home') {
     out.hospital_address = null;
+    out.department = null; // home ไม่มี department
   } else if (out.appointment_type === 'hospital') {
     if (!out.hospital_address || !String(out.hospital_address).trim()) {
       const e = new Error('กรอกชื่อ/ที่อยู่โรงพยาบาล');
@@ -90,20 +102,14 @@ function normalizeTypeAndAddress(input) {
       throw e;
     }
     out.hospital_address = String(out.hospital_address).trim();
+    if (!out.department || !String(out.department).trim()) {
+      const e = new Error('กรุณาเลือกแผนก (department) สำหรับนัดโรงพยาบาล');
+      e.status = 400;
+      throw e;
+    }
+    out.department = String(out.department).trim();
   } else {
     const e = new Error('appointment_type ต้องเป็น home หรือ hospital');
-    e.status = 400;
-    throw e;
-  }
-
-  // legacy: ถ้าไม่มี appointment_time ให้ใส่เท่ากับ start_time
-  if (!out.appointment_time && out.start_time) {
-    out.appointment_time = out.start_time;
-  }
-
-  // ตรวจช่วงเวลา (ถ้าส่งมา)
-  if (out.start_time && out.end_time && out.start_time > out.end_time) {
-    const e = new Error('เวลาเริ่มต้องไม่เกินเวลาสิ้นสุด');
     e.status = 400;
     throw e;
   }
@@ -114,11 +120,12 @@ function normalizeTypeAndAddress(input) {
 /** ──────────────────────────────────────────────────────────────────
  * List + filter + pagination
  * query:
- *  - q (ค้นหาใน ชื่อ/สกุล/HN/ประเภท/สถานที่/ที่อยู่โรงพยาบาล/รหัส AP-xxxxxx)
+ *  - q (ค้นหาใน ชื่อ/สกุล/HN/ประเภท/สถานที่/ที่อยู่/แผนก/รหัส AP-xxxxxx)
  *  - status: 'pending'|'done'|'cancelled'|'all'
  *  - from, to (YYYY-MM-DD)
- *  - type: 'home'|'hospital' (optional)
- *  - sort: 'datetime'|'created'|'patient'|'hn'|'status'|'type'|'place'
+ *  - type: 'home'|'hospital'
+ *  - department: text (optional)
+ *  - sort: 'datetime'|'created'|'patient'|'hn'|'status'|'type'|'place'|'department'
  *  - dir: 'asc'|'desc'
  *  - page, limit
  * ────────────────────────────────────────────────────────────────── */
@@ -128,6 +135,7 @@ async function listAppointments({
   from = '',
   to = '',
   type = '',
+  department = '',   // << add
   sort = 'status',
   dir = 'asc',
   page = 1,
@@ -144,12 +152,14 @@ async function listAppointments({
       OR COALESCE(a.appointment_type,'') ILIKE $${i}
       OR COALESCE(a.place,'') ILIKE $${i}
       OR COALESCE(a.hospital_address,'') ILIKE $${i}
+      OR COALESCE(a.department,'') ILIKE $${i}
       OR (COALESCE(p.pname,'') || COALESCE(p.first_name,'') || ' ' || COALESCE(p.last_name,'')) ILIKE $${i}
     )`);
     params.push(`%${q}%`); i++;
   }
   if (status && status !== 'all') { where.push(`a.status = $${i++}`); params.push(status); }
   if (type) { where.push(`a.appointment_type = $${i++}`); params.push(type); }
+  if (department) { where.push(`a.department = $${i++}`); params.push(department); } // << add
   if (from) { where.push(`a.appointment_date >= $${i++}`); params.push(from); }
   if (to)   { where.push(`a.appointment_date <= $${i++}`); params.push(to); }
 
@@ -157,7 +167,6 @@ async function listAppointments({
   const orderSql = buildOrder(sort, dir);
   const off = (Number(page) - 1) * Number(limit);
 
-  // นับรวม
   const countSql = `
     SELECT COUNT(*)::int AS cnt
     FROM ${ATBL} a
@@ -167,7 +176,6 @@ async function listAppointments({
   const { rows: totalRows } = await pool.query(countSql, params);
   const totalCount = totalRows?.[0]?.cnt || 0;
 
-  // data
   const dataSql = `
     SELECT
       a.appointment_id,
@@ -179,7 +187,7 @@ async function listAppointments({
       a.appointment_type,
       a.place,
       a.hospital_address,
-      -- ชื่อคอลัมน์เพื่อแสดงผลใน UI: ถ้า hospital ให้ใช้ hospital_address, ถ้า home แสดง 'บ้านผู้ป่วย' หรือ a.place
+      a.department, -- << add
       CASE WHEN a.appointment_type = 'hospital'
            THEN COALESCE(a.hospital_address, a.place, '')
            ELSE COALESCE(a.place, 'บ้านผู้ป่วย')
@@ -233,7 +241,6 @@ async function createAppointment(payload) {
 
     const data = normalizeTypeAndAddress(payload);
 
-    // กันซ้อนเวลา (optional)
     if (data.patients_id && data.appointment_date && data.start_time && data.end_time) {
       const overlapped = await hasOverlap({
         patients_id: data.patients_id,
@@ -252,27 +259,28 @@ async function createAppointment(payload) {
       INSERT INTO ${ATBL}
         (patients_id, appointment_date, start_time, end_time,
          appointment_time, appointment_type, place, hospital_address,
-         status, note)
+         status, note, department)                                   -- << add
       VALUES ($1,$2,$3,$4,
               $5,$6,$7,$8,
-              COALESCE($9,'pending'),$10)
+              COALESCE($9,'pending'),$10,$11)                         -- << add
       RETURNING
         appointment_id,
         ('${CODE_PREFIX}' || lpad(appointment_id::text, ${CODE_PAD}, '0')) AS appointment_code,
         patients_id, appointment_date, start_time, end_time,
-        appointment_type, place, hospital_address, status, note, created_at, updated_at
+        appointment_type, place, hospital_address, department, status, note, created_at, updated_at
     `;
     const { rows } = await client.query(sql, [
       data.patients_id || null,
       data.appointment_date || null,
       data.start_time || null,
       data.end_time || null,
-      data.appointment_time || data.start_time || null, // legacy support
+      data.appointment_time || data.start_time || null,
       data.appointment_type || null,
       data.place || null,
       data.hospital_address || null,
       data.status || null,
       data.note || null,
+      data.department || null, // << add
     ]);
 
     await client.query('COMMIT');
@@ -297,27 +305,25 @@ async function updateAppointment(idOrCode, update) {
     idParam = parsed;
   }
 
-  // นำ business rule มาจัดก่อน ให้ a) type/home/hospital ถูกต้อง b) กันเวลาซ้อน
   const current = await getAppointmentById(idParam);
   if (!current) return null;
 
-  // รวมค่าเดิมกับค่าที่อัปเดต (เพื่อ normalize และตรวจเวลา)
   const merged = {
-    patients_id: update.patients_id ?? current.patients_id,
-    appointment_date: update.appointment_date ?? current.appointment_date,
-    start_time: update.start_time ?? current.start_time,
-    end_time: update.end_time ?? current.end_time,
-    appointment_time: update.appointment_time ?? current.appointment_time,
-    appointment_type: update.appointment_type ?? current.appointment_type,
-    place: update.place ?? current.place,
-    hospital_address: update.hospital_address ?? current.hospital_address,
-    status: update.status ?? current.status,
-    note: update.note ?? current.note,
+    patients_id:       update.patients_id       ?? current.patients_id,
+    appointment_date:  update.appointment_date  ?? current.appointment_date,
+    start_time:        update.start_time        ?? current.start_time,
+    end_time:          update.end_time          ?? current.end_time,
+    appointment_time:  update.appointment_time  ?? current.appointment_time,
+    appointment_type:  update.appointment_type  ?? current.appointment_type,
+    place:             update.place             ?? current.place,
+    hospital_address:  update.hospital_address  ?? current.hospital_address,
+    status:            update.status            ?? current.status,
+    note:              update.note              ?? current.note,
+    department:        update.department        ?? current.department, // << add
   };
 
   const normalized = normalizeTypeAndAddress(merged);
 
-  // กันซ้อนเวลา (ถ้ามีส่งหรือค่าปัจจุบันครบ)
   if (normalized.patients_id && normalized.appointment_date && normalized.start_time && normalized.end_time) {
     const overlapped = await hasOverlap({
       patients_id: normalized.patients_id,
@@ -333,11 +339,10 @@ async function updateAppointment(idOrCode, update) {
     }
   }
 
-  // สร้าง SET เฉพาะฟิลด์ที่เปลี่ยนจริง ๆ จาก normalized เมื่อเทียบกับ current
   const patch = {};
   [
     'patients_id','appointment_date','start_time','end_time','appointment_time',
-    'appointment_type','place','hospital_address','status','note'
+    'appointment_type','place','hospital_address','status','note','department' // << add
   ].forEach((k) => {
     if (normalized[k] !== current[k]) patch[k] = normalized[k];
   });
@@ -351,11 +356,9 @@ async function updateAppointment(idOrCode, update) {
     params.push(patch[k]);
   });
 
-  // อัปเดต timestamp เสมอ
   fields.push(`updated_at = NOW()`);
 
   if (fields.length === 1) {
-    // ไม่มีอะไรเปลี่ยน (มีแค่ updated_at) ก็คืนค่าปัจจุบัน
     return current;
   }
 
