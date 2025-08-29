@@ -35,6 +35,7 @@ const menuPortalTarget = typeof window !== 'undefined' ? document.body : undefin
 const rsx = {
   control: (base, state) => ({
     ...base,
+    width: 200,
     minHeight: 32,
     borderRadius: 10,
     borderColor: state.isFocused ? '#60a5fa' : '#e5e7eb',
@@ -848,6 +849,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>รักษาที่</div>
           <Select
+          {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -861,6 +863,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>สถานะผู้ป่วย</div>
           <Select
+          {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -874,6 +877,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>เพศ</div>
           <Select
+          {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -887,6 +891,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>กรุ๊ปเลือด</div>
           <Select
+          {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -900,6 +905,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>Rh</div>
           <Select
+          {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -913,6 +919,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>ประเภทผู้ป่วย</div>
           <Select
+          {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -922,26 +929,6 @@ export default function PatientsPage() {
             value={patientTypeOptions.find(o => o.value === (filters as any).patients_type) ?? null}
             onChange={(opt) => { setFilters((f: any) => ({ ...f, patients_type: (opt as any)?.value || '' })); setPage(1); }}
           />
-        </div>
-
-        <div className={styles.dateRangeRow}>
-          <div className={styles.formGroup}>
-            <div className={styles.label}>รับเข้าตั้งแต่</div>
-            <DatePickerField
-              value={(filters as any).admit_from || ''}
-              onChange={(val) => { setFilters((f: any) => ({ ...f, admit_from: toISODateLocal(val) })); setPage(1); }}
-            />
-          </div>
-
-          <div className={styles.hyphen}>–</div>
-
-          <div className={styles.formGroup}>
-            <div className={styles.label}>รับเข้าถึง</div>
-            <DatePickerField
-              value={(filters as any).admit_to || ''}
-              onChange={(val) => { setFilters((f: any) => ({ ...f, admit_to: toISODateLocal(val) })); setPage(1); }}
-            />
-          </div>
         </div>
 
         {/* ปุ่มล้างตัวกรอง */}

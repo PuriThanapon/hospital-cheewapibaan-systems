@@ -221,19 +221,46 @@
 /* ─────────────────────────────────────────────────────────
   FILTERS & FORM CONTROLS
 ────────────────────────────────────────────────────────── */
-.filters {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
+/* ── FILTERS & FORM CONTROLS (อัปเดตให้รองรับปุ่มล้างตัวกรองในแถวเดียว) ── */
+.filters,
+.filtersBar{
+  display: grid;
+  grid-template-columns: repeat(6, 200px) 1fr; /* 6 ตัวกรองคงที่ + ช่องว่างยืด */
+  gap: 12px 16px;
+  align-items: end;
   background: var(--card);
   border: 1px solid var(--line);
-  padding: 12px;
   border-radius: 12px;
-  align-self: start;
+  padding: 12px;
 }
-.filters > * { flex: 0 0 auto; }          /* ลูก ๆ อย่ายืดเต็มแถว */
+.filters > *,
+.filtersBar>*{flex:0 0 auto}
+
+/* ขนาดช่องค้นหาให้คงที่ */
+.search{ width: 260px; flex: 0 0 260px; }
+
+/* ที่ห่อปุ่ม “ล้างตัวกรองทั้งหมด” ให้อยู่ขวาสุดของแถว */
+.clearWrap{margin-left:auto;display:flex;align-items:center}}
+
+/* ปุ่มล้างตัวกรอง ให้สูงเท่าช่องกรอง (36px) และหน้าตาเข้าชุด */
+.btnClearfilter{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+.btnClearfilter:hover{ background:#f8fafc; box-shadow: var(--shadow); }
+
+/* จอแคบ: ถ้าพื้นที่ไม่พอให้ปุ่มลงบรรทัดถัดไป (ยังอยู่ในบล็อกเดียวกัน) */
+@media (max-width: 640px){
+  .filters > *,
+  .filtersBar > *{ flex: 1 1 100%; }   /* ให้แต่ละช่องเต็มแถว */
+  .search{ width: 100%; flex-basis: 100%; }
+  .clearWrap{
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 .search { width: 260px; flex: 0 0 260px; } /* ช่องค้นหาคงที่ */
+
+
 
 .input,
 .select {
