@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import styles from './diagnosis.module.css'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
 import Swal from 'sweetalert2'
 import 'sweetalert2/dist/sweetalert2.min.css'
@@ -373,7 +375,13 @@ export default function PatientDiagnosisPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>การวินิจฉัยของผู้ป่วย (ICD-10-TM)</h1>
+        <h1 className={styles.title}>
+          <Link 
+              href={`/patient`} 
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </Link>🩺 การวินิจฉัยของผู้ป่วย (ICD-10-TM)</h1>
         <div className={styles.toolbar}>
           <label className={styles.inline}>
             <span>รหัสผู้ป่วย (HN)</span>

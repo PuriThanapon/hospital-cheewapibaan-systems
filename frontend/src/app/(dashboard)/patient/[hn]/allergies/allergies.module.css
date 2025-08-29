@@ -73,7 +73,7 @@
   align-items: center;
   gap: 12px;
 }
-.title::before { content: "⚕️"; font-size: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.1)); }
+.title::before {font-size: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.1)); }
 .subtitle { color: var(--text-secondary); margin-top: 8px; font-size: 15px; font-weight: 500; }
 .subtitle b { color: var(--medical-primary); font-weight: 600; }
 

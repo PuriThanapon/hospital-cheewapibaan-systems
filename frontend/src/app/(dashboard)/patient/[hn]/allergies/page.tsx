@@ -5,6 +5,8 @@ import { useParams, useSearchParams } from 'next/navigation';
 import styles from './allergies.module.css';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 /* ---------- Types ---------- */
 type Severity = 'mild' | 'moderate' | 'severe';
@@ -661,7 +663,13 @@ export default function AllergyPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <div className={styles.title}>💊 หน้าเก็บการแพ้ยา</div>
+          <div className={styles.title}>
+            <Link 
+              href={`/patient`} 
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </Link> 💊 หน้าเก็บการแพ้ยา</div>
           <div className={styles.subtitle}>
             HN: <b>{patients_id}</b> • ผู้ป่วย: <b>{patient_name}</b>
           </div>

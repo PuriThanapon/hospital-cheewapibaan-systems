@@ -22,6 +22,8 @@ import DeceasedForm from '@/app/components/forms/DeceasedForm';
 import DatePickerField from '@/app/components/DatePicker';
 import type { AppointmentFormValue } from '@/app/components/forms/AppointmentForm';
 import Link from 'next/link';
+import { collectSelectedDocs } from '@/app/lib/patientFiles';
+import { uploadPatientFiles } from '@/app/lib/uploadPatientFiles';
 
 type Status = 'pending' | 'done' | 'cancelled';
 // react-select (SSR safe)
@@ -326,41 +328,48 @@ async function downloadPatientAttachment(
   }
 }
 
+const EXTRA_DOC_LABELS: Record<string,string> = {
+  assistance_letter:     'หนังสือขอความช่วยเหลือ',
+  power_of_attorney:     'หนังสือมอบอำนาจ/รับรองบุคคลไร้ญาติ',
+  homeless_certificate:  'หนังสือรับรองบุคคลไร้ที่พึ่ง',
+  adl_assessment:        'แบบประเมิน ADL',
+  clinical_summary:      'ประวัติการรักษา (Clinical Summary)',
+  destitute_certificate: 'หนังสือรับรองผู้ยากไร้', // <- คีย์นี้ “ไม่มีใน ALLOWED_TYPES”
+};
+
 async function uploadAllPatientFiles(patients_id: string, formValue: any) {
   if (!patients_id) return;
+  const url = joinUrl(API_BASE, `/api/patient-files/${encodeURIComponent(patients_id)}`);
 
-  const EXTRA_DOC_KEYS = [
-    'assistance_letter',
-    'power_of_attorney',
-    'adl_assessment',
-    'clinical_summary',
-    'destitute_certificate',
-    'homeless_certificate',
-  ];
-
-  for (const key of EXTRA_DOC_KEYS) {
+  // ส่งเอกสาร “ใหม่” เป็น other + label
+  for (const key of Object.keys(EXTRA_DOC_LABELS)) {
     const f: File | undefined = formValue?.[key];
     if (!f) continue;
     const fd = new FormData();
-    fd.append('doc_type', key);
+    fd.append('doc_type', 'other');                 // 👈 กัน ENUM
+    fd.append('label', EXTRA_DOC_LABELS[key]);      // 👈 ให้รู้ว่าไฟล์ประเภทอะไร
+    if (formValue?.appointment_id != null) fd.append('appointment_id', String(formValue.appointment_id));
     fd.append('file', f, f.name);
-    await fetch(`/api/patient-files/${encodeURIComponent(patients_id)}`, {
-      method: 'POST',
-      body: fd,
-    });
+
+    const r = await fetch(url, { method: 'POST', body: fd });
+    if (!r.ok) {
+      let msg = 'อัปโหลดไฟล์ไม่สำเร็จ';
+      try { const j = await r.json(); msg = j.message || msg; } catch {}
+      throw new Error(`${msg} (${key})`);
+    }
   }
 
+  // เอกสารอื่นๆ ที่ผู้ใช้พิมพ์เอง
   const others = Array.isArray(formValue?.other_docs) ? formValue.other_docs : [];
   for (const row of others) {
     if (!row?.file) continue;
     const fd = new FormData();
     fd.append('doc_type', 'other');
     if (row.label) fd.append('label', row.label);
+    if (formValue?.appointment_id != null) fd.append('appointment_id', String(formValue.appointment_id));
     fd.append('file', row.file, row.file.name);
-    await fetch(`/api/patient-files/${encodeURIComponent(patients_id)}`, {
-      method: 'POST',
-      body: fd,
-    });
+    const r = await fetch(url, { method: 'POST', body: fd });
+    if (!r.ok) throw new Error('อัปโหลดเอกสารอื่นๆ ไม่สำเร็จ');
   }
 }
 
@@ -397,6 +406,19 @@ export default function PatientsPage() {
   // 🔗 refs สำหรับเรียก validate() จาก PatientForm
   const addFormRef = useRef(null);
   const editFormRef = useRef(null);
+
+  type PatientFile = {
+    id: number;
+    patients_id: string;
+    doc_type: string;
+    label?: string | null;
+    filename?: string | null;
+    mime_type?: string | null;
+    uploaded_at?: string | null;
+    appointment_id?: number | null;
+  };
+
+  const [patientFiles, setPatientFiles] = useState<PatientFile[]>([]);
 
   // build query string
   const qs = useMemo(() => {
@@ -674,15 +696,21 @@ export default function PatientsPage() {
     }
   };
 
-  const handleVerify = async (patients_id) => {
+  const handleVerify = async (patients_id: string) => {
     try {
-      const d = await http(`/api/patients/${encodeURIComponent(patients_id)}`);
+      const [d, fl] = await Promise.all([
+        http(`/api/patients/${encodeURIComponent(patients_id)}`),
+        http(`/api/patient-files/${encodeURIComponent(patients_id)}`),
+      ]);
       setVerifyData(d as any);
+      setPatientFiles((fl as any)?.data || []);
       setOpenVerify(true);
     } catch (e) {
       $swal.fire({ icon: 'error', title: 'ดึงข้อมูลไม่สำเร็จ', text: (e as any).message || '' });
     }
   };
+
+
 
   // ✅ ฟังก์ชันลบผู้ป่วย (purge อัตโนมัติฝั่งแบ็กเอนด์)
   const handleDelete = async (patients_id: string) => {
@@ -956,7 +984,7 @@ export default function PatientsPage() {
                       href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
                       className={`${styles.btn} ${styles.btnSm}`}
                     >
-                      <FileText size={14} /> วินิจฉัย
+                      <FileText size={14} /> โรคประจำตัว
                     </Link>
                     {r.status !== 'เสียชีวิต' && (
                       <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenDeceased(r.patients_id)}>
@@ -1216,7 +1244,12 @@ export default function PatientsPage() {
       {/* Verify */}
       <Modal
         open={openVerify}
-        title={<div className="flex items-center gap-2"><Eye size={20} className="text-green-600" /> ผลการตรวจสอบผู้ป่วย</div>}
+        title={
+          <div className="flex items-center gap-2">
+            <Eye size={20} className="text-sky-700" />
+            ผลการตรวจสอบผู้ป่วย
+          </div>
+        }
         size="xl"
         bodyClassName="max-h-[80vh] overflow-y-auto"
         onClose={() => { setOpenVerify(false); setVerifyData(null); }}
@@ -1224,7 +1257,7 @@ export default function PatientsPage() {
         footer={
           <div className="w-full flex justify-center">
             <button
-              className="px-8 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-lg flex items-center gap-2"
+              className="px-8 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors duration-200 shadow-sm flex items-center gap-2"
               onClick={() => { setOpenVerify(false); setVerifyData(null); }}
             >
               <X size={16} /> ปิด
@@ -1235,265 +1268,287 @@ export default function PatientsPage() {
         {!verifyData ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <AlertCircle size={48} className="text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">ไม่มีข้อมูล</p>
+              <AlertCircle size={48} className="text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">ไม่มีข้อมูล</p>
             </div>
           </div>
         ) : (
+          /* ===== NEW LAYOUT ===== */
           <div className="space-y-6">
-            {/* Patient Overview Card */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl shadow-lg p-6 border border-blue-200">
-              <div className="flex items-center space-x-6 mb-4">
-                <div className="w-40 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                  {(verifyData as any).patients_id}
-                </div>
+            {/* Top header strip (compact & readable) */}
+            <div className="rounded-2xl border border-slate-200 bg-white">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4 p-6">
                 <div className="flex-1">
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
-                    {(verifyData as any).pname || ''}{(verifyData as any).first_name} {(verifyData as any).last_name}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-mono text-sm">
+                      HN {(verifyData as any).patients_id}
+                    </span>
+                    <div className="text-xl lg:text-2xl font-bold text-slate-900">
+                      {(verifyData as any).pname || ''}{(verifyData as any).first_name} {(verifyData as any).last_name}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span className="flex items-center gap-1">
+                  <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
+                    <span className="inline-flex items-center gap-1">
                       <User size={14} /> อายุ {calculateAge((verifyData as any).birthdate)} ปี
                     </span>
-                    <span className="flex items-center gap-1">
-                      ประเภทผู้ป่วย: {(verifyData as any).patients_type}
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar size={14} /> รับเข้า {formatThaiDateBE((verifyData as any).admittion_date)}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <MapPinPlusInside size={14} /> {(verifyData as any).treat_at || '-'}
                     </span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="mb-2"><Pill alive={(verifyData as any).status !== 'เสียชีวิต'} /></div>
-                  <div className="text-xs text-gray-500">รับเข้า: {formatThaiDateBE((verifyData as any).admittion_date)}</div>
+
+                <div className="flex items-center gap-3">
+                  <Pill alive={(verifyData as any).status !== 'เสียชีวิต'} />
                 </div>
               </div>
             </div>
 
-            {/* Personal Information */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
-              <div className="flex items-center gap-2 mb-6 pb-3 border-b-2 border-green-100">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <User size={16} className="text-green-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-800">ข้อมูลส่วนตัว</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <User size={14} className="text-gray-600" />
-                    <span className="font-semibold text-gray-700">ชื่อ-นามสกุล</span>
-                  </div>
-                  <div className="text-gray-900 text-lg">{(verifyData as any).pname} {(verifyData as any).first_name} {(verifyData as any).last_name}</div>
-                </div>
-                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <IdCard size={14} className="text-gray-600" />
-                    <span className="font-semibold text-gray-700">เลขบัตรประชาชน</span>
-                  </div>
-                  <div className="text-gray-900 text-lg">{(verifyData as any).card_id || '-'}</div>
-                </div>
-                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-semibold text-gray-700">อายุ</span>
-                  </div>
-                  <div className="text-gray-900 text-lg">{calculateAgeFromBirthdate((verifyData as any).birthdate || '-')}</div>
-                </div>
-                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-semibold text-gray-700">เพศ</span>
-                  </div>
-                  <div className="text-gray-900 text-lg">{(verifyData as any).gender || '-'}</div>
-                </div>
-                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-semibold text-gray-700">เชื้อชาติ</span>
-                  </div>
-                  <div className="text-gray-900 text-lg">{(verifyData as any).nationality || '-'}</div>
-                </div>
-                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-semibold text-gray-700">ศาสนา</span>
-                  </div>
-                  <div className="text-gray-900 text-lg">{(verifyData as any).religion || '-'}</div>
-                </div>
-                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Phone size={14} className="text-gray-600" />
-                    <span className="font-semibold text-gray-700">เบอร์โทรศัพท์</span>
-                  </div>
-                  <div className="text-gray-900 text-lg font-mono">{(verifyData as any).phone || (verifyData as any).phone_number || '-'}</div>
-                </div>
-                <div className="md:col-span-2 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MapPin size={14} className="text-gray-600" />
-                    <span className="font-semibold text-gray-700">ที่อยู่</span>
-                  </div>
-                  <div className="text-gray-900 leading-relaxed">{(verifyData as any).address || '-'}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Medical Information */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
-              <div className="flex items-center gap-2 mb-6 pb-3 border-b-2 border-red-100">
-                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                  <Droplets size={16} className="text-red-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-800">ข้อมูลทางการแพทย์</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-xl border border-red-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Droplets size={14} className="text-red-600" />
-                    <span className="font-semibold text-gray-700">กรุ๊ปเลือด</span>
-                  </div>
-                  <div className="text-gray-900 text-lg font-bold">
-                    {(verifyData as any).blood_group || '-'} {(verifyData as any).bloodgroup_rh || ''}
-                  </div>
-                </div>
-                <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Heart size={14} className="text-blue-600" />
-                    <span className="font-semibold text-gray-700">ประเภทผู้ป่วย</span>
-                  </div>
-                  <div className="text-gray-900 text-lg">{(verifyData as any).patients_type || '-'}</div>
-                </div>
-                <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MapPinPlusInside size={14} className="text-blue-600" />
-                    <span className="font-semibold text-gray-700">รักษาที่</span>
-                  </div>
-                  <div className="text-gray-900 text-lg">{(verifyData as any).treat_at || '-'}</div>
-                </div>
-                <div className="md:col-span-2 p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl border border-yellow-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText size={14} className="text-yellow-600" />
-                    <span className="font-semibold text-gray-700">โรคประจำตัว / ประวัติการแพทย์</span>
-                  </div>
-                  <div className="text-gray-900 leading-relaxed">{(verifyData as any).disease || 'ไม่มีข้อมูล'}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Admission */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
-              <div className="flex items-center gap-2 mb-6 pb-3 border-b-2 border-purple-100">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Calendar size={16} className="text-purple-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-800">ข้อมูลการรับเข้า</h3>
-              </div>
-              <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl border border-purple-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar size={14} className="text-purple-600" />
-                  <span className="font-semibold text-gray-700">วันที่รับเข้า</span>
-                </div>
-                <div className="text-gray-900 text-lg font-medium">{formatThaiDateBE((verifyData as any).admittion_date || '-')}</div>
-              </div>
-            </div>
-
-            {/* Attachments */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
-              <div className="flex items-center gap-2 mb-6 pb-3 border-b-2 border-blue-100">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <FileText size={16} className="text-blue-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-800">เอกสารแนบ</h3>
-              </div>
-
-              {(() => {
-                const fields = [
-                  { key: 'patient_id_card', label: 'สำเนาบัตรประชาชนผู้ป่วย' },
-                  { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ' },
-                  { key: 'patient_photo', label: 'รูปถ่ายผู้ป่วย' },
-                  { key: 'relative_id_card', label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์' },
-                ] as const;
-
-                const hasAny = fields.some(f => Boolean((verifyData as any)[`has_${f.key}`]));
-                const fileUrl = (field: string) =>
-                  joinUrl(API_BASE, `/api/patients/${encodeURIComponent((verifyData as any).patients_id)}/file/${field}`);
-
-                if (!hasAny) {
-                  return <div className="text-gray-500">ไม่มีเอกสารแนบ</div>;
-                }
-
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {fields.map(f => {
-                      const hasFile = (verifyData as any)[`has_${f.key}`];
-                      if (!hasFile) return null;
-
-                      const Actions = (
-                        <div className="mt-3 flex gap-2">
-                          <a
-                            href={fileUrl(f.key)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
-                            title="เปิดดู"
-                          >
-                            เปิดดู
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => downloadPatientAttachment(verifyData as any, f.key as any)}
-                            className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50"
-                          >
-                            ดาวน์โหลด
-                          </button>
+            {/* Main 2-column content: Left summary (sticky) + Right detail */}
+            <div className="grid lg:grid-cols-12 gap-6">
+              {/* LEFT: Patient Summary (sticky inside modal scroll) */}
+              <aside className="lg:col-span-4">
+                <div className="sticky top-2 space-y-4">
+                  {/* ID & Quick Facts */}
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs text-slate-500">เพศ</div>
+                        <div className="font-medium text-slate-900">{(verifyData as any).gender || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500">อายุ (ปี)</div>
+                        <div className="font-medium text-slate-900">{calculateAge((verifyData as any).birthdate)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500">กรุ๊ปเลือด</div>
+                        <div className="font-medium text-slate-900">
+                          {(verifyData as any).blood_group || '-'} {(verifyData as any).bloodgroup_rh || ''}
                         </div>
-                      );
-
-                      return (
-                        <div key={f.key} className="p-4 border border-gray-200 rounded-xl bg-gradient-to-br from-gray-50 to-white">
-                          <div className="font-semibold text-gray-800 mb-2">{f.label}</div>
-
-                          {f.key === 'patient_photo' ? (
-                            <img
-                              src={fileUrl(f.key)}
-                              alt={f.label}
-                              className="w-full h-40 object-cover rounded-lg border"
-                            />
-                          ) : (
-                            <div className="text-sm text-gray-500">
-                              มีไฟล์แนบพร้อมใช้งาน
-                            </div>
-                          )}
-
-                          {Actions}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Death info (if any) */}
-            {(verifyData as any).status === 'เสียชีวิต' && (verifyData as any).death_date && (
-              <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl shadow-lg p-6 border-2 border-gray-300">
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-400">
-                  <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center">
-                    <Skull size={16} className="text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-800">ข้อมูลการเสียชีวิต</h3>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-white rounded-lg border border-gray-300">
-                    <div className="font-semibold text-gray-700 mb-1">วันที่เสียชีวิต</div>
-                    <div className="text-gray-900 text-lg">{formatThaiDateBE((verifyData as any).death_date)}</div>
-                  </div>
-                  <div className="p-4 bg-white rounded-lg border border-gray-300">
-                    <div className="font-semibold text-gray-700 mb-1">เวลาที่เสียชีวิต</div>
-                    <div className="text-gray-900 text-lg">{(verifyData as any).death_time} น.</div>
-                  </div>
-                  {(verifyData as any).death_cause && (
-                    <div className="p-4 bg-white rounded-lg border border-gray-300">
-                      <div className="font-semibold text-gray-700 mb-1">สาเหตุ</div>
-                      <div className="text-gray-900 text-lg">{(verifyData as any).death_cause}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500">ประเภทผู้ป่วย</div>
+                        <div className="font-medium text-slate-900">{(verifyData as any).patients_type || '-'}</div>
+                      </div>
                     </div>
-                  )}
+
+                    <div className="mt-4 h-px bg-slate-100" />
+
+                    <div className="mt-4">
+                      <div className="text-xs text-slate-500">เบอร์โทรศัพท์</div>
+                      <div className="font-mono text-slate-900">{(verifyData as any).phone || (verifyData as any).phone_number || '-'}</div>
+                    </div>
+                  </div>
+
+                  {/* Contact & Address */}
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MapPin size={16} className="text-sky-700" />
+                      <div className="font-semibold text-slate-800">ที่อยู่</div>
+                    </div>
+                    <div className="text-slate-700 leading-relaxed text-sm">
+                      {(verifyData as any).address || '-'}
+                    </div>
+                  </div>
+
+                  {/* Quick Actions (documents / history) */}
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="text-sm text-slate-500 mb-2">การทำงานเร็ว</div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
+                        href={`/patient/${encodeURIComponent((verifyData as any).patients_id)}/encounters`}
+                      >
+                        ประวัติการรักษา
+                      </a>
+                      <a
+                        className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50"
+                        href={`/patient/${encodeURIComponent((verifyData as any).patients_id)}/diagnosis`}
+                      >
+                        โรคประจำตัว
+                      </a>
+                      <a
+                        className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50"
+                        href={`/patient/${encodeURIComponent((verifyData as any).patients_id)}/allergies?name=${encodeURIComponent(
+                          `${(verifyData as any).pname || ''}${(verifyData as any).first_name} ${(verifyData as any).last_name}`.replace(/\s+/g, ' ').trim()
+                        )}`}
+                      >
+                        แพ้ยา
+                      </a>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              </aside>
+
+              {/* RIGHT: Sections */}
+              <section className="lg:col-span-8 space-y-6">
+                {/* 1) Personal */}
+                <div className="rounded-2xl border border-slate-200 bg-white">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                    <User size={16} className="text-sky-700" />
+                    <h3 className="text-base font-semibold text-slate-800">ข้อมูลส่วนตัว</h3>
+                  </div>
+                  <div className="p-6">
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                      <div>
+                        <dt className="text-xs text-slate-500">ชื่อ-นามสกุล</dt>
+                        <dd className="text-slate-900">
+                          {(verifyData as any).pname} {(verifyData as any).first_name} {(verifyData as any).last_name}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">เลขบัตรประชาชน</dt>
+                        <dd className="text-slate-900">{(verifyData as any).card_id || '-'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">เชื้อชาติ</dt>
+                        <dd className="text-slate-900">{(verifyData as any).nationality || '-'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">ศาสนา</dt>
+                        <dd className="text-slate-900">{(verifyData as any).religion || '-'}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+
+                {/* 2) Medical */}
+                <div className="rounded-2xl border border-slate-200 bg-white">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                    <Droplets size={16} className="text-sky-700" />
+                    <h3 className="text-base font-semibold text-slate-800">ข้อมูลทางการแพทย์</h3>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                      <div className="text-xs text-slate-600 mb-1">กรุ๊ปเลือด</div>
+                      <div className="text-lg font-semibold text-slate-900">
+                        {(verifyData as any).blood_group || '-'} {(verifyData as any).bloodgroup_rh || ''}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-teal-200 bg-teal-50 p-4">
+                      <div className="text-xs text-slate-600 mb-1">ประเภทผู้ป่วย</div>
+                      <div className="text-lg text-slate-900">{(verifyData as any).patients_type || '-'}</div>
+                    </div>
+                    <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+                      <div className="text-xs text-slate-600 mb-1">รักษาที่</div>
+                      <div className="text-lg text-slate-900">{(verifyData as any).treat_at || '-'}</div>
+                    </div>
+                    <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="text-xs text-slate-600 mb-1">โรคประจำตัว / ประวัติการแพทย์</div>
+                      <div className="text-slate-900">{(verifyData as any).disease || 'ไม่มีข้อมูล'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3) Admission */}
+                <div className="rounded-2xl border border-slate-200 bg-white">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                    <Calendar size={16} className="text-indigo-700" />
+                    <h3 className="text-base font-semibold text-slate-800">ข้อมูลการรับเข้า</h3>
+                  </div>
+                  <div className="p-6">
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
+                      <div className="text-xs text-slate-600 mb-1">วันที่รับเข้า</div>
+                      <div className="text-lg text-slate-900">
+                        {formatThaiDateBE((verifyData as any).admittion_date || '-')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4) Attachments */}
+                <div className="rounded-2xl border border-slate-200 bg-white">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                    <FileText size={16} className="text-sky-700" />
+                    <h3 className="text-base font-semibold text-slate-800">เอกสารแนบ</h3>
+                  </div>
+
+                  <div className="p-6">
+                    {patientFiles.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {patientFiles.map((f) => {
+                          const isImage = (f.mime_type || '').startsWith('image/');
+                          const viewUrl = joinUrl(API_BASE, `/api/patient-files/download/${encodeURIComponent(String(f.id))}`);
+                          const dlUrl = `${viewUrl}?dl=1`;
+
+                          return (
+                            <div key={f.id} className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+                              <div className="font-semibold text-slate-800 mb-1">
+                                {f.label || f.doc_type || 'ไฟล์แนบ'}
+                              </div>
+                              <div className="text-xs text-slate-500 mb-3 break-all">
+                                {f.filename || '(ไม่ระบุชื่อไฟล์)'}
+                              </div>
+
+                              {isImage ? (
+                                <img
+                                  src={viewUrl}
+                                  alt={f.label || f.filename || 'attachment'}
+                                  className="w-full h-44 object-cover rounded-lg border"
+                                />
+                              ) : (
+                                <div className="flex items-center gap-2 text-slate-600">
+                                  <FileText size={16} className="shrink-0" />
+                                  <span className="text-sm">ไฟล์แนบพร้อมใช้งาน</span>
+                                </div>
+                              )}
+
+                              <div className="mt-3 flex gap-2">
+                                <a
+                                  href={viewUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
+                                >
+                                  เปิดดู
+                                </a>
+                                <a
+                                  href={dlUrl}
+                                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50"
+                                >
+                                  ดาวน์โหลด
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-slate-500">ไม่มีเอกสารแนบ</div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* 5) Death info (if any) */}
+                {(verifyData as any).status === 'เสียชีวิต' && (verifyData as any).death_date && (
+                  <div className="rounded-2xl border border-slate-300 bg-slate-50">
+                    <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                      <Skull size={16} className="text-slate-600" />
+                      <h3 className="text-base font-semibold text-slate-800">ข้อมูลการเสียชีวิต</h3>
+                    </div>
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-white rounded-lg border border-slate-200">
+                        <div className="text-xs text-slate-600 mb-1">วันที่เสียชีวิต</div>
+                        <div className="text-slate-900 text-lg">{formatThaiDateBE((verifyData as any).death_date)}</div>
+                      </div>
+                      <div className="p-4 bg-white rounded-lg border border-slate-200">
+                        <div className="text-xs text-slate-600 mb-1">เวลาที่เสียชีวิต</div>
+                        <div className="text-slate-900 text-lg">{(verifyData as any).death_time} น.</div>
+                      </div>
+                      {(verifyData as any).death_cause && (
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 md:col-span-2">
+                          <div className="text-xs text-slate-600 mb-1">สาเหตุ</div>
+                          <div className="text-slate-900">{(verifyData as any).death_cause}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </section>
+            </div>
           </div>
         )}
       </Modal>

@@ -70,6 +70,7 @@
    BASE STYLES
 -------------------------------- */
 .page {
+  border-radius: 15px;
   min-height: 100vh;
   padding: var(--space-6);
   background: var(--bg-primary);
@@ -116,8 +117,6 @@
 }
 
 .title::before {
-  content: "🩺";
-  font-size: 28px;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
 }
 
