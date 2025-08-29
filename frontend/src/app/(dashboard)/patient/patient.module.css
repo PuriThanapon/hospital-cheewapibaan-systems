@@ -277,3 +277,28 @@
   border-color:#dc2626 !important;
   color:#fff !important;
 }
+
+.thAction { text-align: center; white-space: nowrap; }
+.thDanger { color: #e11d48; }            /* red-600 */
+
+.tdIcon { text-align: center; }
+
+.iconBtn {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #e5e7eb;            /* slate-200 */
+  border-radius: 8px; background: #fff;
+}
+.iconBtn:hover { background: #f8fafc; }  /* slate-50 */
+.iconBtn:disabled { opacity: .4; cursor: not-allowed; }
+
+.iconDanger { color: #e11d48; }          /* red-600 */
+
+.iconBadgeWrap { position: relative; }
+.iconBadge {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 9999px; background: #ef4444; color: #fff;
+  font-size: 10px; line-height: 16px; text-align: center; font-weight: 700;
+}
+

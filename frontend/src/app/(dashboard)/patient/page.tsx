@@ -477,7 +477,7 @@ export default function PatientsPage() {
         const hasCountsAlready = list.some((r: any) => 'allergy_count' in r || 'has_allergy' in r || 'allergies_count' in r);
 
         if (!hasCountsAlready && list.length) {
-          try { list = await hydrateAllergyCounts(list); } catch {}
+          try { list = await hydrateAllergyCounts(list); } catch { }
         }
 
         setRows(list);
@@ -986,7 +986,14 @@ export default function PatientsPage() {
               <th className={styles.th}>ประเภท</th>
               <th className={styles.th}>รักษาที่</th>
               <th className={styles.th}>สถานะ</th>
-              <th className={styles.th}>การทำงาน</th>
+              <th className={`${styles.th} ${styles.thAction}`}>ตรวจสอบ</th>
+              <th className={`${styles.th} ${styles.thAction}`}>แก้ไข</th>
+              <th className={`${styles.th} ${styles.thAction}`}>เพิ่มนัด</th>
+              <th className={`${styles.th} ${styles.thAction}`}>ประวัติ</th>
+              <th className={`${styles.th} ${styles.thAction}`}>แพ้ยา</th>
+              <th className={`${styles.th} ${styles.thAction}`}>โรคประจำตัว</th>
+              <th className={`${styles.th} ${styles.thAction}`}>เสียชีวิต</th>
+              <th className={`${styles.th} ${styles.thAction} ${styles.thDanger}`}>ลบ</th>
             </tr>
           </thead>
           <tbody>
@@ -1025,56 +1032,91 @@ export default function PatientsPage() {
                   <td className={styles.td}>{r.patients_type || '-'}</td>
                   <td className={styles.td}>{r.treat_at || '-'}</td>
                   <td className={styles.td}><Pill alive={r.status !== 'เสียชีวิต'} /></td>
-                  <td className={styles.td}>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleVerify(r.patients_id)}>
-                        <Eye size={14} /> ตรวจสอบ
-                      </button>
-                      <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenEdit(r.patients_id)}>
-                        <Pencil size={14} /> แก้ไข
-                      </button>
-                      {r.status !== 'เสียชีวิต' && (
-                        <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenAppt(r.patients_id)}>
-                          <CalendarPlus size={14} /> เพิ่มนัด
-                        </button>
-                      )}
-                      <Link
-                        href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`}
-                        className={`${styles.btn} ${styles.btnSm}`}
-                      >
-                        <FileText size={14} /> ประวัติ
-                      </Link>
+                  <td className={styles.tdIcon}>
+                    <button
+                      className={`${styles.iconBtn}`}
+                      title="ตรวจสอบ" aria-label="ตรวจสอบ"
+                      onClick={() => handleVerify(r.patients_id)}
+                    >
+                      <Eye size={16} />
+                    </button>
+                  </td>
 
-                      {/* ปุ่มแพ้ยา: สี/จำนวนตาม hasAllergy */}
-                      <Link
-                        href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
-                          `${r.pname || ''}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
-                        )}`}
-                        className={`${styles.btn} ${styles.btnSm}`}
-                        style={allergyBtnStyle}
-                        title={hasAllergy ? `แพ้ยา ${allergyCount} รายการ` : 'ไม่มีข้อมูลแพ้ยา'}
-                      >
-                        <AlertCircle size={14} /> แพ้ยา{hasAllergy ? ` (${allergyCount})` : ''}
-                      </Link>
+                  <td className={styles.tdIcon}>
+                    <button
+                      className={styles.iconBtn}
+                      title="แก้ไข" aria-label="แก้ไข"
+                      onClick={() => handleOpenEdit(r.patients_id)}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  </td>
 
-                      <Link
-                        href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
-                        className={`${styles.btn} ${styles.btnSm}`}
-                      >
-                        <FileText size={14} /> โรคประจำตัว
-                      </Link>
-                      {r.status !== 'เสียชีวิต' && (
-                        <button className={`${styles.btn} ${styles.btnSm}`} onClick={() => handleOpenDeceased(r.patients_id)}>
-                          <Skull size={14} /> เสียชีวิต
-                        </button>
-                      )}
-                      <button
-                        className={`${styles.btn} ${styles.btnSm} ${styles.btnDanger}`}
-                        onClick={() => handleDelete(r.patients_id)}
-                      >
-                        <Trash2 size={14} /> ลบ
-                      </button>
-                    </div>
+                  <td className={styles.tdIcon}>
+                    <button
+                      className={styles.iconBtn}
+                      title="เพิ่มนัด" aria-label="เพิ่มนัด"
+                      onClick={() => handleOpenAppt(r.patients_id)}
+                      disabled={r.status === 'เสียชีวิต'}
+                    >
+                      <CalendarPlus size={16} />
+                    </button>
+                  </td>
+
+                  <td className={styles.tdIcon}>
+                    <Link
+                      href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`}
+                      className={styles.iconBtn}
+                      title="ประวัติ" aria-label="ประวัติ"
+                    >
+                      <FileText size={16} />
+                    </Link>
+                  </td>
+
+                  <td className={styles.tdIcon}>
+                    <Link
+                      href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
+                        `${r.pname || ''}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
+                      )}`}
+                      className={`${styles.iconBtn} ${styles.iconBadgeWrap}`}
+                      style={allergyBtnStyle}
+                      title={hasAllergy ? `แพ้ยา ${allergyCount} รายการ` : 'ไม่มีข้อมูลแพ้ยา'}
+                      aria-label="แพ้ยา"
+                    >
+                      <AlertCircle size={16} />
+                      {hasAllergy && <span className={styles.iconBadge}>{allergyCount}</span>}
+                    </Link>
+                  </td>
+
+                  <td className={styles.tdIcon}>
+                    <Link
+                      href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
+                      className={styles.iconBtn}
+                      title="โรคประจำตัว" aria-label="โรคประจำตัว"
+                    >
+                      <FileText size={16} />
+                    </Link>
+                  </td>
+
+                  <td className={styles.tdIcon}>
+                    <button
+                      className={styles.iconBtn}
+                      title="เสียชีวิต" aria-label="เสียชีวิต"
+                      onClick={() => handleOpenDeceased(r.patients_id)}
+                      disabled={r.status === 'เสียชีวิต'}
+                    >
+                      <Skull size={16} />
+                    </button>
+                  </td>
+
+                  <td className={styles.tdIcon}>
+                    <button
+                      className={`${styles.iconBtn} ${styles.iconDanger}`}
+                      title="ลบ" aria-label="ลบ"
+                      onClick={() => handleDelete(r.patients_id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               );
