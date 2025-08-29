@@ -240,7 +240,7 @@
 .search{ width: 260px; flex: 0 0 260px; }
 
 /* ที่ห่อปุ่ม “ล้างตัวกรองทั้งหมด” ให้อยู่ขวาสุดของแถว */
-.clearWrap{margin-left:auto;display:flex;align-items:center}}
+.clearWrap{margin-left:auto;display:flex;align-items:center}
 
 /* ปุ่มล้างตัวกรอง ให้สูงเท่าช่องกรอง (36px) และหน้าตาเข้าชุด */
 .btnClearfilter{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
