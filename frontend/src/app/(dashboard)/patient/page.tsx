@@ -6,8 +6,8 @@ import {
   Search, X, Plus, Pencil, Eye, CalendarPlus, Skull, RefreshCw,
   User, Calendar, FileText, CheckCircle, AlertCircle, Heart,
   Phone, MapPin, Droplets, IdCard,
-  CalendarArrowDown,MapPinPlusInside,
-  CardSim,
+  CalendarArrowDown, MapPinPlusInside,
+  CardSim, Trash2, // ⬅️ เพิ่มไอคอนลบ
 } from 'lucide-react';
 import makeAnimated from 'react-select/animated';
 import dynamic from 'next/dynamic';
@@ -46,9 +46,7 @@ const $swal = Swal.mixin({
   cancelButtonText: 'ยกเลิก',
   confirmButtonColor: '#2563eb',
   cancelButtonColor: '#6b7280',
-  customClass: {
-    popup: 'swal-popup-on-top'
-  }
+  customClass: { popup: 'swal-popup-on-top' }
 });
 const toast = Swal.mixin({
   toast: true,
@@ -63,14 +61,12 @@ const RS_PROPS = {
   menuPortalTarget: typeof window !== 'undefined' ? document.body : undefined,
   menuPosition: 'fixed',
   menuShouldBlockScroll: true,
-  isSearchable: false,                 // ไม่ต้องพิมพ์
+  isSearchable: false,
   styles: {
-    menuPortal: (base: any) => ({ ...base, zIndex: 12050 }), // > overlay(10000)
+    menuPortal: (base: any) => ({ ...base, zIndex: 12050 }),
     menu: (base: any) => ({ ...base, zIndex: 12050 }),
   },
-  onKeyDown: (e: any) => {             // กัน Enter วิ่งขึ้นไปที่ Modal
-    if (e.key === 'Enter') e.stopPropagation();
-  },
+  onKeyDown: (e: any) => { if (e.key === 'Enter') e.stopPropagation(); },
 } as const;
 
 // ฟิลเตอร์ options
@@ -102,7 +98,7 @@ const statusOptions = [
 const treatatOptions = [
   { value: 'โรงพยาบาล', label: 'โรงพยาบาล'},
   { value: 'บ้าน', label: 'บ้าน'},
-]
+];
 
 type FileField =
   | 'patient_id_card'
@@ -130,7 +126,7 @@ async function http(url, options: any = {}) {
   const finalUrl = /^https?:\/\//i.test(url) ? url : joinUrl(API_BASE, url);
 
   const headers = options.body instanceof FormData
-    ? {} // ❌ อย่าใส่ Content-Type เอง ให้ browser จัดการ
+    ? {}
     : { 'Content-Type': 'application/json' };
 
   const res = await fetch(finalUrl, {
@@ -166,7 +162,7 @@ function buildPatientFormData(values: Record<string, any>) {
   // ใส่ฟิลด์ข้อความ (ข้ามพวกไฟล์)
   Object.entries(values).forEach(([k, v]) => {
     if (!v) return;
-    if (v instanceof File) return;                 // ข้ามไฟล์ไว้ก่อน (จะใส่ทีหลัง)
+    if (v instanceof File) return;
     const s = norm(v);
     if (s !== '') fd.append(k, s);
   });
@@ -309,7 +305,6 @@ async function downloadPatientAttachment(
     const cd = res.headers.get('content-disposition');
     const ct = res.headers.get('content-type');
 
-    // หานามสกุลไฟล์จากชื่อเดิม/ชนิดไฟล์
     const originalName = filenameFromContentDisposition(cd);
     const ext = extFromName(originalName) || extFromMime(ct) || '';
 
@@ -334,14 +329,13 @@ async function downloadPatientAttachment(
 async function uploadAllPatientFiles(patients_id: string, formValue: any) {
   if (!patients_id) return;
 
-  // เคสนี้ *ไม่รวม* 4 ไฟล์มาตรฐานที่คุณส่งไปกับ /api/patients อยู่แล้ว
   const EXTRA_DOC_KEYS = [
-    'assistance_letter',      // หนังสือขอความอนุเคราะห์
-    'power_of_attorney',      // หนังสือมอบอำนาจ (หรือหนังสือรับรองบุคคลไร้ญาติ)
-    'adl_assessment',         // แบบประเมิน ADL
-    'clinical_summary',       // ประวัติการรักษา (clinical summary)
-    'destitute_certificate',  // หนังสือรับรองบุคคลไร้ที่พึ่ง  (ตั้ง key ให้ตรง backend)
-    'homeless_certificate',   // (ถ้ามี key แยกตาม backend)
+    'assistance_letter',
+    'power_of_attorney',
+    'adl_assessment',
+    'clinical_summary',
+    'destitute_certificate',
+    'homeless_certificate',
   ];
 
   for (const key of EXTRA_DOC_KEYS) {
@@ -352,11 +346,10 @@ async function uploadAllPatientFiles(patients_id: string, formValue: any) {
     fd.append('file', f, f.name);
     await fetch(`/api/patient-files/${encodeURIComponent(patients_id)}`, {
       method: 'POST',
-      body: fd, // อย่าตั้ง Content-Type เอง
+      body: fd,
     });
   }
 
-  // เอกสารอื่นๆ แบบหลายไฟล์
   const others = Array.isArray(formValue?.other_docs) ? formValue.other_docs : [];
   for (const row of others) {
     if (!row?.file) continue;
@@ -375,7 +368,7 @@ export default function PatientsPage() {
   // state: query + filters + pagination
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState({
-    treat_at: '',gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: ''
+    treat_at: '', gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: ''
   });
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -441,11 +434,11 @@ export default function PatientsPage() {
   }, [qs]);
 
   const clearFilters = () => {
-    setFilters({ treat_at: '',gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: '' });
+    setFilters({ treat_at: '', gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: '' });
     setPage(1); setTick(t => t + 1);
   };
   const activeFilterEntries = useMemo(() => Object.entries(filters).filter(([, v]) => !!v), [filters]);
-  const filterLabels = { treat_at: 'รักษาที่',status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
+  const filterLabels = { treat_at: 'รักษาที่', status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
 
   // actions
   const refresh = () => setTick(t => t + 1);
@@ -473,10 +466,8 @@ export default function PatientsPage() {
       const formValues = addFormRef.current.getValues();
       const formData = buildPatientFormData(formValues);
 
-      // ⬇️ บันทึกข้อมูลหลัก + 4 ไฟล์มาตรฐานที่แนบมากับ formData
       const created = await http('/api/patients', { method: 'POST', body: formData });
 
-      // ⬇️ อัปโหลดไฟล์ "เสริม" ผ่าน /api/patient-files
       const patients_id = created?.patients_id ?? formValues?.patients_id;
       await uploadAllPatientFiles(patients_id, formValues);
 
@@ -511,13 +502,11 @@ export default function PatientsPage() {
       const formValues = editFormRef.current.getValues();
       const formData = buildPatientFormData(formValues);
 
-      // ⬇️ อัปเดตข้อมูลหลัก + 4 ไฟล์มาตรฐาน (ถ้ามี)
       await http(`/api/patients/${encodeURIComponent(openEdit!)}`, {
         method: 'PUT',
         body: formData,
       });
 
-      // ⬇️ อัปโหลดไฟล์ "เสริม" ที่ติ๊กเลือก/แนบมาเพิ่ม
       await uploadAllPatientFiles(openEdit!, formValues);
 
       setOpenEdit(null);
@@ -564,7 +553,6 @@ export default function PatientsPage() {
         phone: p.phone_number || '',
       });
     } catch {
-      // ถ้าดึงรายละเอียดผู้ป่วยไม่ได้ ให้เปิดฟอร์มพร้อม HN อย่างน้อย
       setApptForm({ ...resetApptForm(), hn: patients_id });
     }
   };
@@ -603,7 +591,6 @@ export default function PatientsPage() {
     };
 
     try {
-      // ✅ ไม่ await เวลาเปิด loading
       Swal.fire({
         title: 'กำลังบันทึกนัดหมาย...',
         allowOutsideClick: false,
@@ -625,7 +612,6 @@ export default function PatientsPage() {
       }
       setOpenAppt(null);
       setApptForm(resetApptForm());
-      // ไม่มีผลกับตารางผู้ป่วย แต่รีเฟรชไว้ก็ดี ถ้ามี count/สถานะอื่นผูกอยู่
       refresh();
     } catch (e: any) {
       Swal.close();
@@ -647,7 +633,6 @@ export default function PatientsPage() {
       setDeceasedPatient(null);
     }
   };
-
 
   const handleMarkDeceased = async () => {
     const e = {};
@@ -699,6 +684,58 @@ export default function PatientsPage() {
     }
   };
 
+  // ✅ ฟังก์ชันลบผู้ป่วย
+  const handleDelete = async (patients_id: string, fullName?: string) => {
+    const { isConfirmed } = await $swal.fire({
+      icon: 'warning',
+      title: 'ลบผู้ป่วยถาวร?',
+      html: `
+        <div style="text-align:left">
+          <div><b>HN:</b> <code>${patients_id}</code></div>
+          ${fullName ? `<div><b>ชื่อ:</b> ${fullName}</div>` : ''}
+          <div class="mt-2">การลบจะลบข้อมูลที่เกี่ยวข้องตามที่หลังบ้านกำหนด และ <b>ไม่สามารถกู้คืนได้</b></div>
+          <div class="mt-3">เพื่อยืนยัน โปรดพิมพ์ <b>${patients_id}</b> ลงในช่องด้านล่าง</div>
+        </div>
+      `,
+      input: 'text',
+      inputPlaceholder: patients_id,
+      inputValidator: (val) => {
+        if ((val || '').trim() !== patients_id) return `ต้องพิมพ์ ${patients_id} ให้ตรง`;
+        return undefined;
+      },
+      showCancelButton: true,
+      confirmButtonText: 'ลบถาวร',
+      confirmButtonColor: '#dc2626',
+    });
+    if (!isConfirmed) return;
+
+    try {
+      $swal.fire({
+        title: 'กำลังลบ...',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      await http(`/api/patients/${encodeURIComponent(patients_id)}`, { method: 'DELETE' });
+
+      Swal.close();
+      toast.fire({ icon: 'success', title: 'ลบผู้ป่วยเรียบร้อย' });
+      refresh();
+    } catch (e: any) {
+      Swal.close();
+      const hint = e?.status === 409
+        ? 'มีข้อมูลที่ผูกอยู่ (เช่น encounters/appointments/diagnosis) จึงยังลบไม่ได้ — แนะนำเปลี่ยนสถานะเป็น “จำหน่าย” หรือ “เสียชีวิต” แทน'
+        : '';
+      $swal.fire({
+        icon: 'error',
+        title: 'ลบไม่สำเร็จ',
+        html: `${e?.message || ''}${hint ? `<div class="mt-2 text-sm text-gray-500">${hint}</div>` : ''}`,
+      });
+    }
+  };
+
   // derived
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -716,10 +753,10 @@ export default function PatientsPage() {
 
     return [...rows].sort((a, b) => {
       const r = statusRank(a.status) - statusRank(b.status);
-      if (r !== 0) return r;                               // เรียงตามสถานะก่อน
+      if (r !== 0) return r;
       const dt = time(b.admittion_date) - time(a.admittion_date);
-      if (dt !== 0) return dt;                             // รับเข้าใหม่อยู่ก่อน
-      return String(b.patients_id).localeCompare(String(a.patients_id)); // กันชน
+      if (dt !== 0) return dt;
+      return String(b.patients_id).localeCompare(String(a.patients_id));
     });
   }, [rows]);
 
@@ -940,13 +977,11 @@ export default function PatientsPage() {
                     <Link
                       href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
                         `${r.pname || ''}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
-                      )
-                        }`}
+                      )}`}
                       className={`${styles.btn} ${styles.btnSm}`}
                     >
                       <AlertCircle size={14} /> แพ้ยา
                     </Link>
-                    {/* ✅ ปุ่มไปหน้าวินิจฉัย */}
                     <Link
                       href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
                       className={`${styles.btn} ${styles.btnSm}`}
@@ -958,6 +993,19 @@ export default function PatientsPage() {
                         <Skull size={14} /> เสียชีวิต
                       </button>
                     )}
+                    {/* ✅ ปุ่มลบ */}
+                    <button
+                      className={`${styles.btn} ${styles.btnSm}`}
+                      style={{ background: '#ef4444', borderColor: '#ef4444', color: '#fff' }}
+                      onClick={() =>
+                        handleDelete(
+                          r.patients_id,
+                          `${(r.pname || '')}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
+                        )
+                      }
+                    >
+                      <Trash2 size={14} /> ลบ
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -1011,7 +1059,6 @@ export default function PatientsPage() {
           </div>
         }
       >
-        {/* ✅ ส่ง ref เพื่อให้เรียก validate() ได้ */}
         <PatientForm ref={addFormRef} value={addDraft} onChange={setAddDraft} />
       </Modal>
 
@@ -1049,7 +1096,6 @@ export default function PatientsPage() {
           </div>
         }
       >
-        {/* ✅ ส่ง ref เพื่อให้เรียก validate() ได้ */}
         <PatientForm ref={editFormRef} value={editDraft} onChange={setEditDraft} />
       </Modal>
 
@@ -1090,8 +1136,6 @@ export default function PatientsPage() {
           </div>
         }
       >
-        {/* แถบ HN ผู้ป่วย (optional) */}
-
         <AppointmentForm
           value={apptForm}
           onChange={setApptForm}
@@ -1100,7 +1144,6 @@ export default function PatientsPage() {
           PLACE_OPTIONS={PLACE_OPTIONS}
         />
       </Modal>
-
 
       {/* Mark Deceased */}
       <Modal
@@ -1120,7 +1163,7 @@ export default function PatientsPage() {
 
             <div className="order-1 sm:order-2 flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <button
-                className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
+                className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors	duration-200 flex items-center gap-2"
                 onClick={() => setOpenDeceased(null)}
               >
                 <X size={16} /> ยกเลิก
@@ -1137,7 +1180,6 @@ export default function PatientsPage() {
       >
         {deceasedPatient ? (
           <div className="mb-6 p-4 bg-red-50 rounded-lg border border-red-200">
-            {/* Header Section */}
             <div className="flex items-center gap-2 text-red-800 mb-3">
               <User size={16} />
               <span className="font-medium">ผู้ป่วย:</span>
@@ -1146,9 +1188,7 @@ export default function PatientsPage() {
               </span>
             </div>
 
-            {/* Patient Information Grid */}
             <div className="grid grid-cols-3 md:grid-cols-2 gap-3">
-              {/* ชื่อ-นามสกุล */}
               <div className="col-span-full">
                 <div className="text-sm text-gray-600 mb-1">ชื่อ-นามสกุล</div>
                 <div className="font-semibold text-gray-800">
@@ -1156,7 +1196,6 @@ export default function PatientsPage() {
                 </div>
               </div>
 
-              {/* เลขบัตรประชาชน */}
               <div className="col-span-full">
                 <div className="text-sm text-gray-600 mb-1">เลขบัตรประชาชน</div>
                 <div className="font-mono text-gray-800">
@@ -1164,7 +1203,6 @@ export default function PatientsPage() {
                 </div>
               </div>
 
-              {/* อายุ */}
               <div>
                 <div className="text-sm text-gray-600 mb-1">อายุ</div>
                 <div className="text-gray-800">
@@ -1172,7 +1210,6 @@ export default function PatientsPage() {
                 </div>
               </div>
 
-              {/* เพศ */}
               <div>
                 <div className="text-sm text-gray-600 mb-1">เพศ</div>
                 <div className="text-gray-800">
@@ -1180,7 +1217,6 @@ export default function PatientsPage() {
                 </div>
               </div>
 
-              {/* กรุ๊ปเลือด */}
               <div>
                 <div className="text-sm text-gray-600 mb-1">กรุ๊ปเลือด</div>
                 <div className="text-gray-800">
@@ -1188,7 +1224,6 @@ export default function PatientsPage() {
                 </div>
               </div>
 
-              {/* เชื้อชาติ */}
               <div>
                 <div className="text-sm text-gray-600 mb-1">เชื้อชาติ</div>
                 <div className="text-gray-800">
@@ -1196,7 +1231,6 @@ export default function PatientsPage() {
                 </div>
               </div>
 
-              {/* ศาสนา */}
               <div>
                 <div className="text-sm text-gray-600 mb-1">ศาสนา</div>
                 <div className="text-gray-800">
@@ -1401,7 +1435,6 @@ export default function PatientsPage() {
               </div>
 
               {(() => {
-                // ฟิลด์ไฟล์ที่รองรับ จะมี flag has_* กลับมาจาก backend
                 const fields = [
                   { key: 'patient_id_card', label: 'สำเนาบัตรประชาชนผู้ป่วย' },
                   { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ' },
@@ -1409,16 +1442,12 @@ export default function PatientsPage() {
                   { key: 'relative_id_card', label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์' },
                 ] as const;
 
-                const hasAny =
-                  fields.some(f => Boolean((verifyData as any)[`has_${f.key}`]));
-
+                const hasAny = fields.some(f => Boolean((verifyData as any)[`has_${f.key}`]));
                 const fileUrl = (field: string) =>
                   joinUrl(API_BASE, `/api/patients/${encodeURIComponent(verifyData.patients_id)}/file/${field}`);
 
                 if (!hasAny) {
-                  return (
-                    <div className="text-gray-500">ไม่มีเอกสารแนบ</div>
-                  );
+                  return <div className="text-gray-500">ไม่มีเอกสารแนบ</div>;
                 }
 
                 return (
@@ -1427,7 +1456,6 @@ export default function PatientsPage() {
                       const hasFile = (verifyData as any)[`has_${f.key}`];
                       if (!hasFile) return null;
 
-                      // ปุ่ม action เหมือนกันทุกไฟล์
                       const Actions = (
                         <div className="mt-3 flex gap-2">
                           <a
@@ -1453,7 +1481,6 @@ export default function PatientsPage() {
                         <div key={f.key} className="p-4 border border-gray-200 rounded-xl bg-gradient-to-br from-gray-50 to-white">
                           <div className="font-semibold text-gray-800 mb-2">{f.label}</div>
 
-                          {/* พรีวิวรูปเฉพาะ patient_photo */}
                           {f.key === 'patient_photo' ? (
                             <img
                               src={fileUrl(f.key)}
@@ -1461,7 +1488,6 @@ export default function PatientsPage() {
                               className="w-full h-40 object-cover rounded-lg border"
                             />
                           ) : (
-                            // ไฟล์อื่นให้ข้อความและเปิดดู/ดาวน์โหลด (รองรับทั้งภาพ/ PDF)
                             <div className="text-sm text-gray-500">
                               มีไฟล์แนบพร้อมใช้งาน
                             </div>

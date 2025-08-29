@@ -314,6 +314,29 @@ async function createPatient(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function deletePatient(req, res, next) {
+  try {
+    const patientId = toPatientsId(req.params.id);
+    if (!patientId) return res.status(400).json({ message: 'รหัสผู้ป่วยไม่ถูกต้อง' });
+
+    const r = await pool.query(
+      `DELETE FROM patients WHERE patients_id=$1`,
+      [patientId]
+    );
+
+    if (!r.rowCount) {
+      return res.status(404).json({ message: 'ไม่พบผู้ป่วย' });
+    }
+    // ลบสำเร็จ – ไม่ต้องมีเนื้อหา
+    return res.status(204).end();
+  } catch (e) {
+    // ถ้ามี foreign key ผูกอยู่ ให้ตอบ 409 เพื่อให้ฝั่งหน้าเว็บแสดงคำใบ้ได้
+    if (e.code === '23503') {
+      return res.status(409).json({ message: 'มีข้อมูลที่ผูกอยู่ (เช่น encounters/appointments) จึงยังลบไม่ได้' });
+    }
+    next(e);
+  }
+}
 // PUT /api/patients/:id  (รองรับแก้ไข + อัปไฟล์/ลบไฟล์)
 async function updatePatient(req, res, next) {
   const patientId = toPatientsId(req.params.id);
@@ -471,7 +494,7 @@ module.exports = {
   updatePatient,
   downloadPatientFile,
   markDeceased,
-
+  deletePatient,
   // lookup (ลืม HN)
   search,
   recent,

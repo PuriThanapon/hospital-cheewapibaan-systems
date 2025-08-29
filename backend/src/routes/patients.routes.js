@@ -24,7 +24,7 @@ router.get('/:id/home-needs/latest', homeNeedsCtrl.latestForPatient);
 
 // รายการเดียว (วางท้ายสุด)
 router.get('/:id', ctrl.getOnePatient);
-
+router.delete('/:id', ctrl.deletePatient);
 // เขียน/แก้ไข (multipart)
 router.post('/', ctrl.uploadPatientFiles, ctrl.createPatient);
 router.put('/:id', ctrl.uploadPatientFiles, ctrl.updatePatient);
