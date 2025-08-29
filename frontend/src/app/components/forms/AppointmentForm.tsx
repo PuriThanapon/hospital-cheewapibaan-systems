@@ -1,7 +1,8 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import DatePickerField from '@/app/components/DatePicker';
-import MedicalThaiTimePicker from '../TimePicker';
+// ⬇️ ลบ MedicalThaiTimePicker ออก
+// import MedicalThaiTimePicker from '../TimePicker';
 import PatientLookupModal from '../modals/PatientLookupModal';
 
 type Status = 'pending' | 'done' | 'cancelled';
@@ -97,6 +98,22 @@ function todayISO(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/* ------------- Time options (24 ชม. ไทย, ทุก 30 นาที) ------------- */
+type TimeOpt = { value: string; label: string };
+function buildTimeOptions(stepMin = 30): TimeOpt[] {
+  const opts: TimeOpt[] = [{ value: '', label: 'เลือกเวลา' }];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += stepMin) {
+      const hh = String(h).padStart(2, '0');
+      const mm = String(m).padStart(2, '0');
+      const v = `${hh}:${mm}`;
+      opts.push({ value: v, label: `${v} น.` });
+    }
+  }
+  return opts;
+}
+const TH_TIME_OPTIONS = buildTimeOptions(15);
+
 /* ------------------------------ Component ------------------------------ */
 export default function AppointmentForm({
   value,
@@ -135,11 +152,11 @@ export default function AppointmentForm({
     }
   }, [value?.date]);
 
-  const handleWheelBlock: React.WheelEventHandler<HTMLDivElement> = (e) => {
+  const handleWheelBlock: React.WheelEventHandler<HTMLDivElement | HTMLSelectElement> = (e) => {
     e.preventDefault();
     e.stopPropagation();
   };
-  const handleKeyBlock: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+  const handleKeyBlock: React.KeyboardEventHandler<HTMLDivElement | HTMLSelectElement> = (e) => {
     const k = e.key;
     if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'PageUp' || k === 'PageDown') {
       e.preventDefault();
@@ -462,12 +479,18 @@ export default function AppointmentForm({
             <div>
               <label className="block">
                 <div className="mb-2 text-sm font-medium text-gray-700">เวลาเริ่ม</div>
-                <MedicalThaiTimePicker
+                <select
+                  lang="th"
+                  className="w-full px-4 py-1.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:border-blue-500 focus:ring-blue-100 transition-all duration-200"
                   value={value.start || ''}
-                  onChange={(t: string) => onChange({ ...value, start: t })}
-                  mode="select"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200"
-                />
+                  onChange={(e) => onChange({ ...value, start: e.target.value })}
+                  onWheel={handleWheelBlock}
+                  onKeyDown={handleKeyBlock}
+                >
+                  {TH_TIME_OPTIONS.map(t => (
+                    <option key={`s-${t.value || 'blank'}`} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
                 {errors?.start && (
                   <div className="mt-1 text-xs text-red-600 font-medium">{errors.start}</div>
                 )}
@@ -478,12 +501,18 @@ export default function AppointmentForm({
             <div>
               <label className="block">
                 <div className="mb-2 text-sm font-medium text-gray-700">เวลาสิ้นสุด</div>
-                <MedicalThaiTimePicker
+                <select
+                  lang="th"
+                  className="w-full px-4 py-1.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:border-blue-500 focus:ring-blue-100 transition-all duration-200"
                   value={value.end || ''}
-                  onChange={(t: string) => onChange({ ...value, end: t })}
-                  mode="select"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200"
-                />
+                  onChange={(e) => onChange({ ...value, end: e.target.value })}
+                  onWheel={handleWheelBlock}
+                  onKeyDown={handleKeyBlock}
+                >
+                  {TH_TIME_OPTIONS.map(t => (
+                    <option key={`e-${t.value || 'blank'}`} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
                 {errors?.end && (
                   <div className="mt-1 text-xs text-red-600 font-medium">{errors.end}</div>
                 )}
