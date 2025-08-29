@@ -314,29 +314,97 @@ async function createPatient(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// DELETE /api/patients/:id — ลบผู้ป่วยพร้อมเก็บกวาดทุกตารางลูกที่อ้างถึง
 async function deletePatient(req, res, next) {
+  const pid = toPatientsId(req.params.id);
+  if (!pid) return res.status(400).json({ message: 'รหัสผู้ป่วยไม่ถูกต้อง' });
+
+  const client = await pool.connect();
   try {
-    const patientId = toPatientsId(req.params.id);
-    if (!patientId) return res.status(400).json({ message: 'รหัสผู้ป่วยไม่ถูกต้อง' });
+    await client.query('BEGIN');
 
-    const r = await pool.query(
-      `DELETE FROM patients WHERE patients_id=$1`,
-      [patientId]
+    const got = await client.query(
+      `SELECT 1 FROM patients WHERE patients_id=$1 FOR UPDATE`, [pid]
     );
-
-    if (!r.rowCount) {
+    if (!got.rowCount) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'ไม่พบผู้ป่วย' });
     }
-    // ลบสำเร็จ – ไม่ต้องมีเนื้อหา
+
+    // 1) ดึงตารางที่มี FK ชี้มาหา patients
+    const { rows: fks } = await client.query(`
+      SELECT n.nspname  AS schema,
+             c.relname  AS "table",
+             a.attname  AS "column"
+      FROM pg_constraint co
+      JOIN pg_class      c   ON co.conrelid = c.oid
+      JOIN pg_namespace  n   ON n.oid       = c.relnamespace
+      JOIN unnest(co.conkey) WITH ORDINALITY AS k(attnum, ord) ON TRUE
+      JOIN pg_attribute  a   ON a.attrelid  = c.oid AND a.attnum = k.attnum
+      WHERE co.contype='f'
+        AND co.confrelid = 'public.patients'::regclass
+    `);
+
+    // 2) เผื่อบางตารางไม่มี FK แต่เราใช้งานจริง ใส่ white-list ไว้ (เอก/พหูพจน์)
+    const known = [
+      { schema: 'public', table: 'appointment',   column: 'patients_id' },
+      { schema: 'public', table: 'appointments',  column: 'patients_id' },
+      { schema: 'public', table: 'encounter',     column: 'patients_id' },
+      { schema: 'public', table: 'encounters',    column: 'patients_id' },
+      { schema: 'public', table: 'diagnosis',     column: 'patients_id' },
+      { schema: 'public', table: 'diagnoses',     column: 'patients_id' },
+      { schema: 'public', table: 'allergies',     column: 'patients_id' },
+      { schema: 'public', table: 'home_needs',    column: 'patients_id' },
+      { schema: 'public', table: 'patient_files', column: 'patients_id' },
+      { schema: 'public', table: 'vital_signs',   column: 'patients_id' },
+      { schema: 'public', table: 'medications',   column: 'patients_id' },
+      { schema: 'public', table: 'lab_results',   column: 'patients_id' },
+      { schema: 'public', table: 'bed_stays',     column: 'patients_id' },
+    ];
+
+    // 3) รวม FK + white-list แล้วลบเฉพาะตารางที่ “มีอยู่จริง”
+    const planned = new Map();
+    [...fks, ...known].forEach(r => {
+      if (!r?.schema || !r?.table || !r?.column) return;
+      planned.set(`${r.schema}.${r.table}`, r);
+    });
+
+    for (const [, r] of planned) {
+      // เช็คว่าตารางมีจริงไหม
+      const ex = await client.query(
+        `SELECT 1
+           FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+          WHERE n.nspname=$1 AND c.relname=$2
+          LIMIT 1`,
+        [r.schema, r.table]
+      );
+      if (!ex.rowCount) continue; // ไม่มีตารางนั้น ข้าม
+
+      // ขอชื่อ identifier แบบ quote ถูกต้องจาก DB
+      const qi = await client.query(
+        `SELECT quote_ident($1) sch, quote_ident($2) tbl, quote_ident($3) col`,
+        [r.schema, r.table, r.column]
+      );
+      const { sch, tbl, col } = qi.rows[0];
+
+      await client.query(`DELETE FROM ${sch}.${tbl} WHERE ${col} = $1`, [pid]);
+    }
+
+    // 4) ลบผู้ป่วย
+    await client.query(`DELETE FROM patients WHERE patients_id=$1`, [pid]);
+
+    await client.query('COMMIT');
     return res.status(204).end();
   } catch (e) {
-    // ถ้ามี foreign key ผูกอยู่ ให้ตอบ 409 เพื่อให้ฝั่งหน้าเว็บแสดงคำใบ้ได้
-    if (e.code === '23503') {
-      return res.status(409).json({ message: 'มีข้อมูลที่ผูกอยู่ (เช่น encounters/appointments) จึงยังลบไม่ได้' });
-    }
+    try { await client.query('ROLLBACK'); } catch {}
     next(e);
+  } finally {
+    client.release();
   }
 }
+
+
+
 // PUT /api/patients/:id  (รองรับแก้ไข + อัปไฟล์/ลบไฟล์)
 async function updatePatient(req, res, next) {
   const patientId = toPatientsId(req.params.id);

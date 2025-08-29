@@ -5,10 +5,6 @@
  */
 
 /* === General & Typography === */
-/*
-  The `wrapper` class provides the main container with consistent spacing.
-  The `header` and `bar` classes manage content alignment and responsiveness.
-*/
 .wrapper {
     display: grid;
     gap: 24px;
@@ -45,10 +41,7 @@
 }
 
 @media (min-width: 900px) {
-    .bar {
-        grid-template-columns: 1fr auto;
-        align-items: end;
-    }
+    .bar { grid-template-columns: 1fr auto; align-items: end; }
 }
 
 .label {
@@ -73,15 +66,9 @@
 
 .input:focus,
 .select:focus,
-.textarea:focus {
-    box-shadow: 0 0 0 2px #e2e8f0;
-}
+.textarea:focus { box-shadow: 0 0 0 2px #e2e8f0; }
 
 /* === Buttons === */
-/*
-  The `btn` and `btnPrimary` classes define a consistent look for buttons,
-  with hover effects for better user feedback.
-*/
 .btn {
     display: inline-flex;
     align-items: center;
@@ -92,47 +79,46 @@
     background: #fff;
     font-size: 14px;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.2s, box-shadow .2s, border-color .2s;
 }
+.btn:hover { background: #f8fafc; }
 
-.btn:hover {
-    background: #f8fafc;
+.btnPrimary { background: #005a50ff; color: #fff; }
+.btnPrimary:hover { background: rgb(0, 51, 45); }
+
+.btnClearfilter{ background: red; color: #fff; }
+.btnClearfilter:hover{ background: rgb(122, 0, 0); }
+
+.btnSm { padding: 4px 8px; font-size: 12px; border-radius: 10px; }
+
+/* ✅ ปุ่มลบ/อันตราย (ใช้กับ <button className={`${styles.btn} ${styles.btnSm} ${styles.btnDanger}`}> ) */
+.btnDanger{
+  background:#ef4444;         /* red-500 */
+  border-color:#ef4444;
+  color:#fff;
 }
-
-.btnPrimary {
-    background: #005a50ff;
-    color: #fff;
+.btnDanger:hover{
+  background:#dc2626;         /* red-600 */
+  border-color:#dc2626;
 }
-
-.btnPrimary:hover {
-    background: rgb(0, 51, 45);
+.btnDanger:focus{
+  box-shadow:0 0 0 3px rgba(239,68,68,.35);
 }
+.btnDanger[disabled]{ opacity:.6; cursor:not-allowed; }
 
-.btnClearfilter{
-    background: red;
-    color: #fff;
+/* (ตัวเลือก) ปุ่มขอบแดงแบบไม่ทึบ */
+.btnDangerOutline{
+  background:#fff;
+  color:#b91c1c;
+  border-color:#fecaca;
 }
-
-.btnClearfilter:hover{
-    background: rgb(122, 0, 0);
-}
-
-.btnSm {
-    padding: 4px 8px;
-    font-size: 12px;
-    border-radius: 10px;
+.btnDangerOutline:hover{
+  background:#fee2e2;
+  border-color:#fca5a5;
 }
 
 /* === Filters & Search UI === */
-/*
-  The `filtersBar` uses a responsive grid to arrange filter elements cleanly.
-  `chipsRow` and `chip` are for displaying selected filters as small, interactive tags.
-*/
-.sectionTitle {
-    font-size: 14px;
-    font-weight: 600;
-    opacity: 0.9;
-}
+.sectionTitle { font-size: 14px; font-weight: 600; opacity: 0.9; }
 
 .filtersBar {
     display:flex;
@@ -146,396 +132,148 @@
     border-radius: 16px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
 }
-
 .filtersBar > div:not(.dateRangeRow):not(.clearWrap){
-  flex: 0 1 220px;
-  min-width: 220px;
+  flex: 0 1 220px; min-width: 220px;
 }
 
-@media (min-width: 640px) {
-    .filtersBar {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
+@media (min-width: 640px) { .filtersBar { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 768px) { .filtersBar { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1280px){ .filtersBar { grid-template-columns: repeat(6, 1fr); } }
 
-@media (min-width: 768px) {
-    .filtersBar {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (min-width: 1280px) {
-    .filtersBar {
-        grid-template-columns: repeat(6, 1fr);
-    }
-}
-
-.chipsRow {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
+.chipsRow { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    border: 1px solid #e5e7eb;
-    background: #f8fafc;
-    font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid #e5e7eb; background: #f8fafc; font-size: 12px;
 }
+.chip button { border: none; background: transparent; cursor: pointer; }
 
-.chip button {
-    border: none;
-    background: transparent;
-    cursor: pointer;
-}
+.overflow-y-auto { scroll-behavior: smooth; }
 
-.overflow-y-auto {
-  scroll-behavior: smooth;
-}
 /* === Tables === */
-/*
-  The `table` and related classes provide a professional, clean look for data tables.
-*/
 .tableWrap {
-    overflow: auto;
-    scroll-behavior: smooth;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    background: #fff;
+    overflow: auto; scroll-behavior: smooth;
+    border: 1px solid #e5e7eb; border-radius: 16px; background: #fff;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
 }
-
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-}
-
-.thead {
-    background: #f1f5f9;
-}
-
-.th {
-    text-align: left;
-    padding: 12px 16px;
-    font-weight: 600;
-}
-
-.td {
-    padding: 12px 16px;
-    border-top: 1px solid #e5e7eb;
-    vertical-align: top;
-    white-space: nowrap;
-}
-
-.tdNowrap {
-    white-space: nowrap;
-}
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.thead { background: #f1f5f9; }
+.th { text-align: left; padding: 12px 16px; font-weight: 600; }
+.td { padding: 12px 16px; border-top: 1px solid #e5e7eb; vertical-align: top; white-space: nowrap; }
+.tdNowrap { white-space: nowrap; }
 
 /* === Cards & Data Display === */
-/*
-  `card` and `verifyCard` classes are for presenting information in structured blocks.
-  `kvGrid` is a responsive layout for displaying key-value pairs.
-*/
-.card,
-.verifyCard {
-    padding: 16px;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+.card, .verifyCard {
+    padding: 16px; border: 1px solid #e5e7eb; border-radius: 16px;
+    background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
 }
-
-.verifyCard {
-    display: grid;
-    gap: 8px;
-}
+.verifyCard { display: grid; gap: 8px; }
 
 .modalSectionTitle {
-    font-size: 18px;
-    font-weight: 600;
-    color: #111827;
-    margin: 8px 0 4px;
-    border-bottom: 2px solid #e5e7eb;
-    padding-bottom: 4px;
+    font-size: 18px; font-weight: 600; color: #111827;
+    margin: 8px 0 4px; border-bottom: 2px solid #e5e7eb; padding-bottom: 4px;
 }
 
-.kvGrid {
-    display: grid;
-    gap: 16px;
-    grid-template-columns: 1fr;
-}
+.kvGrid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 768px) { .kvGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px){ .kvGrid { grid-template-columns: repeat(3, 1fr); } }
 
-@media (min-width: 768px) {
-    .kvGrid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (min-width: 1024px) {
-    .kvGrid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-.kvLabel {
-    font-size: 12px;
-    color: #475569;
-}
-
-.kvValue {
-    font-size: 15px;
-    line-height: 1.6;
-    font-weight: 500;
-    color: #111827;
-}
-
-.full {
-    grid-column: 1 / -1;
-}
+.kvLabel { font-size: 12px; color: #475569; }
+.kvValue { font-size: 15px; line-height: 1.6; font-weight: 500; color: #111827; }
+.full { grid-column: 1 / -1; }
 
 /* === Modals === */
-/*
-  These classes define the core structure and styling for modal dialogs.
-*/
 .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    z-index: 50;
+    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5);
+    display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50;
 }
-
 .modal {
-    width: 100%;
-    max-width: 720px;
-    background: #fff;
-    border-radius: 16px;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
-    display: flex;
-    flex-direction: column;
-    max-height: 86vh;
+    width: 100%; max-width: 720px; background: #fff; border-radius: 16px;
+    border: 1px solid #e5e7eb; box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
+    display: flex; flex-direction: column; max-height: 86vh;
 }
-
-.modalSm {
-    max-width: 520px;
-}
-.modalMd {
-    max-width: 720px;
-}
-.modalLg {
-    max-width: 900px;
-}
-.modalXl {
-    max-width: 1100px;
-}
+.modalSm { max-width: 520px; }
+.modalMd { max-width: 720px; }
+.modalLg { max-width: 900px; }
+.modalXl { max-width: 1100px; }
 
 .modalHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px 20px;
-    border-bottom: 1px solid #e5e7eb;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 20px; border-bottom: 1px solid #e5e7eb;
 }
+.modalTitle { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
 
-.modalTitle {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    line-height: 1.3;
-}
-
-.modalBody {
-    padding: 24px;
-    overflow: auto;
-    scroll-behavior: smooth;
-}
-
-.modalBodyScroll {
-    max-height: 70vh;
-    overflow: auto;
-    scroll-behavior: smooth;
-}
+.modalBody { padding: 24px; overflow: auto; scroll-behavior: smooth; }
+.modalBodyScroll { max-height: 70vh; overflow: auto; scroll-behavior: smooth; }
 
 .modalFooter {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 16px 20px;
-    border-top: 1px solid #e5e7eb;
-    flex-wrap: wrap;
+    display: flex; gap: 12px; justify-content: flex-end; align-items: center;
+    padding: 16px 20px; border-top: 1px solid #e5e7eb; flex-wrap: wrap;
 }
 
 /* === Loading & Banners === */
-/*
-  Spinner is a simple loading indicator.
-  Banner classes provide colored alerts for info, success, and errors.
-*/
 .spinner {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 3px solid #e5e7eb;
-    border-top-color: #0f172a;
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 3px solid #e5e7eb; border-top-color: #0f172a;
     animation: sp 0.7s linear infinite;
 }
-
-@keyframes sp {
-    to {
-        transform: rotate(360deg);
-    }
-}
+@keyframes sp { to { transform: rotate(360deg); } }
 
 .banner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-radius: 12px;
-    font-size: 14px;
-    border: 1px solid transparent;
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    border-radius: 12px; font-size: 14px; border: 1px solid transparent;
 }
-
-.bannerInfo {
-    background: #eff6ff;
-    border-color: #bfdbfe;
-    color: #1e40af;
-}
-
-.bannerError {
-    background: #fef2f2;
-    border-color: #fecaca;
-    color: #b91c1c;
-}
-
-.bannerSuccess {
-    background: #ecfdf5;
-    border-color: #a7f3d0;
-    color: #065f46;
-}
+.bannerInfo { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.bannerError { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.bannerSuccess { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
 
 /* === Pagination === */
 .pagination {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding: 16px;
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    flex-wrap: wrap; padding: 16px;
 }
-
 .pageBtn {
-    padding: 6px 16px;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    background: #fff;
-    cursor: pointer;
-    transition: background 0.2s;
+    padding: 6px 16px; border: 1px solid #e5e7eb; border-radius: 10px;
+    background: #fff; cursor: pointer; transition: background 0.2s;
 }
-
-.pageBtn:hover {
-    background: #f8fafc;
-}
-
-.pageBtn[disabled] {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.pageInfo {
-    font-size: 14px;
-    color: #475569;
-}
+.pageBtn:hover { background: #f8fafc; }
+.pageBtn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.pageInfo { font-size: 14px; color: #475569; }
 
 /* === Utilities & Status Pills === */
-.muted {
-    color: #475569;
-}
-
-.small {
-    font-size: 12px;
-    color: #475569;
-    margin-left: 6px;
-}
-
-.mono {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-}
+.muted { color: #475569; }
+.small { font-size: 12px; color: #475569; margin-left: 6px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
 .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    border: 1px solid;
-    font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px; border: 1px solid; font-size: 12px;
 }
-
-.pillAlive {
-    background: #ecfdf5;
-    color: #047857;
-    border-color: #a7f3d0;
-}
-
-.pillDead {
-    background: #fff1f2;
-    color: #be123c;
-    border-color: #fecdd3;
-}
+.pillAlive { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.pillDead  { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
 
 .dateRangeRow{
-  order: 50;                 /* ให้อยู่ก่อนปุ่มในแถวล่าง */
-  flex: 1 1 520px;           /* ยืดได้และมี min width เหมาะสม */
+  order: 50;
+  flex: 1 1 520px;
   min-width: 420px;
-  display: flex;
-  gap: 12px;
-  align-items: end;
+  display: flex; gap: 12px; align-items: end;
 }
+.formGroup{ display: flex; flex-direction: column; min-width: 200px; }
+.hyphen{ padding: 0 4px 6px; color: #6b7280; }
 
-/* กล่อง field + label แนวตั้ง (ใช้ซ้ำได้) */
-.formGroup{
-  display: flex;
-  flex-direction: column;
-  min-width: 200px;
-}
-
-/* ตัวคั่นกลาง “–” */
-.hyphen{
-  padding: 0 4px 6px;
-  color: #6b7280;
-}
-
-/* ปุ่มล้างตัวกรอง ให้อยู่ขวาสุดของแถวเดียวกันกับช่วงวันที่ */
 .clearWrap{
-  order: 51;                 /* ตามหลัง dateRangeRow */
-  flex: 0 0 auto;
-  margin-left: auto;         /* ดันไปชิดขวา */
-  display: flex;
-  align-items: end;
+  order: 51; flex: 0 0 auto; margin-left: auto;
+  display: flex; align-items: end;
 }
-
-/* จอแคบ: ให้ช่วงวันที่และปุ่มล้างลงคนละบรรทัด */
 @media (max-width: 900px){
-  .dateRangeRow{
-    flex-basis: 100%;
-    min-width: 0;
-  }
-  .clearWrap{
-    flex-basis: 100%;
-    margin-left: 0;
-    justify-content: flex-start; /* ปุ่มไปต้นบรรทัด */
-  }
+  .dateRangeRow{ flex-basis: 100%; min-width: 0; }
+  .clearWrap{ flex-basis: 100%; margin-left: 0; justify-content: flex-start; }
   .hyphen{ display: none; }
 }
 
+/* ✅ ให้ SweetAlert confirm เป็นสีแดง เมื่อใช้ customClass.confirmButton = 'swal-confirm-danger' */
+:global(.swal2-confirm.swal-confirm-danger){
+  background:#dc2626 !important;
+  border-color:#dc2626 !important;
+  color:#fff !important;
+}
