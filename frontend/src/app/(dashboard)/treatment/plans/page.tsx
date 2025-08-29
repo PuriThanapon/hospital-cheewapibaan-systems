@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Plus, RefreshCw, Search, User, FileText, Eye } from 'lucide-react';
 import PatientLookupModal from '@/app/components/modals/PatientLookupModal';
 
 type Plan = {
@@ -9,14 +10,14 @@ type Plan = {
   patients_id: string;
   title?: string | null;
   care_model?: string | null;
-  care_location?: string | null;
+  care_location?: 'home' | 'hospital' | 'mixed' | null;
   created_at?: string;
   updated_at?: string;
 };
 
 type PatientLite = {
   patients_id: string;
-  pname?: string;         // คำนำหน้า เช่น นาย/นาง/น.ส.
+  pname?: string;
   first_name?: string;
   last_name?: string;
 };
@@ -39,16 +40,16 @@ export default function TreatmentPlansListPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
-  // filter by patient
+  // filters
   const [lookupOpen, setLookupOpen] = useState(false);
   const [hnInput, setHnInput] = useState('');
   const [filterHN, setFilterHN] = useState('');
   const [filterName, setFilterName] = useState<string>('');
 
-  // patient cache: HN -> PatientLite
+  // patient cache
   const [patientByHN, setPatientByHN] = useState<Record<string, PatientLite>>({});
 
-  // โหลดรายการแผน
+  // load plans
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -75,13 +76,12 @@ export default function TreatmentPlansListPage() {
     return () => { alive = false; };
   }, [filterHN]);
 
-  // ดึงชื่อผู้ป่วยของ HN ที่ยังไม่มีในแคช
+  // warm patient names cache
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const need = Array.from(
-        new Set(rows.map(r => normalizePatientsId(r.patients_id)))
-      ).filter(hn => hn && !patientByHN[hn]);
+      const need = Array.from(new Set(rows.map(r => normalizePatientsId(r.patients_id))))
+        .filter(hn => hn && !patientByHN[hn]);
 
       if (need.length === 0) return;
 
@@ -107,9 +107,7 @@ export default function TreatmentPlansListPage() {
 
       setPatientByHN(prev => {
         const next = { ...prev };
-        for (const [hn, p] of results) {
-          if (p) next[hn] = p;
-        }
+        for (const [hn, p] of results) if (p) next[hn] = p;
         return next;
       });
     })();
@@ -122,65 +120,60 @@ export default function TreatmentPlansListPage() {
   }, [filterHN, filterName]);
 
   return (
-    <div className="min-h-screen p-4 bg-[#f7f7fb] rounded-2xl">
-      <div className="mx-auto max-w-7xl">
-        {/* Header with enhanced styling */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 p-6 bg-white/70 backdrop-blur-sm rounded-3xl shadow-lg border border-white/20">
-          <div className="mb-4 lg:mb-0">
-            <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent mb-2">
-              แผนการรักษา
-            </h1>
-            <p className="text-slate-600 text-lg font-medium">{subtitle}</p>
+    <div className="min-h-screen w-full bg-[#f7f7fb] rounded-2xl">
+      {/* ใช้ padding แบบเต็มกว้าง ไม่มี max-width */}
+      <div className="w-full px-3 sm:px-6 lg:px-8 py-6">
+
+        {/* Header */}
+        <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4 w-full">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">แผนการรักษา (Treatment Plans)</h1>
+              <div className="text-sm text-gray-500">{subtitle}</div>
+            </div>
           </div>
-          <Link
-            href="/treatment/plans/new"
-            className="inline-flex items-center px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-105 transition-all duration-300 ease-out"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            สร้างแผนใหม่
-          </Link>
+          <div className="md:ml-auto">
+            <Link
+              href="/treatment/plans/new"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow hover:from-indigo-700 hover:to-purple-700 transition-colors"
+            >
+              <Plus size={16} /> สร้างแผนใหม่
+            </Link>
+          </div>
         </div>
 
-        {/* Enhanced search bar */}
-        <div className="mb-8 p-6 bg-white/80 backdrop-blur-sm rounded-3xl shadow-lg border border-white/30">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  className="w-full pl-10 pr-4 py-3 border-0 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 text-slate-700 placeholder-slate-400"
-                  placeholder="พิมพ์ HN (เช่น HN-00000001 หรือ 1)"
-                  value={hnInput}
-                  onChange={e => setHnInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const hn = normalizePatientsId(hnInput);
-                      setFilterHN(hn);
-                      setFilterName('');
-                    }
-                  }}
-                />
-              </div>
+        {/* Filters / Search */}
+        <div className="rounded-2xl border bg-white p-4 shadow-sm mb-6 w-full">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex-1 relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                className="w-full pl-9 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                placeholder="พิมพ์ HN (เช่น HN-00000001 หรือ 1)"
+                value={hnInput}
+                onChange={e => setHnInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const hn = normalizePatientsId(hnInput);
+                    setFilterHN(hn);
+                    setFilterName('');
+                  }
+                }}
+              />
+            </div>
+            <div className="flex gap-2">
               <button
-                className="px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium border border-slate-200 hover:border-slate-300 transition-all duration-200 hover:scale-105"
+                className="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-50"
                 onClick={() => setLookupOpen(true)}
                 type="button"
               >
-                <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                ลืมรหัส (ค้นหา)
+                <User className="w-4 h-4 inline mr-1" /> ลืมรหัส (ค้นหา)
               </button>
-            </div>
-            <div className="flex gap-3">
               <button
-                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:scale-105 transition-all duration-300"
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
                 onClick={() => {
                   const hn = normalizePatientsId(hnInput);
                   setFilterHN(hn);
@@ -190,124 +183,97 @@ export default function TreatmentPlansListPage() {
                 ดูเฉพาะคนนี้
               </button>
               <button
-                className="px-6 py-3 rounded-2xl bg-white text-slate-700 font-medium border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all duration-200 hover:scale-105"
+                className="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-50"
                 onClick={() => { setFilterHN(''); setFilterName(''); setHnInput(''); }}
               >
-                ล้างตัวกรอง
+                <RefreshCw className="w-4 h-4 inline mr-1" /> ล้างตัวกรอง
               </button>
             </div>
           </div>
         </div>
 
-        {/* Enhanced status messages */}
+        {/* Banners */}
         {err && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-red-50 to-pink-50 text-red-700 border border-red-200/50 mb-6 shadow-sm">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              {err}
-            </div>
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 w-full">
+            {err}
           </div>
         )}
-
         {!err && loading && (
-          <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200/50 shadow-sm">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700 mr-3"></div>
-              <span className="font-medium">กำลังโหลด...</span>
-            </div>
+          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 px-4 py-3 flex items-center gap-2 w-full">
+            <span className="inline-block w-4 h-4 rounded-full border-2 border-blue-300 border-t-transparent animate-spin" />
+            กำลังโหลด...
           </div>
         )}
 
+        {/* Empty */}
         {!loading && !err && rows.length === 0 && (
-          <div className="p-8 rounded-3xl bg-white/70 backdrop-blur-sm border border-slate-200/50 text-center shadow-lg">
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-slate-700 mb-2">ไม่พบแผนการรักษา</h3>
-              <p className="text-slate-500">ลองปรับเปลี่ยนเงื่อนไขการค้นหาหรือสร้างแผนใหม่</p>
-            </div>
+          <div className="rounded-2xl border bg-white p-8 text-center text-gray-600 shadow-sm w-full">
+            ไม่พบแผนการรักษา — ลองค้นหาด้วย HN อื่น หรือสร้างแผนใหม่
           </div>
         )}
 
+        {/* Table */}
         {!loading && !err && rows.length > 0 && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/30 overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="rounded-2xl border bg-white shadow-sm overflow-hidden w-full">
+            <div className="overflow-x-auto max-w-[100vw]">
               <table className="min-w-full">
                 <thead>
-                  <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">รหัสแผน</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">HN / ชื่อผู้ป่วย</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">หัวเรื่อง</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">รูปแบบ</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">สถานที่รักษา</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">การทำงาน</th>
+                  <tr className="bg-gray-50 border-b">
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">รหัสแผน</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">HN / ชื่อผู้ป่วย</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">หัวเรื่อง</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">รูปแบบ</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">สถานที่รักษา</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">การทำงาน</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {rows.map((r, index) => {
+                <tbody className="divide-y">
+                  {rows.map((r) => {
                     const hn = normalizePatientsId(r.patients_id);
                     const p = patientByHN[hn];
                     const name = p
                       ? `${p.pname ?? ''}${p.first_name ?? ''} ${p.last_name ?? ''}`.replace(/\s+/g, ' ').trim()
                       : '';
+
+                    const locationBadge =
+                      r.care_location === 'home' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      r.care_location === 'hospital' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                      r.care_location === 'mixed' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                      'bg-gray-50 text-gray-600 border-gray-200';
+
+                    const locationText =
+                      r.care_location === 'home' ? 'บ้าน' :
+                      r.care_location === 'hospital' ? 'โรงพยาบาล' :
+                      r.care_location === 'mixed' ? 'ผสมผสาน' : '—';
+
                     return (
-                      <tr 
-                        key={r.plan_id} 
-                        className="hover:bg-slate-50/50 transition-colors duration-200 group"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="font-mono text-sm font-semibold text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1 inline-block">
+                      <tr key={r.plan_id} className="hover:bg-gray-50/50">
+                        <td className="px-6 py-3 align-top">
+                          <span className="font-mono text-sm px-2 py-1 rounded border bg-gray-50 text-gray-800">
                             {r.plan_id}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-mono text-sm font-bold text-slate-800">{hn}</div>
-                          <div className="text-sm text-slate-500 font-medium mt-1">
-                            {name || '—'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-slate-800">
-                            {r.title || <span className="text-slate-400">ไม่มีหัวเรื่อง</span>}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-slate-600">
-                            {r.care_model || <span className="text-slate-400">—</span>}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                            r.care_location === 'home' 
-                              ? 'bg-green-100 text-green-800' 
-                              : r.care_location === 'hospital' 
-                              ? 'bg-blue-100 text-blue-800'
-                              : r.care_location === 'mixed'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {r.care_location === 'home' ? '🏠 บ้าน'
-                              : r.care_location === 'hospital' ? '🏥 โรงพยาบาล'
-                              : r.care_location === 'mixed' ? '🔄 ผสมผสาน'
-                              : '—'}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-3 align-top">
+                          <div className="font-mono text-sm text-gray-900">{hn}</div>
+                          <div className="text-sm text-gray-600">{name || '—'}</div>
+                        </td>
+                        <td className="px-6 py-3 align-top">
+                          <div className="text-sm text-gray-900">
+                            {r.title || <span className="text-gray-400">ไม่มีหัวเรื่อง</span>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 align-top">
+                          <div className="text-sm text-gray-700">{r.care_model || <span className="text-gray-400">—</span>}</div>
+                        </td>
+                        <td className="px-6 py-3 align-top">
+                          <span className={`inline-block text-xs px-2 py-1 rounded-full border ${locationBadge}`}>{locationText}</span>
+                        </td>
+                        <td className="px-6 py-3 align-top">
                           <Link
                             href={`/treatment/plans/${encodeURIComponent(r.plan_id)}`}
-                            className="inline-flex items-center px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium text-sm shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200 group-hover:from-indigo-600 group-hover:to-purple-700"
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm hover:from-indigo-700 hover:to-purple-700"
                           >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            รายละเอียด
+                            <Eye size={14} /> รายละเอียด
                           </Link>
                         </td>
                       </tr>
@@ -319,7 +285,7 @@ export default function TreatmentPlansListPage() {
           </div>
         )}
 
-        {/* Modal: ค้นหาผู้ป่วย */}
+        {/* Patient lookup modal */}
         <PatientLookupModal
           open={lookupOpen}
           onClose={() => setLookupOpen(false)}
@@ -329,7 +295,6 @@ export default function TreatmentPlansListPage() {
             setFilterHN(hn);
             setFilterName(name || '');
             setHnInput(hn);
-            // ใส่ลง cache เพื่อแสดงชื่อทันที
             setPatientByHN(prev => ({ ...prev, [hn]: { patients_id: hn, pname: p.pname, first_name: p.first_name, last_name: p.last_name } }));
             setLookupOpen(false);
           }}

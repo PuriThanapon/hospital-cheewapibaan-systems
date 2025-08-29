@@ -3,6 +3,7 @@ const ctrl = require('../controllers/patients.controller');
 const homeNeedsCtrl = require('../controllers/home_needs.controller');
 const router = express.Router();
 
+const encounters = require('../controllers/encounters.controller');
 /**
  * ⛳️ หลักการ:
  * 1) เส้นทาง static/specific ต้องมาก่อน :id
@@ -28,5 +29,9 @@ router.delete('/:id', ctrl.deletePatient);
 // เขียน/แก้ไข (multipart)
 router.post('/', ctrl.uploadPatientFiles, ctrl.createPatient);
 router.put('/:id', ctrl.uploadPatientFiles, ctrl.updatePatient);
+
+router.get('/:hn/encounters/summary',    encounters.getSummary);
+router.post('/:hn/encounters/baseline',  encounters.upsertBaseline);
+router.post('/:hn/encounters/treatments',encounters.addTreatment);
 
 module.exports = router;

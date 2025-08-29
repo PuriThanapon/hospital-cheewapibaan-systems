@@ -1,16 +1,10 @@
-// backend/src/routes/diagnosis.routes.js
+// src/routes/patients.routes.js
 const router = require('express').Router();
-const c = require('../controllers/diagnosis.controller');
+const encounters = require('../controllers/encounters.controller');
 
-// list แบบ query: /api/patient_diagnosis?patients_id=HN-xxxx
-router.get('/', c.listDiagnosis);
+// ... routes เดิมของคุณ
 
-// list แบบ path ที่ชัดเจน: /api/patient_diagnosis/by-patient/HN-xxxx
-router.get('/by-patient/:patients_id', c.getDiagnosisByPatient);
+// ✅ Encounters endpoints
 
-// CRUD by diag_id
-router.post('/', c.createDiagnosis);
-router.patch('/:diag_id', c.updateDiagnosis);
-router.delete('/:diag_id', c.deleteDiagnosis);
 
 module.exports = router;

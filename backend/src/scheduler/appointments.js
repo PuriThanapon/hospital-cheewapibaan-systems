@@ -96,7 +96,7 @@ function buildAppointmentFlex(r) {
 
                         { type: "text", text: `⏰ เวลา: ${formatTime(r.start_time)} - ${formatTime(r.end_time)}`, size: "sm" },
                         { type: "text", text: `📍 สถานที่: ${r.place ?? "-"}`, size: "sm" },
-                        { type: "text", text: `📍 สถานที่: ${r.department ?? "-"}`, size: "sm" },
+                        { type: "text", text: `📍 แผนก: ${r.department ?? "-"}`, size: "sm" },
                         { type: "text", text: `📝 หมายเหตุ: ${r.note ?? "-"}`, size: "sm" }
                     ]
                 }

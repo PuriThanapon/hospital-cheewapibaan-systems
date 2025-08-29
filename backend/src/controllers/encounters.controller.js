@@ -1,57 +1,128 @@
-// backend/src/controllers/encounters.controller.js
-const { pool } = require('../config/db')
+// src/controllers/encounters.controller.js
+const { pool } = require('../config/db');
 
-// CREATE
-exports.createEncounter = async (req, res) => {
+/* ---------- one-time init (create tables if missing) ---------- */
+async function initTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS patient_encounter_baseline (
+      patients_id     TEXT PRIMARY KEY,
+      reason_in_dept  TEXT,
+      reason_admit    TEXT,
+      bedbound_cause  TEXT,
+      other_history   TEXT,
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS patient_symptom_treatments (
+      treatment_id  BIGSERIAL PRIMARY KEY,
+      patients_id   TEXT NOT NULL,
+      symptom       TEXT NOT NULL,
+      severity      TEXT NOT NULL CHECK (severity IN ('mild','moderate','severe')),
+      symptom_date  DATE NOT NULL,
+      medication    TEXT,
+      note          TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_treatments_patient ON patient_symptom_treatments(patients_id);
+    CREATE INDEX IF NOT EXISTS idx_treatments_date ON patient_symptom_treatments(symptom_date DESC, created_at DESC);
+  `);
+}
+
+const normalizeHN = (v='') => decodeURIComponent(String(v));
+
+/* ---------- GET /api/patients/:hn/encounters/summary ---------- */
+async function getSummary(req, res, next) {
   try {
-    const { patients_id, encounter_date, encounter_type, provider, place, note, status } = req.body
-    if (!patients_id || !encounter_date || !encounter_type) {
-      return res.status(400).json({ error: 'patients_id, encounter_date และ encounter_type จำเป็น' })
-    }
-    const q = `
-      INSERT INTO encounters (patients_id, encounter_date, encounter_type, provider, place, note, status)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      RETURNING *`
-    const r = await pool.query(q, [patients_id, encounter_date, encounter_type, provider, place, note, status || 'open'])
-    res.json(r.rows[0])
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
+    await initTables();
+    const hn = normalizeHN(req.params.hn);
+
+    const bl = await pool.query(
+      `SELECT patients_id, reason_in_dept, reason_admit, bedbound_cause, other_history, updated_at
+         FROM patient_encounter_baseline
+        WHERE patients_id = $1`,
+      [hn]
+    );
+
+    const tr = await pool.query(
+      `SELECT treatment_id, patients_id, symptom, severity, 
+              to_char(symptom_date,'YYYY-MM-DD') AS symptom_date,
+              medication, note, created_at
+         FROM patient_symptom_treatments
+        WHERE patients_id = $1
+        ORDER BY symptom_date DESC, created_at DESC`,
+      [hn]
+    );
+
+    res.json({
+      data: {
+        baseline: bl.rows[0] || null,
+        treatments: tr.rows || [],
+      }
+    });
+  } catch (e) { next(e); }
 }
 
-// READ (list by patient)
-exports.listEncounters = async (req, res) => {
-  const { patients_id } = req.query
-  if (!patients_id) return res.status(400).json({ error: 'ต้องส่ง patients_id' })
-  const r = await pool.query(
-    `SELECT * FROM encounters WHERE patients_id=$1 ORDER BY encounter_date DESC, created_at DESC`,
-    [patients_id]
-  )
-  res.json(r.rows)
-}
-
-// UPDATE
-exports.updateEncounter = async (req, res) => {
+/* ---------- POST /api/patients/:hn/encounters/baseline ---------- */
+async function upsertBaseline(req, res, next) {
   try {
-    const { encounter_id } = req.params
-    const { encounter_date, encounter_type, provider, place, note, status } = req.body
-    const q = `
-      UPDATE encounters
-      SET encounter_date=$1, encounter_type=$2, provider=$3, place=$4, note=$5, status=$6, updated_at=now()
-      WHERE encounter_id=$7
-      RETURNING *`
-    const r = await pool.query(q, [encounter_date, encounter_type, provider, place, note, status, encounter_id])
-    if (!r.rows[0]) return res.status(404).json({ error: 'ไม่พบ Encounter' })
-    res.json(r.rows[0])
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
+    await initTables();
+    const hn = normalizeHN(req.params.hn);
+    const {
+      reason_in_dept = null,
+      reason_admit = null,
+      bedbound_cause = null,
+      other_history = null,
+    } = req.body || {};
+
+    await pool.query(
+      `INSERT INTO patient_encounter_baseline
+         (patients_id, reason_in_dept, reason_admit, bedbound_cause, other_history)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (patients_id) DO UPDATE SET
+         reason_in_dept = EXCLUDED.reason_in_dept,
+         reason_admit   = EXCLUDED.reason_admit,
+         bedbound_cause = EXCLUDED.bedbound_cause,
+         other_history  = EXCLUDED.other_history,
+         updated_at     = now()`,
+      [hn, reason_in_dept, reason_admit, bedbound_cause, other_history]
+    );
+
+    res.json({ ok: true });
+  } catch (e) { next(e); }
 }
 
-// DELETE
-exports.deleteEncounter = async (req, res) => {
-  const { encounter_id } = req.params
-  const r = await pool.query('DELETE FROM encounters WHERE encounter_id=$1', [encounter_id])
-  if (r.rowCount === 0) return res.status(404).json({ error: 'ไม่พบ Encounter' })
-  res.status(204).end()
+/* ---------- POST /api/patients/:hn/encounters/treatments ---------- */
+async function addTreatment(req, res, next) {
+  try {
+    await initTables();
+    const hn = normalizeHN(req.params.hn);
+    let {
+      symptom = '',
+      severity = 'mild',
+      symptom_date = null,
+      medication = null,
+      note = null,
+    } = req.body || {};
+
+    symptom = String(symptom || '').trim();
+    severity = String(severity || 'mild').toLowerCase();
+    if (!['mild','moderate','severe'].includes(severity)) severity = 'mild';
+    if (!symptom) return res.status(400).json({ error: 'symptom is required' });
+    if (!symptom_date) return res.status(400).json({ error: 'symptom_date is required (YYYY-MM-DD)' });
+
+    const { rows } = await pool.query(
+      `INSERT INTO patient_symptom_treatments
+         (patients_id, symptom, severity, symptom_date, medication, note)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING treatment_id`,
+      [hn, symptom, severity, symptom_date, medication, note]
+    );
+
+    res.json({ ok: true, treatment_id: rows[0].treatment_id });
+  } catch (e) { next(e); }
 }
+
+module.exports = {
+  getSummary,
+  upsertBaseline,
+  addTreatment,
+};
