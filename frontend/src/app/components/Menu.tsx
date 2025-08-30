@@ -25,7 +25,7 @@ const menuItems = [
       { icon: <Users size={20} />, label: "รายชื่อผู้ป่วย", href: "/patient" },
       { icon: <Stethoscope size={20} />, label: "ข้อมูลการรักษา", href: "/treatment" },
       { icon: <CalendarDays size={20} />, label: "การนัดหมาย", href: "/appointments" },
-      { icon: <Bed size={20} />, label: "จัดการเตียง", href: "bed-stays"},
+      { icon: <Bed size={20} />, label: "จัดการเตียง", href: "/bed-stays"},
       { icon: <FileText size={20} />, label: "ออกรายงาน", href: "/report" },
       { icon: <FolderClosed size={20} />, label: "เอกสาร", href: "/templates"},
     ],
