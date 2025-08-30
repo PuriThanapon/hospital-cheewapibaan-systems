@@ -6,17 +6,20 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Modal from '@/app/components/ui/Modal';
 import DatePickerField from '@/app/components/DatePicker';
-import { ClipboardList, Edit3, Plus, Save, User, X, Calendar, Pill, FileText, Activity, ArrowLeft, Stethoscope, Heart } from 'lucide-react';
+import {
+  ClipboardList, Edit3, Plus, Save, User, X, Calendar, Pill,
+  FileText, Activity, ArrowLeft, Stethoscope, Heart, Phone, Building2
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
-import BaselineForm from '@/app/components/forms/BaselineForm';
+import BaselineForm, { Baseline as BaselineFormType } from '@/app/components/forms/BaselineForm';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
 const join = (p: string) => (p.startsWith('http') ? p : `${API_BASE}${p}`);
 
 const toast = Swal.mixin({
   toast: true, position: 'top-end', timer: 2200, showConfirmButton: false,
-  didOpen: (t) => { t.onmouseenter = Swal.stopTimer; t.onmouseleave = Swal.resumeTimer; },
+  didOpen: (t) => { (t as any).onmouseenter = Swal.stopTimer; (t as any).onmouseleave = Swal.resumeTimer; },
 });
 
 type Baseline = {
@@ -25,6 +28,8 @@ type Baseline = {
   reason_admit?: string | null;
   bedbound_cause?: string | null;
   other_history?: string | null;
+  referral_hospital?: string | null;  // ✅ ใหม่
+  referral_phone?: string | null;     // ✅ ใหม่
 };
 
 type Treatment = {
@@ -87,21 +92,23 @@ export default function EncountersPage() {
   const [baseline, setBaseline] = useState<Baseline | null>(null);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
 
-  // ===== Patient name state
+  // Patient name
   const [pname, setPname] = useState<PatientName | null>(null);
 
-  // ===== Baseline modal state
+  // Baseline modal + state (ใช้ร่วมกับ BaselineForm)
   const [blOpen, setBlOpen]     = useState(false);
   const [blSaving, setBlSaving] = useState(false);
-  const [bl, setBl]             = useState<Baseline>({
+  const [bl, setBl] = useState<Baseline>({
     patients_id: hn || '',
     reason_in_dept: '',
     reason_admit: '',
     bedbound_cause: '',
     other_history: '',
+    referral_hospital: '',  // ✅
+    referral_phone: '',     // ✅
   });
 
-  // ===== Treatment modal state
+  // Treatment modal state
   const [trOpen, setTrOpen]     = useState(false);
   const [trSaving, setTrSaving] = useState(false);
   const [tr, setTr]             = useState({
@@ -119,11 +126,10 @@ export default function EncountersPage() {
     setTr(s => ({ ...s, patients_id: hn || '' }));
   }, [hn]);
 
-  // โหลดชื่อผู้ป่วยจากตาราง patients
+  // โหลดชื่อผู้ป่วยจากตาราง patients (optional)
   async function loadPatientName() {
     if (!hn) return;
     try {
-      // คาดหวังให้มีเอ็นด์พอยต์นี้: GET /api/patients/:hn → { data: { pname, first_name, last_name, ... } } หรือ object ตรง ๆ
       const res = await http<any>(`/api/patients/${encodeURIComponent(hn)}`);
       const obj = res?.data ?? res ?? {};
       setPname({
@@ -132,7 +138,6 @@ export default function EncountersPage() {
         last_name: obj.last_name ?? null,
       });
     } catch {
-      // ถ้าไม่มีเอ็นด์พอยต์ดังกล่าว ก็ปล่อยว่างไว้ (แสดงเฉพาะ HN)
       setPname(null);
     }
   }
@@ -146,7 +151,16 @@ export default function EncountersPage() {
       );
       const b = res?.data?.baseline || null;
       setBaseline(b);
-      setBl(prev => ({ ...prev, patients_id: hn, ...(b || {}) }));
+      setBl(prev => ({
+        ...prev,
+        patients_id: hn,
+        reason_in_dept: b?.reason_in_dept ?? '',
+        reason_admit: b?.reason_admit ?? '',
+        bedbound_cause: b?.bedbound_cause ?? '',
+        other_history: b?.other_history ?? '',
+        referral_hospital: b?.referral_hospital ?? '',
+        referral_phone: b?.referral_phone ?? '',
+      }));
       setTreatments(res?.data?.treatments || []);
       if (!b) setBlOpen(true);
     } catch (e: any) {
@@ -165,9 +179,18 @@ export default function EncountersPage() {
   async function saveBaseline() {
     setBlSaving(true);
     try {
+      // เตรียม payload ให้ครบฟิลด์
+      const payload = {
+        reason_in_dept: bl.reason_in_dept || null,
+        reason_admit: bl.reason_admit || null,
+        bedbound_cause: bl.bedbound_cause || null,
+        other_history: bl.other_history || null,
+        referral_hospital: (bl as any).referral_hospital ?? null,
+        referral_phone: (bl as any).referral_phone ?? null,
+      };
       await http(`/api/patients/${encodeURIComponent(hn)}/encounters/baseline`, {
         method: 'POST',
-        body: JSON.stringify(bl),
+        body: JSON.stringify(payload),
       });
       toast.fire({ icon: 'success', title: 'บันทึกประวัติเบื้องต้นแล้ว' });
       setBlOpen(false);
@@ -254,17 +277,17 @@ export default function EncountersPage() {
       <header className="bg-white border-b border-gray-200 rounded-2xl mb-5">
         <div className="w-full px-6 py-6">
           <div className="flex items-center gap-4 mb-6">
-            <Link 
-              href={`/patient`} 
+            <Link
+              href={`/patient`}
               className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </Link>
-            
+
             <div className="p-3 rounded-lg text-white" style={{backgroundColor: '#005A50'}}>
               <Stethoscope className="w-6 h-6" />
             </div>
-            
+
             <div className="flex-1">
               <h1 className="text-xl font-bold text-gray-900">ประวัติผู้ป่วย</h1>
               <div className="flex items-center gap-3 text-sm text-gray-600 mt-1">
@@ -336,6 +359,25 @@ export default function EncountersPage() {
                   {baseline.other_history || <span className="text-gray-400">ไม่ระบุ</span>}
                 </p>
               </div>
+
+              <div className="p-4 bg-white rounded-lg border border-gray-200 md:col-span-2 xl:col-span-2">
+                <div className="flex items-center gap-3 mb-2">
+                  <Building2 className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-sm font-medium text-gray-700">ต้นสังกัด/ช่องทางติดต่อ</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                    <span className="text-gray-500">โรงพยาบาลต้นสังกัด:</span>
+                    <span className="text-gray-900">{baseline.referral_hospital || <span className="text-gray-400">ไม่ระบุ</span>}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-blue-600" />
+                    <span className="text-gray-500">เบอร์โทร:</span>
+                    <span className="text-gray-900">{baseline.referral_phone || <span className="text-gray-400">ไม่ระบุ</span>}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -355,7 +397,7 @@ export default function EncountersPage() {
                 <p className="text-sm text-gray-600">บันทึกอาการและการรักษาใหม่</p>
               </div>
             </div>
-            
+
             <button
               className="px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 hover:opacity-90"
               style={{backgroundColor: '#005A50'}}
@@ -386,7 +428,7 @@ export default function EncountersPage() {
               <p className="text-sm text-gray-600">รายการการรักษาที่ผ่านมาทั้งหมด</p>
             </div>
           </div>
-          
+
           {treatments.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -398,15 +440,15 @@ export default function EncountersPage() {
               {treatments.map((t) => (
                 <div key={t.treatment_id} className="p-5 bg-gray-50 rounded-lg border">
                   <h3 className="font-medium text-gray-900 mb-3">{t.symptom}</h3>
-                  
+
                   <div className="flex flex-wrap items-center gap-3 mb-3">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
                       <span>{t.symptom_date}</span>
                     </div>
-                    
+
                     <SevBadge s={t.severity} />
-                    
+
                     {t.medication && (
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Pill className="w-4 h-4" />
@@ -414,7 +456,7 @@ export default function EncountersPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {t.note && (
                     <div className="p-3 bg-white rounded-lg border-l-4" style={{borderColor: '#005A50'}}>
                       <div className="flex items-start gap-2">
@@ -431,7 +473,6 @@ export default function EncountersPage() {
             </div>
           )}
         </section>
-        <BaselineForm value={bl} onChange={setBl} />
       </main>
 
       {/* ===== BASELINE MODAL ===== */}
@@ -444,8 +485,8 @@ export default function EncountersPage() {
           title="บันทึกประวัติเบื้องต้น"
           footer={
             <div className="flex justify-end gap-3">
-              <button 
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2" 
+              <button
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
                 onClick={() => setBlOpen(false)}
               >
                 <X className="w-4 h-4" /> ยกเลิก
@@ -461,54 +502,11 @@ export default function EncountersPage() {
             </div>
           }
         >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">เหตุผลที่มาอยู่แผนกนี้</label>
-              <textarea 
-                className="w-full border border-gray-300 rounded-lg p-3 resize-none" 
-                style={{'--tw-ring-color': '#005A50'}}
-                onFocus={(e) => e.target.style.borderColor = '#005A50'}
-                onBlur={(e) => e.target.style.borderColor = '#d1d5db'} 
-                rows={3}
-                placeholder="กรุณาระบุเหตุผล..."
-                value={bl.reason_in_dept || ''} 
-                onChange={e => setBl(s => ({...s, reason_in_dept:e.target.value}))}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">สาเหตุที่เข้ามาที่แผนก</label>
-              <textarea 
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" 
-                rows={3}
-                placeholder="กรุณาระบุสาเหตุ..."
-                value={bl.reason_admit || ''} 
-                onChange={e => setBl(s => ({...s, reason_admit:e.target.value}))}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">สาเหตุที่ติดเตียง</label>
-              <textarea 
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" 
-                rows={3}
-                placeholder="กรุณาระบุสาเหตุ..."
-                value={bl.bedbound_cause || ''} 
-                onChange={e => setBl(s => ({...s, bedbound_cause:e.target.value}))}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">อื่น ๆ</label>
-              <textarea 
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" 
-                rows={4}
-                placeholder="ข้อมูลเพิ่มเติม..."
-                value={bl.other_history || ''} 
-                onChange={e => setBl(s => ({...s, other_history:e.target.value}))}
-              />
-            </div>
-          </div>
+          {/* ✅ ใช้ฟอร์มชุดเดียวเพื่อไม่ให้ค่าทับกัน */}
+          <BaselineForm
+            value={bl as unknown as BaselineFormType}
+            onChange={(v) => setBl(v as unknown as Baseline)}
+          />
         </Modal>
       )}
 
@@ -522,8 +520,8 @@ export default function EncountersPage() {
           title="เพิ่มบันทึกการรักษาตามอาการ"
           footer={
             <div className="flex justify-end gap-3">
-              <button 
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2" 
+              <button
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
                 onClick={() => setTrOpen(false)}
               >
                 <X className="w-4 h-4" /> ยกเลิก
@@ -544,11 +542,11 @@ export default function EncountersPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <span className="text-red-500">*</span> อาการที่เป็น
               </label>
-              <textarea 
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" 
+              <textarea
+                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 rows={3}
                 placeholder="อธิบายอาการที่เป็น..."
-                value={tr.symptom} 
+                value={tr.symptom}
                 onChange={e => setTr(s => ({...s, symptom:e.target.value}))}
               />
             </div>
@@ -556,9 +554,9 @@ export default function EncountersPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">ระดับความรุนแรง</label>
-                <select 
+                <select
                   className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={tr.severity} 
+                  value={tr.severity}
                   onChange={e => setTr(s => ({...s, severity: e.target.value as any}))}
                 >
                   <option value="mild">เบา</option>
@@ -569,8 +567,8 @@ export default function EncountersPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">วันที่เกิดอาการ</label>
-                <DatePickerField 
-                  value={tr.symptom_date} 
+                <DatePickerField
+                  value={tr.symptom_date}
                   onChange={(v) => setTr(s => ({...s, symptom_date: v}))}
                 />
               </div>
@@ -578,21 +576,21 @@ export default function EncountersPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">ยา/วิธีการรักษา</label>
-              <input 
+              <input
                 className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="ระบุยาหรือวิธีการรักษา..."
-                value={tr.medication || ''} 
+                value={tr.medication || ''}
                 onChange={e => setTr(s => ({...s, medication:e.target.value}))}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">หมายเหตุเพิ่มเติม</label>
-              <textarea 
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" 
+              <textarea
+                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 rows={3}
                 placeholder="หมายเหตุหรือข้อมูลเพิ่มเติม..."
-                value={tr.note || ''} 
+                value={tr.note || ''}
                 onChange={e => setTr(s => ({...s, note:e.target.value}))}
               />
             </div>

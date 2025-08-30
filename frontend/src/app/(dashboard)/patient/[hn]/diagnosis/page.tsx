@@ -82,15 +82,21 @@ function fmtDate(d?: string | null) {
   const dt = new Date(d)
   return isNaN(dt.getTime()) ? d : dt.toLocaleDateString()
 }
-function ageFromDOB(dob?: string | null): number | null {
-  if (!dob) return null
-  const d = new Date(dob)
-  if (isNaN(d.getTime())) return null
-  const now = new Date()
-  let a = now.getFullYear() - d.getFullYear()
-  const m = now.getMonth() - d.getMonth()
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--
-  return a
+function calculateAge(birthdateStr) {
+  if (!birthdateStr) return '-';
+  const birthDate = new Date(birthdateStr);
+  if (isNaN(birthDate.getTime())) return '-';
+  const today = new Date();
+  let years = today.getFullYear() - birthDate.getFullYear();
+  let months = today.getMonth() - birthDate.getMonth();
+  if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+    years--;
+    months = 12 + months;
+  }
+  if (today.getDate() < birthDate.getDate() && months > 0) months--;
+  if (years > 0) return `${years} ปี`;
+  if (months > 0) return `${months} เดือน`;
+  return `0 เดือน`;
 }
 
 export default function PatientDiagnosisPage() {
@@ -120,7 +126,7 @@ export default function PatientDiagnosisPage() {
       setMessage(null)
       const [pRes, dRes] = await Promise.all([
         fetch(ENDPOINTS.getPatient(patientsId), { cache: 'no-store' }),
-        fetch(ENDPOINTS.listDx(patientsId),    { cache: 'no-store' }),
+        fetch(ENDPOINTS.listDx(patientsId), { cache: 'no-store' }),
       ])
       const raw = dRes.ok ? await dRes.json() : []
       const mapped: Diagnosis[] = (raw || []).map((x: Diagnosis) => ({
@@ -178,42 +184,84 @@ export default function PatientDiagnosisPage() {
     }
 
     const html = `
-      <div style="text-align:left; display:grid; gap:10px">
-        <label>ICD-10-TM
-          <input id="dx-code" class="swal2-input" placeholder="เช่น E11.9" value="${v.code ?? ''}">
-        </label>
-        <label>คำวินิจฉัย
-          <input id="dx-term" class="swal2-input" placeholder="เช่น เบาหวานชนิดที่ 2" value="${v.term ?? ''}">
-        </label>
-        <label>วันที่ให้บริการ
-          <input id="dx-dateserv" type="date" class="swal2-input" value="${v.diagnosed_at ?? ''}">
-        </label>
-        <label>วันที่เริ่มเป็น
-          <input id="dx-onset" type="date" class="swal2-input" value="${v.onset_date ?? ''}">
-        </label>
-        <label>ชนิดการวินิจฉัย
-          <select id="dx-type" class="swal2-input">
-            <option value="principal" ${v.dx_type==='principal'?'selected':''}>โรคหลัก (Principal)</option>
-            <option value="secondary" ${v.dx_type==='secondary'?'selected':''}>โรคร่วม (Secondary)</option>
-            <option value="complication" ${v.dx_type==='complication'?'selected':''}>ภาวะแทรกซ้อน</option>
-            <option value="external_cause" ${v.dx_type==='external_cause'?'selected':''}>สาเหตุภายนอก</option>
-          </select>
-        </label>
-        <label>ยืนยันผล
-          <select id="dx-veri" class="swal2-input">
-            <option value="confirmed" ${v.verification_status==='confirmed'?'selected':''}>ยืนยันแล้ว</option>
-            <option value="presumed" ${v.verification_status==='presumed'?'selected':''}>สงสัย/คาดว่า</option>
-            <option value="ruled_out" ${v.verification_status==='ruled_out'?'selected':''}>ตัดออก</option>
-          </select>
-        </label>
-        <label>สถานะ
-          <select id="dx-status" class="swal2-input">
-            <option value="active" ${v.status==='active'?'selected':''}>กำลังรักษา</option>
-            <option value="resolved" ${v.status==='resolved'?'selected':''}>หายแล้ว</option>
-            <option value="inactive" ${v.status==='inactive'?'selected':''}>ยกเลิกติดตาม</option>
-          </select>
-        </label>
-      </div>
+      <div class="grid grid-cols-1 gap-4 p-4">
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-1 block">ICD-10-TM</span>
+        <input 
+          id="dx-code" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+          placeholder="เช่น E11.9" 
+          value="${v.code ?? ''}"
+        >
+      </label>
+      
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-1 block">คำวินิจฉัย</span>
+        <input 
+          id="dx-term" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
+          placeholder="เช่น เบาหวานชนิดที่ 2" 
+          value="${v.term ?? ''}"
+        >
+      </label>
+      
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-1 block">วันที่ให้บริการ</span>
+        <input 
+          id="dx-dateserv" 
+          type="date" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          value="${v.diagnosed_at ?? ''}"
+        >
+      </label>
+      
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-1 block">วันที่เริ่มเป็น</span>
+        <input 
+          id="dx-onset" 
+          type="date" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          value="${v.onset_date ?? ''}"
+        >
+      </label>
+      
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-1 block">ชนิดการวินิจฉัย</span>
+        <select 
+          id="dx-type" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+        >
+          <option value="principal" ${v.dx_type === 'principal' ? 'selected' : ''}>โรคหลัก (Principal)</option>
+          <option value="secondary" ${v.dx_type === 'secondary' ? 'selected' : ''}>โรคร่วม (Secondary)</option>
+          <option value="complication" ${v.dx_type === 'complication' ? 'selected' : ''}>ภาวะแทรกซ้อน</option>
+          <option value="external_cause" ${v.dx_type === 'external_cause' ? 'selected' : ''}>สาเหตุภายนอก</option>
+        </select>
+      </label>
+      
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-1 block">ยืนยันผล</span>
+        <select 
+          id="dx-veri" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+        >
+          <option value="confirmed" ${v.verification_status === 'confirmed' ? 'selected' : ''}>ยืนยันแล้ว</option>
+          <option value="presumed" ${v.verification_status === 'presumed' ? 'selected' : ''}>สงสัย/คาดว่า</option>
+          <option value="ruled_out" ${v.verification_status === 'ruled_out' ? 'selected' : ''}>ตัดออก</option>
+        </select>
+      </label>
+      
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-1 block">สถานะ</span>
+        <select 
+          id="dx-status" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+        >
+          <option value="active" ${v.status === 'active' ? 'selected' : ''}>กำลังรักษา</option>
+          <option value="resolved" ${v.status === 'resolved' ? 'selected' : ''}>หายแล้ว</option>
+          <option value="inactive" ${v.status === 'inactive' ? 'selected' : ''}>ยกเลิกติดตาม</option>
+        </select>
+      </label>
+    </div>
     `
 
     const result = await Swal.fire({
@@ -244,7 +292,7 @@ export default function PatientDiagnosisPage() {
     return result.value as Partial<Diagnosis>
   }
 
-  function violatesPrincipalRule(payload: Partial<Diagnosis>, editingId?: number|string) {
+  function violatesPrincipalRule(payload: Partial<Diagnosis>, editingId?: number | string) {
     const dtype = payload.dx_type ?? 'secondary'
     if (dtype !== 'principal') return false
     const enc = (defaultEncounterId ?? null)
@@ -262,7 +310,7 @@ export default function PatientDiagnosisPage() {
     if (!values) return
 
     if (violatesPrincipalRule(values)) {
-      await Swal.fire({ icon:'warning', title:'ตั้งโรคหลักซ้ำ', text:'Encounter เดียวกันมี “โรคหลัก (Principal)” ได้เพียง 1 รายการ' })
+      await Swal.fire({ icon: 'warning', title: 'ตั้งโรคหลักซ้ำ', text: 'Encounter เดียวกันมี “โรคหลัก (Principal)” ได้เพียง 1 รายการ' })
       return
     }
 
@@ -290,9 +338,9 @@ export default function PatientDiagnosisPage() {
     } catch (err: any) {
       const msg = String(err?.message || 'บันทึกไม่สำเร็จ')
       if (msg.includes('unique') || msg.includes('23505')) {
-        await Swal.fire({ icon:'warning', title:'ตั้งโรคหลักซ้ำ', text:'Encounter เดียวกันมีโรคหลัก (Principal) อยู่แล้ว' })
+        await Swal.fire({ icon: 'warning', title: 'ตั้งโรคหลักซ้ำ', text: 'Encounter เดียวกันมีโรคหลัก (Principal) อยู่แล้ว' })
       } else {
-        await Swal.fire({ icon:'error', title:'บันทึกไม่สำเร็จ', text: msg })
+        await Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: msg })
       }
       setMessage(msg)
     }
@@ -303,7 +351,7 @@ export default function PatientDiagnosisPage() {
     if (!values) return
 
     if (violatesPrincipalRule(values, row.diag_id)) {
-      await Swal.fire({ icon:'warning', title:'ตั้งโรคหลักซ้ำ', text:'Encounter เดียวกันมี “โรคหลัก (Principal)” ได้เพียง 1 รายการ' })
+      await Swal.fire({ icon: 'warning', title: 'ตั้งโรคหลักซ้ำ', text: 'Encounter เดียวกันมี “โรคหลัก (Principal)” ได้เพียง 1 รายการ' })
       return
     }
 
@@ -330,7 +378,7 @@ export default function PatientDiagnosisPage() {
       Toast.fire({ icon: 'success', title: 'บันทึกการแก้ไขสำเร็จ' })
     } catch (err: any) {
       const msg = String(err?.message || 'บันทึกไม่สำเร็จ')
-      await Swal.fire({ icon:'error', title:'บันทึกไม่สำเร็จ', text: msg })
+      await Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: msg })
       setMessage(msg)
     }
   }
@@ -350,25 +398,25 @@ export default function PatientDiagnosisPage() {
       const res = await fetch(ENDPOINTS.deleteDx(diag_id), { method: 'DELETE' })
       if (!res.ok) throw new Error(await res.text())
       await loadAll()
-      Toast.fire({ icon:'success', title:'ลบสำเร็จ' })
-    } catch (err:any) {
-      await Swal.fire({ icon:'error', title:'ลบไม่สำเร็จ', text: err?.message || '' })
+      Toast.fire({ icon: 'success', title: 'ลบสำเร็จ' })
+    } catch (err: any) {
+      await Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: err?.message || '' })
     }
   }
 
   const goToPatient = async () => {
     const hnNext = patientsId.trim()
     if (!hnNext) {
-      await Swal.fire({ icon:'warning', title:'ข้อมูลไม่ครบ', text:'กรุณากรอก HN' })
+      await Swal.fire({ icon: 'warning', title: 'ข้อมูลไม่ครบ', text: 'กรุณากรอก HN' })
       return
     }
     const url = `/patient/${encodeURIComponent(hnNext)}/diagnosis${encounterParam ? `?encounter=${encodeURIComponent(encounterParam)}` : ''}`
     if (hnNext === (hn || '')) {
       await loadAll()
-      Toast.fire({ icon:'info', title:'รีเฟรชข้อมูลแล้ว' })
+      Toast.fire({ icon: 'info', title: 'รีเฟรชข้อมูลแล้ว' })
     } else {
       router.push(url)
-      Toast.fire({ icon:'info', title:'กำลังไปยังผู้ป่วยที่เลือก' })
+      Toast.fire({ icon: 'info', title: 'กำลังไปยังผู้ป่วยที่เลือก' })
     }
   }
 
@@ -376,12 +424,12 @@ export default function PatientDiagnosisPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>
-          <Link 
-              href={`/patient`} 
-              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </Link>🩺 การวินิจฉัยของผู้ป่วย (ICD-10-TM)</h1>
+          <Link
+            href={`/patient`}
+            className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </Link>🩺 การวินิจฉัยของผู้ป่วย (ICD-10-TM)</h1>
         <div className={styles.toolbar}>
           <label className={styles.inline}>
             <span>รหัสผู้ป่วย (HN)</span>
@@ -402,7 +450,7 @@ export default function PatientDiagnosisPage() {
           <div><span className={styles.muted}>ผู้ป่วย:</span> <b>{patient.first_name || '-'} {patient.last_name || ''}</b></div>
           <div><span className={styles.muted}>HN:</span> <b>{patient.patients_id}</b></div>
           <div><span className={styles.muted}>เพศ:</span> <b>{patient.gender || '-'}</b></div>
-          <div><span className={styles.muted}>อายุ:</span> <b>{ageFromDOB(patient.birthdate) ?? '-'}</b></div>
+          <div><span className={styles.muted}>อายุ:</span> <b>{calculateAge(patient.birthdate) ?? '-'}</b></div>
         </section>
       ) : (
         <section className={styles.notice}>ไม่พบข้อมูลผู้ป่วย ลองตรวจสอบ HN แล้วกดโหลดอีกครั้ง</section>

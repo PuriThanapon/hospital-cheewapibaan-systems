@@ -122,7 +122,6 @@ const FIELD_META = {
   gender: { label: 'เพศ', focusName: 'gender' },
   blood_group: { label: 'กรุ๊ปเลือด', focusName: 'blood_group' },
   bloodgroup_rh: { label: 'ประเภท Rh', focusName: 'bloodgroup_rh' },
-  disease: { label: 'โรคประจำตัว', focusName: 'disease' },
   treat_at: { label: 'รักษาที่', focusName: 'treat_at' },
 };
 const DEFAULT_REQUIRED = Object.keys(FIELD_META);
@@ -339,6 +338,8 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
             reason_admit: v.reason_admit ?? '',
             bedbound_cause: v.bedbound_cause ?? '',
             other_history: v.other_history ?? '',
+            referral_hospital: v.referral_hospital ?? '',
+            referral_phone: v.referral_phone ?? '',
           }}
           onChange={(b) => onChange({ ...v, ...b })}
         />
@@ -631,19 +632,6 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
             />
           </InputField>
         </div>
-
-        <div className="mt-6">
-          <InputField label="โรคประจำตัว / ประวัติการแพทย์" required error={errors.disease} icon={<FileText size={16} />}>
-            <textarea
-              name="disease"
-              className="w-full px-4 py-4 rounded-lg bg-white border-2 border-gray-300 focus:border-[#005A50] focus:ring-4 focus:ring-[#005A50]/10 transition-all duration-200 resize-none"
-              value={v.disease || ''}
-              onChange={set('disease')}
-              placeholder="ระบุโรคประจำตัว, ประวัติการแพทย์, ยาที่แพ้ หรือข้อมูลสำคัญทางการแพทย์ (ถ้าไม่มี ใส่ -)"
-              rows={4}
-            />
-          </InputField>
-        </div>
       </div>
 
       {/* เอกสารแนบที่จำเป็น */}
@@ -652,7 +640,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <div className="p-2 bg-[#005A50] rounded-lg">
             <FileUp size={20} className="text-white" />
           </div>
-          เอกสารแนบที่จำเป็น
+          เอกสารประกอบการยื่นเรื่อง
           <span className="text-sm font-normal text-gray-500 ml-auto">Required Documents</span>
         </h3>
 

@@ -1274,7 +1274,7 @@ export default function TreatmentsListPage() {
                   <div className="text-gray-900">{detail.treatment_type}</div>
                 </div>
                 <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="font-semibold text-gray-700 mb-1">วันที่รักษา</div>
+                  <div className="font-semibold text-gray-700 mb-1">วันที่บันทึก</div>
                   <div className="text-gray-900">{formatThaiDate(detail.treatment_date)}</div>
                 </div>
                 <div className="md:col-span-2 p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl border border-yellow-200">

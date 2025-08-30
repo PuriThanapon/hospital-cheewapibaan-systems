@@ -503,7 +503,7 @@ const TreatmentForm = forwardRef<TreatmentFormHandle, Props>(
               <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-blue-200">
                 <div className={`w-3 h-3 rounded-full ${value.treatment_date ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                 <span className={value.treatment_date ? 'text-green-700 font-medium' : 'text-gray-600'}>
-                  วันที่รักษา {value.treatment_date ? '✓' : '✗'}
+                  วันที่บันทึก {value.treatment_date ? '✓' : '✗'}
                 </span>
               </div>
             </div>

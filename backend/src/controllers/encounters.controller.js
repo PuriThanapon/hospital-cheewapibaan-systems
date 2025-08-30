@@ -1,17 +1,25 @@
-// src/controllers/encounters.controller.js
+// backend/src/controllers/encounters.controller.js
 const { pool } = require('../config/db');
 
 /* ---------- one-time init (create tables if missing) ---------- */
 async function initTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS patient_encounter_baseline (
-      patients_id     TEXT PRIMARY KEY,
-      reason_in_dept  TEXT,
-      reason_admit    TEXT,
-      bedbound_cause  TEXT,
-      other_history   TEXT,
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+      patients_id        TEXT PRIMARY KEY,
+      reason_in_dept     TEXT,
+      reason_admit       TEXT,
+      bedbound_cause     TEXT,
+      other_history      TEXT,
+      referral_hospital  TEXT,   -- ✅ ใหม่
+      referral_phone     TEXT,   -- ✅ ใหม่
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    -- เผื่อเคยมีตารางแล้ว แต่ยังไม่มีคอลัมน์ใหม่
+    ALTER TABLE patient_encounter_baseline
+      ADD COLUMN IF NOT EXISTS referral_hospital TEXT,
+      ADD COLUMN IF NOT EXISTS referral_phone    TEXT;
+
     CREATE TABLE IF NOT EXISTS patient_symptom_treatments (
       treatment_id  BIGSERIAL PRIMARY KEY,
       patients_id   TEXT NOT NULL,
@@ -33,10 +41,13 @@ const normalizeHN = (v='') => decodeURIComponent(String(v));
 async function getSummary(req, res, next) {
   try {
     await initTables();
-    const hn = normalizeHN(req.params.hn);
+    const hn = normalizeHN(req.params.hn || req.params.id); // รองรับทั้ง :hn/:id
 
     const bl = await pool.query(
-      `SELECT patients_id, reason_in_dept, reason_admit, bedbound_cause, other_history, updated_at
+      `SELECT patients_id,
+              reason_in_dept, reason_admit, bedbound_cause, other_history,
+              referral_hospital, referral_phone,                      -- ✅ ส่งออก
+              updated_at
          FROM patient_encounter_baseline
         WHERE patients_id = $1`,
       [hn]
@@ -65,25 +76,29 @@ async function getSummary(req, res, next) {
 async function upsertBaseline(req, res, next) {
   try {
     await initTables();
-    const hn = normalizeHN(req.params.hn);
+    const hn = normalizeHN(req.params.hn || req.params.id);
     const {
       reason_in_dept = null,
       reason_admit = null,
       bedbound_cause = null,
       other_history = null,
+      referral_hospital = null,     // ✅ รับเพิ่ม
+      referral_phone = null,        // ✅ รับเพิ่ม
     } = req.body || {};
 
     await pool.query(
       `INSERT INTO patient_encounter_baseline
-         (patients_id, reason_in_dept, reason_admit, bedbound_cause, other_history)
-       VALUES ($1,$2,$3,$4,$5)
+         (patients_id, reason_in_dept, reason_admit, bedbound_cause, other_history, referral_hospital, referral_phone)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT (patients_id) DO UPDATE SET
-         reason_in_dept = EXCLUDED.reason_in_dept,
-         reason_admit   = EXCLUDED.reason_admit,
-         bedbound_cause = EXCLUDED.bedbound_cause,
-         other_history  = EXCLUDED.other_history,
-         updated_at     = now()`,
-      [hn, reason_in_dept, reason_admit, bedbound_cause, other_history]
+         reason_in_dept    = EXCLUDED.reason_in_dept,
+         reason_admit      = EXCLUDED.reason_admit,
+         bedbound_cause    = EXCLUDED.bedbound_cause,
+         other_history     = EXCLUDED.other_history,
+         referral_hospital = EXCLUDED.referral_hospital,
+         referral_phone    = EXCLUDED.referral_phone,
+         updated_at        = now()`,
+      [hn, reason_in_dept, reason_admit, bedbound_cause, other_history, referral_hospital, referral_phone]
     );
 
     res.json({ ok: true });
@@ -94,7 +109,7 @@ async function upsertBaseline(req, res, next) {
 async function addTreatment(req, res, next) {
   try {
     await initTables();
-    const hn = normalizeHN(req.params.hn);
+    const hn = normalizeHN(req.params.hn || req.params.id);
     let {
       symptom = '',
       severity = 'mild',
