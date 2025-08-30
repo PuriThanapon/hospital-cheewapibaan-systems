@@ -481,17 +481,17 @@ const TreatmentPlanForm = forwardRef<TreatmentPlanFormHandle, Props>(
 
       {/* ========== ความปรารถนา 1–5 ========== */}
       <label className="md:col-span-2">
-        <div className="mb-1 text-sm text-gray-700">1) เลือกบุคคลมาตัดสินใจแทน</div>
+        <div className="mb-1 text-sm text-gray-700">1) แต่งตั้ง/มอบอำนาจผู้แทนตัดสินใจด้านการรักษาพยาบาล</div>
         <input
           className="w-full px-3 py-2 border rounded-lg border-gray-300"
           value={value.wishes1_decision_person || ''}
           onChange={(e) => onChange({ ...value, wishes1_decision_person: e.target.value })}
-          placeholder="เช่น คุณ… (ความสัมพันธ์…)"
+          placeholder="โปรดระบุบุคคลที่ผู้ป่วยมอบอำนาจให้ตัดสินใจด้านการรักษาพยาบาลเมื่อปู้ป่วยไม่สามารถแสดงเจตนาได้"
         />
       </label>
 
       <label className="md:col-span-2">
-        <div className="mb-1 text-sm text-gray-700">2) เลือกวิธีการดูแลตามที่ผู้ป่วยต้องการ</div>
+        <div className="mb-1 text-sm text-gray-700">2) ความประสงค์ด้านการดูแลรักษา</div>
         <textarea
           rows={2}
           className="w-full px-3 py-2 border rounded-lg border-gray-300"
@@ -521,7 +521,7 @@ const TreatmentPlanForm = forwardRef<TreatmentPlanFormHandle, Props>(
           className="w-full px-3 py-2 border rounded-lg border-gray-300"
           value={value.wishes4_home_caregiver || ''}
           onChange={(e) => onChange({ ...value, wishes4_home_caregiver: e.target.value })}
-          placeholder="ชื่อ-ความสัมพันธ์-เบอร์ติดต่อ (ถ้ามี)"
+          placeholder="โปรดระบุบุคคลที่ทำหน้าที่ดูแลผู้ป่วยที่บ้าน รวมถึงความสัมพันธ์ เบอร์โทร"
         />
       </label>
 

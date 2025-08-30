@@ -501,7 +501,7 @@ export default function PatientsPage() {
     setPage(1); setTick(t => t + 1);
   };
   const activeFilterEntries = useMemo(() => Object.entries(filters).filter(([, v]) => !!v), [filters]);
-  const filterLabels = { treat_at: 'รักษาที่', status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
+  const filterLabels = { treat_at: 'สถานที่รักษา', status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
 
   // actions
   const refresh = () => setTick(t => t + 1);
@@ -847,7 +847,7 @@ export default function PatientsPage() {
       <div className={styles.sectionTitle}>ตัวกรอง</div>
       <div className={styles.filtersBar}>
         <div>
-          <div className={styles.label}>รักษาที่</div>
+          <div className={styles.label}>สถานที่รักษา</div>
           <Select
           {...RS_PROPS}
             components={animatedComponents}
@@ -971,7 +971,7 @@ export default function PatientsPage() {
               <th className={styles.th}>อายุ</th>
               <th className={styles.th}>กรุ๊ปเลือด</th>
               <th className={styles.th}>ประเภท</th>
-              <th className={styles.th}>รักษาที่</th>
+              <th className={styles.th}>สถานที่รักษา</th>
               <th className={styles.th}>สถานะ</th>
               <th className={`${styles.th} ${styles.thAction}`}>ตรวจสอบ</th>
               <th className={`${styles.th} ${styles.thAction}`}>แก้ไข</th>
@@ -1537,7 +1537,7 @@ export default function PatientsPage() {
                       <div className="text-lg text-slate-900">{(verifyData as any).patients_type || '-'}</div>
                     </div>
                     <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
-                      <div className="text-xs text-slate-600 mb-1">รักษาที่</div>
+                      <div className="text-xs text-slate-600 mb-1">สถานที่รักษา</div>
                       <div className="text-lg text-slate-900">{(verifyData as any).treat_at || '-'}</div>
                     </div>
                     <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
