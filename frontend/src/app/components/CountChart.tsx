@@ -130,14 +130,6 @@ export default function CountChart({
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">จำนวนผู้ป่วย</h1>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setRev((n) => n + 1)}
-            className="text-xs px-2 py-1 rounded-lg border hover:bg-gray-50"
-            title="รีเฟรช"
-          >
-            รีเฟรช
-          </button>
-          <img src="/moreDark.png" alt="" width={20} height={20} />
         </div>
       </div>
 

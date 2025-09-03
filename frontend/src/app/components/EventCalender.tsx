@@ -284,7 +284,6 @@ function EventCalendarInner() {
               โหลดผิดพลาด
             </span>
           ) : null}
-          <img src="/moreDark.png" alt="" width={20} height={20} />
         </div>
       </div>
 

@@ -78,13 +78,7 @@ export default function AttendanceChart({
     <div className="rounded-2xl bg-white p-4 h-full">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-lg font-semibold">กลุ่มเป้าหมาย</h1>
-        <button
-          onClick={() => setRev((n) => n + 1)}
-          className="text-sm px-3 py-1.5 rounded-lg border hover:bg-gray-50"
-          title="รีเฟรช"
-        >
-          รีเฟรช
-        </button>
+
       </div>
 
       {loading ? (

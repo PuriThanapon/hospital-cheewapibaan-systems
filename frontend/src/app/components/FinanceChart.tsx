@@ -86,7 +86,6 @@ export default function FinanceChart() {
         <div className="flex items-center gap-2">
           {loading ? <span className="text-xs text-gray-500">กำลังโหลด…</span> : null}
           {err ? <span className="text-xs text-red-600" title={err}>โหลดผิดพลาด</span> : null}
-          <img src="/moreDark.png" alt="" width={20} height={20} />
         </div>
       </div>
 
