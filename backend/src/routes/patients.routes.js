@@ -4,15 +4,8 @@ const router = express.Router();
 
 const ctrl = require('../controllers/patients.controller');
 const homeNeedsCtrl = require('../controllers/home_needs.controller');
-const encounters = require('../controllers/encounters.controller'); // ✅ ต้อง export เป็นฟังก์ชันจริง
-
-/**
- * ⛳️ แนวทางจัดลำดับ:
- * 1) เส้นทาง static/specific มาก่อน
- * 2) เส้นทางย่อยของ :id ไว้รวมกัน
- * 3) เส้นทาง generic '/:id' วางท้ายกลุ่ม GET/DELETE
- * 4) เขียน/แก้ไข (POST/PUT) ปิดท้าย
- */
+const encounters = require('../controllers/encounters.controller');
+const deaths = require('../controllers/deaths.controller'); // ✅ ใช้ไฟล์ที่คุณเพิ่ม
 
 // ---------- Static / specific ----------
 router.get('/next-id', ctrl.getNextPatientId);
@@ -22,14 +15,21 @@ router.get('/recent', ctrl.recent);
 // ---------- List ทั้งหมด ----------
 router.get('/', ctrl.listPatients);
 
-// ---------- เส้นทางย่อยที่ขึ้นต้นด้วย :id ----------
+// ---------- เส้นทางย่อยของ :id ----------
 router.get('/:id/file/:field', ctrl.downloadPatientFile);
-router.patch('/:id/deceased', ctrl.markDeceased);
+
+// ข้อมูลเสียชีวิต (อ่าน/แก้ไข ผ่าน path ของ patients)
+router.get('/:id/deceased', deaths.aliasGetFromPatients);      // ✅ โหลดข้อมูลเสียชีวิต
+router.patch('/:id/deceased', deaths.aliasMarkFromPatients);   // ✅ mark/update
+// ถ้าต้องการยกเลิกสถานะเสียชีวิตด้วย:
+router.delete('/:id/deceased', deaths.aliasUnsetFromPatients); // (ออปชัน)
+
 router.get('/:id/home-needs/latest', homeNeedsCtrl.latestForPatient);
 
 // Encounters (ของผู้ป่วย)
-router.get('/:id/encounters/summary',    encounters.getSummary);
-router.post('/:id/encounters/baseline',  encounters.upsertBaseline);
+router.get('/:id/encounters/summary',   encounters.getSummary);
+router.get('/:id/encounters/baseline',  encounters.getBaseline);     // ✅ เพิ่ม GET baseline
+router.post('/:id/encounters/baseline', encounters.upsertBaseline);
 router.post('/:id/encounters/treatments', encounters.addTreatment);
 
 // ---------- รายการเดียว ----------

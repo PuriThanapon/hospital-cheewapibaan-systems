@@ -1,4 +1,3 @@
-// backend/src/controllers/encounters.controller.js
 const { pool } = require('../config/db');
 
 /* ---------- one-time init (create tables if missing) ---------- */
@@ -10,12 +9,11 @@ async function initTables() {
       reason_admit       TEXT,
       bedbound_cause     TEXT,
       other_history      TEXT,
-      referral_hospital  TEXT,   -- ✅ ใหม่
-      referral_phone     TEXT,   -- ✅ ใหม่
+      referral_hospital  TEXT,
+      referral_phone     TEXT,
       updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
-    -- เผื่อเคยมีตารางแล้ว แต่ยังไม่มีคอลัมน์ใหม่
     ALTER TABLE patient_encounter_baseline
       ADD COLUMN IF NOT EXISTS referral_hospital TEXT,
       ADD COLUMN IF NOT EXISTS referral_phone    TEXT;
@@ -37,16 +35,34 @@ async function initTables() {
 
 const normalizeHN = (v='') => decodeURIComponent(String(v));
 
-/* ---------- GET /api/patients/:hn/encounters/summary ---------- */
+/* ---------- NEW: GET /api/patients/:hn/encounters/baseline ---------- */
+async function getBaseline(req, res, next) {
+  try {
+    await initTables();
+    const hn = normalizeHN(req.params.hn || req.params.id);
+    const bl = await pool.query(
+      `SELECT patients_id,
+              reason_in_dept, reason_admit, bedbound_cause, other_history,
+              referral_hospital, referral_phone,
+              updated_at
+         FROM patient_encounter_baseline
+        WHERE patients_id = $1`,
+      [hn]
+    );
+    res.json({ data: { baseline: bl.rows[0] || null } });
+  } catch (e) { next(e); }
+}
+
+/* ---------- (เดิม) GET /api/patients/:hn/encounters/summary ---------- */
 async function getSummary(req, res, next) {
   try {
     await initTables();
-    const hn = normalizeHN(req.params.hn || req.params.id); // รองรับทั้ง :hn/:id
+    const hn = normalizeHN(req.params.hn || req.params.id);
 
     const bl = await pool.query(
       `SELECT patients_id,
               reason_in_dept, reason_admit, bedbound_cause, other_history,
-              referral_hospital, referral_phone,                      -- ✅ ส่งออก
+              referral_hospital, referral_phone,
               updated_at
          FROM patient_encounter_baseline
         WHERE patients_id = $1`,
@@ -72,7 +88,7 @@ async function getSummary(req, res, next) {
   } catch (e) { next(e); }
 }
 
-/* ---------- POST /api/patients/:hn/encounters/baseline ---------- */
+/* ---------- (เดิม) POST /api/patients/:hn/encounters/baseline ---------- */
 async function upsertBaseline(req, res, next) {
   try {
     await initTables();
@@ -82,8 +98,8 @@ async function upsertBaseline(req, res, next) {
       reason_admit = null,
       bedbound_cause = null,
       other_history = null,
-      referral_hospital = null,     // ✅ รับเพิ่ม
-      referral_phone = null,        // ✅ รับเพิ่ม
+      referral_hospital = null,
+      referral_phone = null,
     } = req.body || {};
 
     await pool.query(
@@ -105,7 +121,7 @@ async function upsertBaseline(req, res, next) {
   } catch (e) { next(e); }
 }
 
-/* ---------- POST /api/patients/:hn/encounters/treatments ---------- */
+/* ---------- (เดิม) POST /api/patients/:hn/encounters/treatments ---------- */
 async function addTreatment(req, res, next) {
   try {
     await initTables();
@@ -137,6 +153,7 @@ async function addTreatment(req, res, next) {
 }
 
 module.exports = {
+  getBaseline,   // ✅ ใหม่
   getSummary,
   upsertBaseline,
   addTreatment,

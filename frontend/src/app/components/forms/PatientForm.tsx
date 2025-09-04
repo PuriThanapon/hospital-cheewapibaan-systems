@@ -9,8 +9,10 @@ import dynamic from 'next/dynamic';
 import makeAnimated from 'react-select/animated';
 import Swal from 'sweetalert2';
 import { ClipboardList } from 'lucide-react';
+import Link from 'next/link';
 import BaselineForm from '@/app/components/forms/BaselineForm';
 
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 
 /* ---------------- Utils ---------------- */
 function calculateAge(birthdateStr) {
@@ -114,7 +116,7 @@ const treatatOptions = [
   { value: 'บ้าน', label: 'บ้าน' },
 ];
 
-/* ---------------- Validation (เฉพาะ 7 ช่อง) ---------------- */
+/* ---------------- Validation (เฉพาะ 7 ช่อง + เงื่อนไขผู้เสียชีวิต) ---------------- */
 const FIELD_META = {
   card_id: { label: 'เลขบัตรประชาชน', type: 'thaiId', focusName: 'card_id' },
   first_name: { label: 'ชื่อ', focusName: 'first_name' },
@@ -165,13 +167,99 @@ function validatePatientForm(values) {
   };
 
   DEFAULT_REQUIRED.forEach((key) => need(key, FIELD_META[key]));
+
+  // ถ้าสถานะเสียชีวิต บังคับกรอก "วันที่เสียชีวิต"
+  if (String(v.status) === 'เสียชีวิต') {
+    if (!v.death_date) {
+      issues.push('• วันที่เสียชีวิต - กรุณากรอก');
+      if (!firstFocusName) firstFocusName = 'death_date';
+    }
+  }
+
   return { ok: issues.length === 0, issues, firstFocusName };
 }
+
+// ---- Thai time helpers & field ----
+const pad2 = (n: number) => n.toString().padStart(2, '0');
+
+function splitHHmm(val?: string): [number | null, number | null] {
+  if (!val || typeof val !== 'string') return [null, null];
+  const m = val.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return [null, null];
+  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+  const mm = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+  return [h, mm];
+}
+
+type ThaiTimeFieldProps = {
+  value?: string;                 // รูปแบบ HH:mm
+  onChange: (val: string) => void;
+  name?: string;                  // ใส่ไว้เพื่อให้ querySelector[name=...] โฟกัสได้
+  minuteStep?: number;            // ค่าเริ่มต้น 5 นาที
+};
+
+const ThaiTimeField: React.FC<ThaiTimeFieldProps> = ({ value, onChange, name, minuteStep = 5 }) => {
+  const [h, m] = splitHHmm(value);
+
+  const hours = React.useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+  const minutes = React.useMemo(() => {
+    const base = Array.from({ length: Math.ceil(60 / minuteStep) }, (_, i) => i * minuteStep);
+    if (m != null && !base.includes(m)) base.push(m); // เผื่อค่าที่ไม่ตรง step
+    return base.sort((a, b) => a - b);
+  }, [m, minuteStep]);
+
+  const handleHourChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nh = e.target.value === '' ? null : parseInt(e.target.value, 10);
+    const mm = m ?? 0;
+    if (nh == null) return onChange('');
+    onChange(`${pad2(nh)}:${pad2(mm)}`);
+  };
+
+  const handleMinuteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nm = e.target.value === '' ? null : parseInt(e.target.value, 10);
+    const hh = h ?? 0;
+    if (nm == null) return onChange('');
+    onChange(`${pad2(hh)}:${pad2(nm)}`);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* เก็บค่าไว้ในฟิลด์ซ่อน เพื่อรองรับระบบโฟกัสด้วย name เดิม */}
+      <input type="hidden" name={name} value={value || ''} />
+      <select
+        className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
+        value={h ?? ''}
+        onChange={handleHourChange}
+        aria-label="ชั่วโมง"
+      >
+        <option value="" disabled>เลือกชั่วโมง</option>
+        {hours.map((x) => (
+          <option key={x} value={x}>{pad2(x)}</option>
+        ))}
+      </select>
+      <span className="text-gray-500">:</span>
+      <select
+        className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
+        value={m ?? ''}
+        onChange={handleMinuteChange}
+        aria-label="นาที"
+      >
+        <option value="" disabled>เลือกนาที</option>
+        {minutes.map((x) => (
+          <option key={x} value={x}>{pad2(x)} นาที</option>
+        ))}
+      </select>
+      <span className="text-gray-600">น.</span>
+    </div>
+  );
+};
+
 
 /* ---------------- Component ---------------- */
 const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = {} }, ref) {
   const v = value || {};
   const set = (k) => (e) => onChange({ ...v, [k]: e.target.value });
+
 
   // ฟอร์แมตเลขบัตรประชาชน: X-XXXX-XXXXX-XX-X
   const handleCardIdChange = (e) => {
@@ -262,6 +350,64 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     getValues: () => ({ ...v }),
   }));
 
+  // มีประวัติเบื้องต้นอยู่แล้วหรือไม่ (รองรับทั้ง flag และตรวจจากฟิลด์)
+  const localHasBaseline =
+  v?.baseline_exists === true ||
+  Boolean(
+    (v.reason_in_dept || '').trim() ||
+    (v.reason_admit || '').trim() ||
+    (v.bedbound_cause || '').trim() ||
+    (v.other_history || '').trim() ||
+    (v.referral_hospital || '').trim() ||
+    (v.referral_phone || '').trim()
+  );
+
+  // ==== NEW: ตรวจว่ามีประวัติเบื้องต้นในระบบไหม (จาก API) ====
+  const [remoteHasBaseline, setRemoteHasBaseline] = React.useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    const hn = v?.patients_id;
+    if (!API_BASE || !hn) { setRemoteHasBaseline(null); return; }
+
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/patients/${encodeURIComponent(hn)}/encounters/baseline`,
+          { cache: 'no-store' }
+        );
+        if (!alive) return;
+
+        if (res.ok) {
+          const js = await res.json();
+          const bl = js?.data?.baseline ?? js?.data ?? null;
+          const exist = Boolean(
+            bl &&
+            (
+              (bl.reason_in_dept || '').trim() ||
+              (bl.reason_admit || '').trim() ||
+              (bl.bedbound_cause || '').trim() ||
+              (bl.other_history || '').trim() ||
+              (bl.referral_hospital || '').trim() ||
+              (bl.referral_phone || '').trim()
+            )
+          );
+          setRemoteHasBaseline(exist);
+        } else if (res.status === 404) {
+          setRemoteHasBaseline(false);
+        } else {
+          setRemoteHasBaseline(null);
+        }
+      } catch {
+        setRemoteHasBaseline(null);
+      }
+    })();
+
+    return () => { alive = false; };
+  }, [v?.patients_id]);
+
+  const hasBaseline = (remoteHasBaseline ?? localHasBaseline);
+
   return (
     <div className="space-y-8 bg-gray-50 p-6">
       {/* Header */}
@@ -319,35 +465,70 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
             />
           </InputField>
+
+          {/* สถานะผู้ป่วย (อ่านอย่างเดียว) */}
+          <InputField label="สถานะผู้ป่วย">
+            <input
+              className={`w-full px-4 py-3 rounded-lg border-2 bg-gray-50 text-sm font-medium
+                ${v.status === 'เสียชีวิต'
+                  ? 'border-red-300 text-red-700'
+                  : 'border-gray-300 text-gray-700'}`}
+              value={v.status || 'มีชีวิต'}
+              readOnly
+              name="status"
+            />
+          </InputField>
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
-        <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
-          <div className="p-2 bg-[#005A50] rounded-lg">
-            <ClipboardList size={20} className="text-white" />
+      {/* ประวัติเบื้องต้น */}
+      {!hasBaseline ? (
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+          <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
+            <div className="p-2 bg-[#005A50] rounded-lg">
+              <ClipboardList size={20} className="text-white" />
+            </div>
+            ประวัติเบื้องต้น
+            <span className="text-sm font-normal text-gray-500 ml-auto">Baseline (optional)</span>
+          </h3>
+
+          <BaselineForm
+            value={{
+              patients_id: v.patients_id || '',
+              reason_in_dept: v.reason_in_dept ?? '',
+              reason_admit: v.reason_admit ?? '',
+              bedbound_cause: v.bedbound_cause ?? '',
+              other_history: v.other_history ?? '',
+              referral_hospital: v.referral_hospital ?? '',
+              referral_phone: v.referral_phone ?? '',
+            }}
+            onChange={(b) => onChange({ ...v, ...b })}
+          />
+
+          <p className="mt-3 text-xs text-gray-500">
+            * ไม่บังคับ กรอกเท่าที่ทราบในเบื้องต้น ระบบจะบันทึกไปเป็นประวัติเบื้องต้นของผู้ป่วย
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
+          <h3 className="text-xl font-bold text-[#005A50] mb-3 flex items-center gap-3">
+            <div className="p-2 bg-[#005A50] rounded-lg">
+              <ClipboardList size={20} className="text-white" />
+            </div>
+            ประวัติเบื้องต้น
+          </h3>
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 text-sm">
+            พบว่ามีประวัติเบื้องต้นแล้ว กรุณาแก้ไขในหน้า{' '}
+            <Link
+              href={`/patient/${encodeURIComponent(v.patients_id || '')}/encounters`}
+              className="font-semibold underline"
+            >
+              ประวัติเบื้องต้น
+            </Link>{' '}
+            โดยตรง
           </div>
-          ประวัติเบื้องต้น
-          <span className="text-sm font-normal text-gray-500 ml-auto">Baseline (optional)</span>
-        </h3>
-
-        <BaselineForm
-          value={{
-            patients_id: v.patients_id || '',
-            reason_in_dept: v.reason_in_dept ?? '',
-            reason_admit: v.reason_admit ?? '',
-            bedbound_cause: v.bedbound_cause ?? '',
-            other_history: v.other_history ?? '',
-            referral_hospital: v.referral_hospital ?? '',
-            referral_phone: v.referral_phone ?? '',
-          }}
-          onChange={(b) => onChange({ ...v, ...b })}
-        />
-
-        <p className="mt-3 text-xs text-gray-500">
-          * ไม่บังคับ กรอกเท่าที่ทราบในเบื้องต้น ระบบจะบันทึกไปเป็นประวัติเบื้องต้นของผู้ป่วย
-        </p>
-      </div>
+        </div>
+      )}
 
       {/* ข้อมูลส่วนตัว */}
       <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
@@ -633,6 +814,61 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           </InputField>
         </div>
       </div>
+
+      {/* ===== ข้อมูลการเสียชีวิต (แสดงเมื่อสถานะ = เสียชีวิต) ===== */}
+      {v.status === 'เสียชีวิต' && (
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+          <h3 className="text-xl font-bold text-red-700 mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
+            <div className="p-2 bg-red-600 rounded-lg">
+              <Heart size={20} className="text-white" />
+            </div>
+            ข้อมูลการเสียชีวิต
+            <span className="text-sm font-normal text-gray-500 ml-auto">Death Information</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <InputField label="วันที่เสียชีวิต" icon={<Calendar size={16} />}>
+              <DatePickerField
+                value={v.death_date}
+                onChange={(val) => onChange({ ...v, death_date: val })}
+                name="death_date"
+              />
+            </InputField>
+
+            <InputField label="เวลาเสียชีวิต">
+              <ThaiTimeField
+                value={v.death_time}
+                onChange={(val) => onChange({ ...v, death_time: val })}
+                name="death_time"
+                minuteStep={5} // ปรับเป็น 1 ถ้าต้องการเลือกทีละนาที
+              />
+            </InputField>
+
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <InputField label="สาเหตุการเสียชีวิต">
+              <input
+                className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
+                value={v.death_cause || ''}
+                onChange={(e) => onChange({ ...v, death_cause: e.target.value })}
+                placeholder="เช่น หัวใจล้มเหลวเฉียบพลัน"
+                name="death_cause"
+              />
+            </InputField>
+
+            <InputField label="การจัดการศพ">
+              <input
+                className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
+                value={v.management || ''}
+                onChange={(e) => onChange({ ...v, management: e.target.value })}
+                placeholder="เช่น ส่งชันสูตร / ประกอบพิธีทางศาสนา"
+                name="management"
+              />
+            </InputField>
+          </div>
+        </div>
+      )}
 
       {/* เอกสารแนบที่จำเป็น */}
       <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">

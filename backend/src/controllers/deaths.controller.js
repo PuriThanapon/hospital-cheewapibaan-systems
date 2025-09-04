@@ -1,6 +1,18 @@
 // backend/src/controllers/death.controller.js
 const Death = require('../models/deaths.model');
 const bedStays = require('../models/bed_stays.model');
+
+const normalizeHN = (v = '') => decodeURIComponent(String(v));
+
+/** helper: compose timestamptz ISO from (date, time) */
+function composeDeceasedAt(death_date, death_time) {
+  // ถ้า time ไม่มี ให้เป็น 00:00
+  const t = String(death_time || '00:00').slice(0,5);
+  // new Date() จะตีความเป็น local time แล้วแปลงเป็น ISO (UTC) ให้ bedStays ใช้ได้
+  const iso = new Date(`${death_date}T${t}:00`).toISOString();
+  return iso;
+}
+
 /** GET /api/deaths */
 exports.list = async (req, res, next) => {
   try {
@@ -32,20 +44,19 @@ exports.createOrMark = async (req, res, next) => {
       return res.status(400).json({ message: 'ต้องระบุ death_date, death_time, death_cause' });
     }
 
-    // 1) บันทึกสถานะเสียชีวิตในตารางผู้ป่วย/ตาราง death ของคุณ
+    // 1) บันทึกสถานะเสียชีวิตใน patients
     const row = await Death.markDeceased(req.params.id, {
       death_date, death_time, death_cause, management
     });
 
-    // 2) ปล่อยเตียงที่ผู้ป่วยยังครองอยู่ (ถ้ามี) ณ เวลาเสียชีวิต
+    // 2) ปล่อยเตียงที่ยังครอง ณ เวลาเสียชีวิต
     const deceasedAt = composeDeceasedAt(death_date, death_time);
     try {
       await bedStays.forceEndActiveForPatient(req.params.id, {
-        at: deceasedAt,         // timestamptz string (เช่น 2025-08-25T12:34:00+07:00)
+        at: deceasedAt, // ISO เช่น 2025-08-25T12:34:00.000Z
         reason: 'deceased'
       });
     } catch (e) {
-      // ไม่ให้ทั้งงานล้ม แต่อยากรู้ว่าปิดเตียงไม่สำเร็จ
       console.error('forceEndActiveForPatient failed:', e);
       return res.status(201).json({
         message: 'บันทึกการเสียชีวิตสำเร็จ แต่ปล่อยเตียงไม่สำเร็จ กรุณาตรวจสอบประวัติเตียง',
@@ -76,9 +87,14 @@ exports.unset = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-/** === Alias เพื่อให้ฝั่ง Frontend เดิมทำงานได้ ===
- * PATCH /api/patients/:id/deceased  -> mark deceased
- */
+/** === Aliases เพื่อให้ Frontend เดิมเรียกผ่าน /api/patients/:id/deceased ได้ === */
 exports.aliasMarkFromPatients = async (req, res, next) => {
   return exports.createOrMark(req, res, next);
+};
+exports.aliasGetFromPatients = async (req, res, next) => {
+  req.params.id = normalizeHN(req.params.id);
+  return exports.getOne(req, res, next);
+};
+exports.aliasUnsetFromPatients = async (req, res, next) => {
+  return exports.unset(req, res, next);
 };
