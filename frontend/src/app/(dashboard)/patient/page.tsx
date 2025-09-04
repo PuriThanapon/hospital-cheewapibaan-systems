@@ -141,7 +141,15 @@ async function http(url, options: any = {}) {
 
   if (!res.ok) {
     let msg = 'Request failed';
-    try { const j = await res.json(); msg = j.message || j.error || msg; } catch { }
+    const ct = res.headers.get('content-type') || '';
+    try {
+      if (ct.includes('application/json')) {
+        const j = await res.json();
+        msg = j.message || j.error || JSON.stringify(j);
+      } else {
+        msg = await res.text();
+      }
+    } catch {}
     const err: any = new Error(msg);
     err.status = res.status;
     throw err;
@@ -305,6 +313,43 @@ const FILE_LABELS: Record<string, string> = {
   relative_id_card: 'บัตรประชาชนญาติ',
 };
 
+/** เปิดดูไฟล์แนบมาตรฐานของผู้ป่วยในแท็บใหม่ */
+async function viewPatientAttachment(
+  patient: { patients_id: string },
+  field: 'patient_id_card' | 'house_registration' | 'patient_photo' | 'relative_id_card'
+) {
+  const patientsId = patient.patients_id;
+  const url = joinUrl(API_BASE, `/api/patients/${encodeURIComponent(patientsId)}/file/${field}`);
+
+  try {
+    Swal.fire({
+      title: 'กำลังเปิดไฟล์...',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => Swal.showLoading(),
+    });
+
+    // ใช้ fetch -> blob -> เปิดด้วย blob URL เพื่อกันกรณี Content-Disposition เป็น attachment
+    const res = await fetch(url, { method: 'GET' });
+    if (!res.ok) {
+      let msg = 'ไม่พบไฟล์/เปิดดูไม่ได้';
+      try { const j = await res.json(); msg = j.message || msg; } catch { }
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    window.open(objUrl, '_blank', 'noopener,noreferrer');
+    // เคลียร์ URL ทีหลัง
+    setTimeout(() => URL.revokeObjectURL(objUrl), 5 * 60 * 1000);
+
+    Swal.close();
+  } catch (e: any) {
+    Swal.close();
+    $swal.fire({ icon: 'error', title: 'เปิดไฟล์ไม่ได้', text: e?.message || '' });
+  }
+}
+
 /** ดาวน์โหลดไฟล์แนบของผู้ป่วย */
 async function downloadPatientAttachment(
   patient: { patients_id: string; pname?: string; first_name?: string; last_name?: string },
@@ -404,6 +449,34 @@ async function uploadAllPatientFiles(patients_id: string, formValue: any) {
   }
 }
 
+type StandardField = 'patient_id_card' | 'house_registration' | 'patient_photo' | 'relative_id_card';
+const STANDARD_FIELDS: Readonly<StandardField[]> = ['patient_id_card', 'house_registration', 'patient_photo', 'relative_id_card'] as const;
+
+/** เช็คว่าไฟล์มาตรฐาน field นั้นมีจริงหรือไม่ (HEAD → fallback GET Range) */
+async function existsStandardFile(patientsId: string, field: StandardField): Promise<boolean> {
+  const url = joinUrl(API_BASE, `/api/patients/${encodeURIComponent(patientsId)}/file/${field}`);
+  try {
+    // ลอง HEAD ก่อน (เบาและเร็ว)
+    const head = await fetch(url, { method: 'HEAD' });
+    if (head.ok) return true;
+    if (head.status === 404) return false;
+    // ถ้าเซิร์ฟเวอร์ไม่รองรับ HEAD → ตกมา GET แบบเบา (ถ้ารองรับ Range)
+    const get = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+    return get.ok; // 200 หรือ 206 ถือว่ามี
+  } catch {
+    return false;
+  }
+}
+
+/** คืนลิสต์คีย์ของไฟล์มาตรฐานที่ "มีจริง" */
+async function listExistingStandardFiles(patientsId: string): Promise<StandardField[]> {
+  const pairs = await Promise.all(
+    STANDARD_FIELDS.map(async (k) => [k, await existsStandardFile(patientsId, k)] as const)
+  );
+  return pairs.filter(([, ok]) => ok).map(([k]) => k);
+}
+
+
 export default function PatientsPage() {
   // state: query + filters + pagination
   const [query, setQuery] = useState('');
@@ -451,6 +524,9 @@ export default function PatientsPage() {
   };
 
   const [patientFiles, setPatientFiles] = useState<PatientFile[]>([]);
+  const [stdFiles, setStdFiles] = useState<StandardField[]>([]);
+  const [stdChecking, setStdChecking] = useState(false);
+
 
   // build query string
   const qs = useMemo(() => {
@@ -629,20 +705,39 @@ export default function PatientsPage() {
     }
   };
 
+  // เพิ่ม/อัปเดต: ตรวจให้ครบเมื่อเป็นโรงพยาบาล
   function validateAppt(f: AppointmentFormValue) {
-    const e: Partial<Record<keyof AppointmentFormValue, string>> = {};
+    const e: Partial<Record<keyof AppointmentFormValue | 'hospital_address' | 'department', string>> = {};
     const get = (k: keyof AppointmentFormValue) => (f[k]?.toString().trim() ?? '');
-    const req: (keyof AppointmentFormValue)[] = ['hn', 'date', 'start', 'end', 'type'];
-    req.forEach(k => { if (!get(k)) e[k] = 'จำเป็น'; });
 
+    // จำเป็นพื้นฐาน
+    (['hn', 'date', 'start', 'end', 'type'] as (keyof AppointmentFormValue)[])
+      .forEach(k => { if (!get(k)) e[k] = 'จำเป็น'; });
+
+    // เวลาเริ่มต้อง < เวลาสิ้นสุด
     const s = get('start'), ed = get('end');
     const sm = parseHHmmToMin(s), em = parseHHmmToMin(ed);
     if (s && ed && (!isFinite(sm) || !isFinite(em) || em <= sm)) e.end = 'เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม';
+
+    // ถ้าเป็นโรงพยาบาล → ต้องมีที่อยู่โรงพยาบาล + แผนก
+    const isHospital = (f.type || '').trim() === 'โรงพยาบาล';
+    if (isHospital && !String((f as any).hospital_address || '').trim()) e.hospital_address = 'กรอกชื่อ/ที่อยู่โรงพยาบาล';
+    if (isHospital && !String((f as any).department || '').trim()) e.department = 'กรุณาเลือกแผนก';
+
     if ((f as any).phone && !/^[0-9+\-() ]{6,}$/.test((f as any).phone as any)) e.phone = 'รูปแบบเบอร์ไม่ถูกต้อง';
 
     return e;
   }
 
+  function toHHmmSS(s?: string) {
+     if (!s) return '';
+     if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s;
+     const m = String(s).match(/^(\d{1,2}):(\d{2})$/);
+     if (!m) return s; // ปล่อยไปให้แบ็กเอนด์แจ้ง error ถ้าไม่ใช่รูปแบบเวลา
+     return `${m[1].padStart(2, '0')}:${m[2]}:00`;
+   }
+
+  // แก้ payload ให้ตรงกับ “นัดหมายหลัก”
   const saveAppt = async () => {
     const errs = validateAppt(apptForm);
     setApptErrors(errs);
@@ -651,16 +746,33 @@ export default function PatientsPage() {
       return;
     }
 
-    const payload = {
-      hn: (apptForm.hn || '').trim(),
-      date: apptForm.date!,
-      start: apptForm.start!,
-      end: apptForm.end!,
-      type: (apptForm.type || '').trim(),
-      place: (apptForm.place || '').trim(),
-      status: (apptForm.status as Status) || 'pending',
-      note: (apptForm.note || '').trim() || null,
+    const hn       = (apptForm.hn || '').trim();
+    const date     = apptForm.date!;
+    const startS   = toHHmmSS(apptForm.start!);
+    const endS     = toHHmmSS(apptForm.end!);
+    const typeLbl  = (apptForm.type || '').trim();             // 'โรงพยาบาล' | 'บ้านผู้ป่วย'
+    const typeApi  = typeLbl === 'โรงพยาบาล' ? 'hospital' : 'home'; // map เป็นค่าที่แบ็กเอนด์ใช้
+    const place    = (apptForm.place || '').trim();
+    const note     = (apptForm.note || '').trim();
+    const hospAddr = (apptForm as any).hospital_address ? String((apptForm as any).hospital_address).trim() : '';
+    const dept     = (apptForm as any).department ? String((apptForm as any).department).trim() : '';
+
+    // โครงสร้างเดียวกับหน้า “นัดหมายหลัก”
+    const base = {
+      hn,
+      appointment_date: date,
+      start_time: startS,
+      end_time: endS,
+      appointment_type: typeApi as 'home' | 'hospital',
+      status: (apptForm.status as any) || 'pending',
+      note: note || null,
+      department: typeApi === 'hospital' ? dept : null,   // hospital เท่านั้นที่ต้องมี department
     };
+
+    const payload =
+      typeApi === 'hospital'
+        ? { ...base, hospital_address: hospAddr }                       // โรงพยาบาล → ต้องส่ง hospital_address
+        : { ...base, place: (place || 'บ้านผู้ป่วย'), hospital_address: null }; // เยี่ยมบ้าน → ใช้ place, hospital_address = null
 
     try {
       Swal.fire({
@@ -671,17 +783,10 @@ export default function PatientsPage() {
         didOpen: () => Swal.showLoading(),
       });
 
-      try {
-        await http('/api/appointments', { method: 'POST', body: JSON.stringify(payload) });
-        Swal.close();
-        toast.fire({ icon: 'success', title: 'บันทึกนัดหมายแล้ว' });
-        setOpenAppt(null);
-        setApptForm(resetApptForm());
-        refresh();
-      } catch (e: any) {
-        Swal.close();
-        toast.fire({ icon: 'error', title: e?.message || 'บันทึกไม่สำเร็จ(อาจซ้ำช่วงเวลา)' });
-      }
+      await http('/api/appointments', { method: 'POST', body: JSON.stringify(payload) });
+
+      Swal.close();
+      toast.fire({ icon: 'success', title: 'บันทึกนัดหมายแล้ว' });
       setOpenAppt(null);
       setApptForm(resetApptForm());
       refresh();
@@ -753,7 +858,15 @@ export default function PatientsPage() {
         http(`/api/patient-files/${encodeURIComponent(patients_id)}`),
       ]);
       setVerifyData(d as any);
-      setPatientFiles((fl as any)?.data || []);
+      const files = Array.isArray(fl) ? fl : ((fl as any)?.data || []);
+      setPatientFiles(files);
+      setStdChecking(true);
+      try {
+        const existing = await listExistingStandardFiles(patients_id);
+        setStdFiles(existing);
+      } finally {
+        setStdChecking(false);
+      }
       setOpenVerify(true);
     } catch (e) {
       $swal.fire({ icon: 'error', title: 'ดึงข้อมูลไม่สำเร็จ', text: (e as any).message || '' });
@@ -849,7 +962,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>สถานที่รักษา</div>
           <Select
-          {...RS_PROPS}
+            {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -863,7 +976,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>สถานะผู้ป่วย</div>
           <Select
-          {...RS_PROPS}
+            {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -877,7 +990,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>เพศ</div>
           <Select
-          {...RS_PROPS}
+            {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -891,7 +1004,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>กรุ๊ปเลือด</div>
           <Select
-          {...RS_PROPS}
+            {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -905,7 +1018,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>Rh</div>
           <Select
-          {...RS_PROPS}
+            {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -919,7 +1032,7 @@ export default function PatientsPage() {
         <div>
           <div className={styles.label}>ประเภทผู้ป่วย</div>
           <Select
-          {...RS_PROPS}
+            {...RS_PROPS}
             components={animatedComponents}
             styles={rsx}
             menuPortalTarget={menuPortalTarget}
@@ -1394,9 +1507,6 @@ export default function PatientsPage() {
                   </div>
                   <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
                     <span className="inline-flex items-center gap-1">
-                      <User size={14} /> อายุ {calculateAge((verifyData as any).birthdate)} ปี
-                    </span>
-                    <span className="inline-flex items-center gap-1">
                       <Calendar size={14} /> รับเข้า {formatThaiDateBE((verifyData as any).admittion_date)}
                     </span>
                     <span className="inline-flex items-center gap-1">
@@ -1570,12 +1680,48 @@ export default function PatientsPage() {
                     <h3 className="text-base font-semibold text-slate-800">เอกสารแนบ</h3>
                   </div>
 
-                  <div className="p-6">
+                  <div className="p-6 space-y-6">
+                    {/* เอกสารมาตรฐานจากแฟ้มผู้ป่วย */}
+                    {/* เอกสารมาตรฐาน (แสดงเฉพาะที่มีจริง) */}
+                    <div>
+                      <div className="text-sm text-slate-500 mb-2">เอกสารมาตรฐาน</div>
+
+                      {stdChecking ? (
+                        <div className="text-slate-500">กำลังตรวจสอบเอกสาร...</div>
+                      ) : stdFiles.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {stdFiles.map((k) => (
+                            <div key={k} className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+                              <div className="font-medium text-slate-800 mb-2">
+                                {FILE_LABELS[k]}
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
+                                  onClick={() => viewPatientAttachment(verifyData as any, k)}
+                                >
+                                  เปิดดู
+                                </button>
+                                <button
+                                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50"
+                                  onClick={() => downloadPatientAttachment(verifyData as any, k)}
+                                >
+                                  ดาวน์โหลด
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-slate-500">ไม่มีเอกสารมาตรฐาน</div>
+                      )}
+                    </div>
+
                     {patientFiles.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {patientFiles.map((f) => {
                           const isImage = (f.mime_type || '').startsWith('image/');
-                          const viewUrl = joinUrl(API_BASE, `/api/patient-files/download/${encodeURIComponent(String(f.id))}`);
+                          const viewUrl = joinUrl(API_BASE, `/api/patient-files/${encodeURIComponent(String(f.id))}/download`);
                           const dlUrl = `${viewUrl}?dl=1`;
 
                           return (

@@ -482,7 +482,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
       </div>
 
       {/* ประวัติเบื้องต้น */}
-      {!hasBaseline ? (
+      {/* {!hasBaseline ? (
         <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
           <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
             <div className="p-2 bg-[#005A50] rounded-lg">
@@ -528,7 +528,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
             โดยตรง
           </div>
         </div>
-      )}
+      )} */}
 
       {/* ข้อมูลส่วนตัว */}
       <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
