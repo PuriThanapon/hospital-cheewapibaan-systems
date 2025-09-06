@@ -148,7 +148,7 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">เอกสารแม่แบบ</h1>
+          <h1 className="text-[28px] font-bold">เอกสารแม่แบบ</h1>
           <p className="text-gray-500 text-sm">เก็บ • เลือก • พรีวิว • พิมพ์ • ดาวน์โหลด</p>
         </div>
         <button

@@ -1,220 +1,255 @@
-// "use client";
-
-// import jsPDF from "jspdf";
-// import autoTable from "jspdf-autotable";
-
-// /**
-//  * PDF exporter (Thai ready)
-//  * ใช้ได้กับ columns ได้ 2 แบบ
-//  * 1) ["HN","ชื่อ-นามสกุล", ...] และ rows เป็น array-of-arrays
-//  * 2) [{header:"HN",dataKey:"hn"}, ...] และ rows เป็น array-of-objects
-//  */
-
-// let __sarabunLoaded = false;
-
-// function bufToB64(buffer) {
-//   let binary = "";
-//   const bytes = new Uint8Array(buffer);
-//   for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-//   return btoa(binary);
-// }
-
-// async function ensureSarabun(doc) {
-//   if (__sarabunLoaded) return;
-
-//   // รองรับ path ที่คุณบอก: /public/font/Sarabun/*
-//   // และกันกรณีวางไว้ที่ /public/font/ThaiSarabun/*
-//   const candidates = [
-//     { url: "/font/Sarabun/Sarabun-Regular.ttf", vfs: "Sarabun-Regular.ttf", name: "Sarabun", style: "normal" },
-//     { url: "/font/Sarabun/Sarabun-Bold.ttf",    vfs: "Sarabun-Bold.ttf",    name: "Sarabun", style: "bold"   },
-//     { url: "/font/ThaiSarabun/subset-Sarabun-Regular.ttf", vfs: "subset-Sarabun-Regular.ttf", name: "Sarabun", style: "normal" },
-//     { url: "/font/ThaiSarabun/subset-Sarabun-Bold.ttf",    vfs: "subset-Sarabun-Bold.ttf",    name: "Sarabun", style: "bold"   },
-//     { url: "/font/Sarabun/THSarabunNew.ttf",    vfs: "THSarabunNew.ttf",    name: "Sarabun", style: "normal" }, // สำรอง
-//     { url: "/font/Sarabun/THSarabunNew-Bold.ttf", vfs: "THSarabunNew-Bold.ttf", name: "Sarabun", style: "bold" },
-//   ];
-
-//   let loaded = 0;
-//   for (const f of candidates) {
-//     try {
-//       const res = await fetch(f.url, { cache: "force-cache" });
-//       if (!res.ok) continue;
-//       const buf = await res.arrayBuffer();
-//       doc.addFileToVFS(f.vfs, bufToB64(buf));
-//       doc.addFont(f.vfs, f.name, f.style);
-//       loaded++;
-//     } catch {
-//       /* noop */
-//     }
-//   }
-
-//   if (loaded > 0) {
-//     doc.setFont("Sarabun", "normal");
-//     __sarabunLoaded = true;
-//   } else {
-//     console.warn("ไม่พบไฟล์ฟอนต์ที่ /public/font/Sarabun/* หรือ /public/font/ThaiSarabun/* — จะใช้ Helvetica แทน");
-//   }
-// }
-
-// function normalizeTable(columns, rows) {
-//   if (!Array.isArray(columns) || columns.length === 0) return { head: [], body: [] };
-
-//   // กรณี columns เป็น array ของ string
-//   if (typeof columns[0] === "string") {
-//     const headers = columns;
-//     // ถ้า rows เป็น object ให้ map ตามชื่อหัวตาราง
-//     let body = rows;
-//     if (rows.length && !Array.isArray(rows[0])) {
-//       body = rows.map((r) => headers.map((key) => (r?.[key] ?? "")));
-//     }
-//     return { head: [headers], body };
-//   }
-
-//   // กรณี columns เป็น array ของ {header,dataKey}
-//   const headers = columns.map((c) => c.header);
-//   const keys = columns.map((c) => c.dataKey);
-//   let body = rows;
-
-//   if (rows.length) {
-//     if (Array.isArray(rows[0])) {
-//       // rows เป็น array-of-arrays อยู่แล้ว: ใช้ตามลำดับ
-//     } else {
-//       body = rows.map((r) => keys.map((k) => (r?.[k] ?? "")));
-//     }
-//   }
-//   return { head: [headers], body };
-// }
-
-// export default async function exportPDF({
-//   filename = "report.pdf",
-//   columns = [],
-//   rows = [],
-//   title = "รายงาน",
-//   subtitle = "",              // เช่น ช่วงวันที่
-//   orientation = "p",          // "p" | "l"
-//   compress = true,
-// } = {}) {
-//   const doc = new jsPDF({ unit: "pt", format: "a4", orientation, compress });
-
-//   // โหลดฟอนต์ Sarabun
-//   await ensureSarabun(doc);
-
-//   // ส่วนหัว
-//   doc.setFont(__sarabunLoaded ? "Sarabun" : "helvetica", "bold");
-//   doc.setFontSize(18);
-//   doc.text(title, 40, 40);
-
-//   doc.setFont(__sarabunLoaded ? "Sarabun" : "helvetica", "normal");
-//   doc.setFontSize(11);
-//   const printedAt = new Date().toLocaleString("th-TH");
-//   const sub =
-//     (subtitle ? `${subtitle}\n` : "") +
-//     `ออกรายงาน: ${printedAt}`;
-//   const lines = doc.splitTextToSize(sub, doc.internal.pageSize.getWidth() - 80);
-//   doc.text(lines, 40, 62);
-
-//   // ตาราง
-//   const { head, body } = normalizeTable(columns, rows);
-
-//   if (!head.length) {
-//     doc.setFontSize(12);
-//     doc.text("ไม่มีข้อมูล", 40, 100);
-//     doc.save(filename);
-//     return;
-//   }
-
-//   autoTable(doc, {
-//     head,
-//     body,
-//     startY: 80,
-//     styles: {
-//       font: __sarabunLoaded ? "Sarabun" : "helvetica",
-//       fontSize: 11,
-//       cellPadding: 5,
-//       overflow: "linebreak",
-//     },
-//     headStyles: { fillColor: [2, 120, 110], textColor: 255, valign: "middle" },
-//     alternateRowStyles: { fillColor: [245, 247, 250] },
-//     margin: { left: 40, right: 40 },
-//     didDrawPage: () => {
-//       const w = doc.internal.pageSize.getWidth();
-//       const h = doc.internal.pageSize.getHeight();
-//       const total = doc.internal.getNumberOfPages();
-//       // jsPDF v2: ไม่มี API current page ที่ stable ใน callback นี้ ใช้ total เฉย ๆ ก็พอ
-//       doc.setFontSize(10);
-//       doc.text(`หน้า ${doc.internal.getCurrentPageInfo?.().pageNumber || total}/${total}`, w - 40, h - 12, { align: "right" });
-//     },
-//   });
-
-//   doc.save(filename);
-// }
-// components/PDFExporter.js
 "use client";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-export default async function exportPDF({ filename = "report.pdf", columns = [], rows = [] , title = "" }) {
-  const doc = new jsPDF();
+/**
+ * โรงพยาบาล – แผนกชีวาภิบาล: PDF Exporter (มาตรฐาน)
+ *
+ * ใช้แบบเดิมได้: exportPDF({ filename, columns, rows, title })
+ * และเพิ่ม option ได้ เช่น โลโก้, แนวกระดาษ, margins, ลายเซ็น, คำเตือนความลับ ฯลฯ
+ */
+export default async function exportPDF({
+  filename = "report.pdf",
+  // ตาราง: array-of-strings (หัว) + array-of-arrays (แถว)
+  columns = [],
+  rows = [],
+  // ส่วนหัวรายงาน
+  title = "รายงาน",
+  subtitle = "",                            // เช่น "ช่วงวันที่: …"
+  // อัตลักษณ์โรงพยาบาล
+  hospitalName = "โรงพยาบาลของท่าน",
+  department = "แผนกชีวาภิบาล",
+  address = "553 11 ตำบล บ้านดู่ อำเภอเมืองเชียงราย เชียงราย 57100",                             // ทางเลือก
+  logoUrl ,                                  // เช่น "/logo.png"
+  docCode,                                  // รหัสเอกสาร (ถ้ามี) เช่น "PC-REP-01"
+  version,                                  // เวอร์ชันรายงาน (ถ้ามี)
+  printedBy = "",                           // ผู้พิมพ์/จัดทำ
+  printAt = new Date(),                     // วันเวลาพิมพ์
 
-  // โหลดฟอนต์จาก public
+  // การจัดหน้า
+  orientation,                              // "portrait" | "landscape" (ไม่ส่ง = auto)
+  format = "a4",
+  margins = { top: 16, right: 14, bottom: 18, left: 14 },
+  autoLandscape = true,                     // หมุนแนวนอนอัตโนมัติเมื่อคอลัมน์เยอะ
+
+  // ตาราง
+  columnWidths = [],                        // (number | "auto")[]
+  columnAligns = [],                        // ("left" | "center" | "right")[]
+  zebra = true,                             // สลับสีแถว
+  headFill = [230, 230, 230],               // สีหัวคอลัมน์ (พิมพ์ขาวดำได้ดี)
+
+  // ความปลอดภัย/พิธีการ
+  showConfidential = true,                  // แสดงคำเตือนความลับ
+  watermarkText = "",                       // เช่น "CONFIDENTIAL"
+  signatures = null,                        // { preparer?: string, reviewer?: string, approver?: string }
+  // หมายเหตุท้ายตาราง (ถ้ามี)
+  note = "",
+
+  // คุณสมบัติไฟล์
+  pdfAuthor = "",
+  pdfSubject = "",
+  pdfKeywords = "",
+} = {}) {
+  // แนวกระดาษอัตโนมัติ (>=7 คอลัมน์ ⇒ landscape)
+  const pageOrientation =
+    orientation || (autoLandscape && columns.length >= 7 ? "landscape" : "portrait");
+
+  const doc = new jsPDF({ unit: "mm", orientation: pageOrientation, format });
+
+  // คุณสมบัติไฟล์
+  try {
+    doc.setProperties({
+      title,
+      subject: pdfSubject || `${department} – ${title}`,
+      author: pdfAuthor || printedBy || hospitalName,
+      keywords: pdfKeywords || "hospital,palliative,report,thai",
+      creator: hospitalName,
+    });
+  } catch {}
+
+  // ---- ฟอนต์ไทย (TH Sarabun) ----
   const [regularBuffer, boldBuffer] = await Promise.all([
-    fetch("/font/Sarabun/Sarabun-Regular.ttf").then(res => res.arrayBuffer()),
-    fetch("/font/Sarabun/Sarabun-Bold.ttf").then(res => res.arrayBuffer())
+    fetch("/font/Sarabun/Sarabun-Regular.ttf").then((r) => r.arrayBuffer()),
+    fetch("/font/Sarabun/Sarabun-Bold.ttf").then((r) => r.arrayBuffer()),
   ]);
-
-  const toBase64 = (buffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)));
-
+  const toBase64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
   doc.addFileToVFS("Sarabun.ttf", toBase64(regularBuffer));
   doc.addFont("Sarabun.ttf", "Sarabun", "normal");
-
   doc.addFileToVFS("Sarabun-Bold.ttf", toBase64(boldBuffer));
   doc.addFont("Sarabun-Bold.ttf", "Sarabun", "bold");
-
   doc.setFont("Sarabun", "normal");
 
-  // วาดหัวข้อ
-  doc.setFont("Sarabun", "bold");
-  doc.setFontSize(12);
-  doc.text(title || "รายงาน", 105, 20, { align: "center" });
+  // ---- โลโก้ (ถ้ามี) ----
+  let logoDataUrl;
+  if (logoUrl) {
+    const blob = await fetch(logoUrl).then((r) => r.blob());
+    const reader = new FileReader();
+    logoDataUrl = await new Promise((resolve) => {
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  }
 
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const headerH = 36;
+  const footerH = 18;
+  const totalPagesExp = "{total_pages_count_string}";
+
+  // ---- สไตล์คอลัมน์ (ความกว้าง/จัดวาง) ----
+  const columnStyles = {};
+  columnWidths.forEach((w, i) => (columnStyles[i] = { ...(columnStyles[i] || {}), cellWidth: w }));
+  columnAligns.forEach((a, i) => (columnStyles[i] = { ...(columnStyles[i] || {}), halign: a }));
+
+  // ---- Hook วาดหัว/ท้าย + ลายน้ำต่อหน้า ----
+  const drawPageFrame = () => {
+    const topY = margins.top;
+    const centerX = pageW / 2;
+
+    // ลายน้ำ (เบามาก)
+    if (watermarkText) {
+      doc.saveGraphicsState?.();
+      doc.setTextColor(210);
+      doc.setFontSize(48);
+      doc.text(watermarkText, pageW / 2, pageH / 2, {
+        angle: 30,
+        align: "center",
+      });
+      doc.restoreGraphicsState?.();
+    }
+
+    // Header
+    if (logoDataUrl) doc.addImage(logoDataUrl, "PNG", margins.left, topY - 2, 14, 14);
+
+    doc.setFont("Sarabun", "bold").setFontSize(13);
+    doc.text(hospitalName, centerX, topY + 2, { align: "center", baseline: "top" });
+
+    doc.setFont("Sarabun", "normal").setFontSize(11);
+    doc.text(department, centerX, topY + 8, { align: "center", baseline: "top" });
+    if (address) {
+      doc.setFontSize(9);
+      doc.text(address, centerX, topY + 14, { align: "center", baseline: "top" });
+    }
+
+    // รายละเอียดมุมขวา (รหัส/เวอร์ชัน)
+    doc.setFontSize(8);
+    let rightTop = topY - 4;
+    if (docCode) {
+      doc.text(`รหัส: ${docCode}`, pageW - margins.right, rightTop, { align: "right" });
+      rightTop += 4;
+    }
+    if (version) {
+      doc.text(`เวอร์ชัน: ${version}`, pageW - margins.right, rightTop, { align: "right" });
+    }
+
+    // เส้นคั่น
+    doc.setDrawColor(170).setLineWidth(0.3);
+    doc.line(margins.left, topY + 18, pageW - margins.right, topY + 18);
+
+    // ชื่อรายงาน + ช่วงวันที่ (subtitle)
+    doc.setFont("Sarabun", "bold").setFontSize(12);
+    doc.text(title, centerX, topY + 24, { align: "center" });
+    if (subtitle) {
+      doc.setFont("Sarabun", "normal").setFontSize(10);
+      doc.text(subtitle, centerX, topY + 30, { align: "center" });
+    }
+
+    // Footer
+    const bottomY = pageH - margins.bottom;
+    doc.setDrawColor(200).setLineWidth(0.2);
+    doc.line(margins.left, bottomY - 8, pageW - margins.right, bottomY - 8);
+
+    doc.setFont("Sarabun", "normal").setFontSize(9);
+    const dateStr = (printAt instanceof Date ? printAt : new Date(printAt)).toLocaleString("th-TH", {
+      dateStyle: "long",
+      timeStyle: "short",
+    });
+    const leftFooter = showConfidential
+      ? `จัดทำเมื่อ: ${dateStr}  โดย: ${printedBy || "-"}  •  เอกสารมีข้อมูลส่วนบุคคล โปรดรักษาความลับ`
+      : `จัดทำเมื่อ: ${dateStr}  โดย: ${printedBy || "-"}`;
+    doc.text(leftFooter, margins.left, bottomY - 3);
+
+    const pageStr = `หน้า ${doc.internal.getNumberOfPages()} / ${totalPagesExp}`;
+    doc.text(pageStr, pageW - margins.right, bottomY - 3, { align: "right" });
+  };
+
+  // ---- วาดตาราง ----
   autoTable(doc, {
-    startY: 28,
-    theme: "grid",
-    columnStyles: {
-      0: { cellWidth: "auto" }, 
-      1: { cellWidth: "auto" }, 
-      2: { cellWidth: "auto" }, 
-      3: { cellWidth: "auto" }, 
-      4: { cellWidth: "auto" }, 
-      5: { cellWidth: "auto" }, 
-      6: { cellWidth: "auto" }, 
-      7: { cellWidth: "auto" }, 
-      8: { cellWidth: "auto" }, 
-      9: { cellWidth: "auto" }, 
-      10: { cellWidth: "auto" },  
-      11: { cellWidth: "auto" },  
-      12: { cellWidth: "auto" },
-      13: { cellWidth: "auto" },
-      14: { cellWidth: "auto" },
-      15: { cellWidth: "auto" },
-      16: { cellWidth: "auto" },
+    startY: margins.top + headerH,
+    margin: {
+      top: margins.top,
+      right: margins.right,
+      bottom: margins.bottom + footerH,
+      left: margins.left,
     },
+    theme: "grid",
     head: [columns],
     body: rows,
     styles: {
       font: "Sarabun",
-      fontSize: 8,
-      cellPadding: 2,
-      overflow: "linebreak", // ✅ ให้ห่อบรรทัด
+      fontSize: 9,
+      cellPadding: 2.2,
+      overflow: "linebreak",
+      lineWidth: 0.2,
     },
     headStyles: {
       font: "Sarabun",
       fontStyle: "bold",
-      fillColor: [175, 175, 175],
+      fillColor: headFill,
       textColor: 0,
     },
-    margin: { top: 10 },
+    bodyStyles: { valign: "top" },
+    alternateRowStyles: zebra ? { fillColor: [247, 247, 247] } : undefined,
+    columnStyles,
+
+    didDrawPage: drawPageFrame,
   });
+
+  // ---- หมายเหตุท้ายตาราง + บล็อกลายเซ็น (เฉพาะหน้าสุดท้าย) ----
+  let y = (doc.lastAutoTable?.finalY || margins.top + headerH) + 6;
+  const maxY = pageH - margins.bottom - footerH - 4;
+
+  const needSpace = (note ? 12 : 0) + (signatures ? 34 : 0);
+
+  if (y + needSpace > maxY) {
+    doc.addPage();
+    drawPageFrame();
+    y = margins.top + headerH + 6;
+  }
+
+  // หมายเหตุ
+  if (note) {
+    doc.setFont("Sarabun", "bold").setFontSize(10).text("หมายเหตุ:", margins.left, y);
+    doc.setFont("Sarabun", "normal").setFontSize(9);
+    const textWidth = pageW - margins.left - margins.right;
+    const lines = doc.splitTextToSize(note, textWidth);
+    doc.text(lines, margins.left + 16, y);
+    y += 6 + (lines.length - 1) * 4.8;
+  }
+
+  // ลายเซ็น
+  if (signatures) {
+    const colW = (pageW - margins.left - margins.right - 20) / 3;
+    const baseY = y + 6;
+
+    const drawSign = (x, label, name) => {
+      doc.setDrawColor(130).setLineWidth(0.2);
+      doc.line(x, baseY + 12, x + colW, baseY + 12);
+      doc.setFont("Sarabun", "normal").setFontSize(9);
+      doc.text(`(${name || " "})`, x + colW / 2, baseY + 18, { align: "center" });
+      doc.text(label, x + colW / 2, baseY + 24, { align: "center" });
+    };
+
+    drawSign(margins.left, "ผู้จัดทำ", signatures.preparer || "");
+    drawSign(margins.left + colW + 10, "ผู้ทบทวน", signatures.reviewer || "");
+    drawSign(margins.left + 2 * (colW + 10), "ผู้อนุมัติ", signatures.approver || "");
+  }
+
+  // รวมจำนวนหน้าจริง
+  if (typeof doc.putTotalPages === "function") {
+    doc.putTotalPages(totalPagesExp);
+  }
 
   doc.save(filename);
 }

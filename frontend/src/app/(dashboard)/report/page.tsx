@@ -9,10 +9,15 @@ import exportCSV from '../../components/CSVExporter'
  * - Thai date formatting (B.E.)
  * - ใช้ PDFExporter & CSVExporter ที่เตรียมไว้แล้ว
  * - Death reports เรียก /api/deaths (มี fallback จาก /api/patients)
+ * - ปรับปรุง: PDF layouts ต่อรายงาน, sort รายเดือน, normalize HN
  ***********************************************************/
 
 /*********************** CONFIG & HTTP ************************/
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000'
+const HOSPITAL_NAME = 'โรงพยาบาลวัดห้วยปลากั้งเพื่อสังคม'
+const DEPARTMENT_NAME = 'แผนกชีวาภิบาล'
+const LOGO_URL = '/logo.png' // ใส่โลโก้ใน public/logo.png
+
 const joinUrl = (base: string, path: string) => {
   const b = base.replace(/\/$/, '')
   const p = path.startsWith('/') ? path : `/${path}`
@@ -41,17 +46,15 @@ async function http<T>(url: string, options: RequestInit = {}): Promise<T> {
 
 /*********************** DATE HELPERS (TH) ************************/
 const formatDate = (dateString: string | undefined): string => {
-  if (!dateString) return "-";
+  if (!dateString) return "-"
   try {
     return new Date(dateString).toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  } catch (error) {
-    return "-";
+      year: 'numeric', month: 'long', day: 'numeric',
+    })
+  } catch {
+    return "-"
   }
-};
+}
 
 const toISO = (d: string | Date) => {
   const dt = typeof d === 'string' ? new Date(d) : d
@@ -61,6 +64,9 @@ const toISO = (d: string | Date) => {
   const day = String(dt.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
+
+const thDate = (s?: string) =>
+  s ? new Date(s).toLocaleDateString('th-TH', { dateStyle: 'long' }) : '-'
 
 /*********************** TYPES ************************/
 type Status = 'pending' | 'done' | 'cancelled'
@@ -159,7 +165,7 @@ async function fetchDeaths(params: { from?: string; to?: string; limit?: number 
   try {
     const data = await http<{ data: DeathRecord[] }>(`/api/deaths?${p.toString()}`)
     return data.data || []
-  } catch (e) {
+  } catch {
     // fallback จาก patients
     const pts = await fetchPatients({})
     return pts
@@ -182,27 +188,38 @@ async function fetchDeaths(params: { from?: string; to?: string; limit?: number 
 
 /*********************** REPORT DEFINITIONS ************************/
 const REPORTS = [
-  { id: 'pt-register', label: 'ทะเบียนผู้ป่วยทั้งหมด' },
-  { id: 'pt-new', label: 'สถิติผู้ป่วยเข้าใหม่ (รายเดือน)' },
-  { id: 'pt-demographic', label: 'สถิติตามเพศ/อายุ/กรุ๊ปเลือด/ประเภท' },
-  { id: 'pt-diseases', label: 'โรคประจำตัวที่พบบ่อย' },
-  { id: 'tx-logs', label: 'บันทึกการรักษา' },
-  { id: 'tx-types', label: 'ประเภทการรักษา' },
-  { id: 'tx-freq', label: 'สถิติความถี่การรักษา (รายเดือน)' },
-  { id: 'ap-mth', label: 'จำนวนนัดหมายรวม (รายเดือน)' },
-  { id: 'ap-by-type', label: 'นัดหมายตามประเภท' },
-  { id: 'ap-by-place', label: 'นัดหมายตามสถานที่' },
-  { id: 'ap-noshow', label: 'อัตรามา/ไม่มาตามนัด' },
-  { id: 'ap-status', label: 'สรุปสถานะนัดหมาย' },
-  { id: 'death-count', label: 'จำนวนผู้ป่วยเสียชีวิต (รายเดือน)' },
-  { id: 'death-causes', label: 'สาเหตุการเสียชีวิต (Top)' },
-  { id: 'death-age', label: 'ช่วงอายุของผู้เสียชีวิต' },
-  { id: 'death-mgmt', label: 'การจัดการศพ (management)' },
+  { id: 'pt-register',   label: 'ทะเบียนผู้ป่วยทั้งหมด' },
+  { id: 'pt-new',        label: 'สถิติผู้ป่วยเข้าใหม่ (รายเดือน)' },
+  { id: 'pt-demographic',label: 'สถิติตามเพศ/อายุ/กรุ๊ปเลือด/ประเภท' },
+  { id: 'pt-diseases',   label: 'โรคประจำตัวที่พบบ่อย' },
+  { id: 'tx-logs',       label: 'บันทึกการรักษา' },
+  { id: 'tx-types',      label: 'ประเภทการรักษา' },
+  { id: 'tx-freq',       label: 'สถิติความถี่การรักษา (รายเดือน)' },
+  { id: 'ap-mth',        label: 'จำนวนนัดหมายรวม (รายเดือน)' },
+  { id: 'ap-by-type',    label: 'นัดหมายตามประเภท' },
+  { id: 'ap-by-place',   label: 'นัดหมายตามสถานที่' },
+  { id: 'ap-noshow',     label: 'อัตรามา/ไม่มาตามนัด' },
+  { id: 'ap-status',     label: 'สรุปสถานะนัดหมาย' },
+  { id: 'death-count',   label: 'จำนวนผู้ป่วยเสียชีวิต (รายเดือน)' },
+  { id: 'death-causes',  label: 'สาเหตุการเสียชีวิต (Top)' },
+  { id: 'death-age',     label: 'ช่วงอายุของผู้เสียชีวิต' },
+  { id: 'death-mgmt',    label: 'การจัดการศพ (management)' },
 ] as const
 
 type ReportId = typeof REPORTS[number]['id']
 
 /*********************** FILTER CONTROLS ************************/
+const normalizeHN = (id = '') => {
+  const raw = String(id).trim().toUpperCase()
+  if (!raw) return ''
+  if (/^HN-?\d+$/.test(raw)) {
+    const digits = raw.replace(/[^0-9]/g, '')
+    return `HN-${digits.padStart(8, '0')}`
+  }
+  if (/^\d+$/.test(raw)) return `HN-${raw.padStart(8, '0')}`
+  return raw
+}
+
 function FilterControls({ report, filters, setFilters }: { report: ReportId; filters: any; setFilters: (f: any) => void }) {
   const common = (
     <>
@@ -237,7 +254,13 @@ function FilterControls({ report, filters, setFilters }: { report: ReportId; fil
         <>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600">HN</label>
-            <input className="border rounded px-2 py-1" value={filters.hn || ''} onChange={(e) => setFilters({ ...filters, hn: e.target.value })} placeholder="เช่น HN-00000001" />
+            <input
+              className="border rounded px-2 py-1"
+              value={filters.hn || ''}
+              onChange={(e) => setFilters({ ...filters, hn: e.target.value })}
+              onBlur={(e) => setFilters({ ...filters, hn: normalizeHN(e.target.value) })}
+              placeholder="เช่น HN-00000001 / 1"
+            />
           </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600">ประเภทการรักษา</label>
@@ -284,6 +307,16 @@ function yearMonthKey(dateStr?: string) {
   const y = d.getFullYear() + 543
   const m = pad2(d.getMonth() + 1)
   return `${m}/${y}`
+}
+function sortYearMonthBE(entries: [string, any[]][]) {
+  // "MM/YYYY_BE" -> sort by actual Date (convert back to CE)
+  return entries.sort((a, b) => {
+    const [am, ayBE] = a[0].split('/').map(Number)
+    const [bm, byBE] = b[0].split('/').map(Number)
+    const ad = new Date((ayBE - 543), am - 1, 1)
+    const bd = new Date((byBE - 543), bm - 1, 1)
+    return ad.getTime() - bd.getTime()
+  })
 }
 function groupByMonth<T>(arr: T[], getDate: (x: T) => string | undefined) {
   const m: Record<string, T[]> = {}
@@ -381,7 +414,8 @@ async function buildReport(report: ReportId, filters: any) {
     case 'pt-new': {
       const rows = await fetchPatients({ from, to })
       const bucket = groupByMonth(rows, (p) => p.admittion_date)
-      const data = Object.entries(bucket).map(([ym, arr]) => ({ month: ym, count: arr.length }))
+      const data = sortYearMonthBE(Object.entries(bucket))
+        .map(([ym, arr]) => ({ month: ym, count: arr.length }))
       const raw = data.map((r) => ({ month: r.month, count: r.count }))
       return { title: 'สถิติผู้ป่วยเข้าใหม่ (รายเดือน)', columns: [ { header: 'เดือน', dataKey: 'month' }, { header: 'จำนวน', dataKey: 'count' } ], rows: data, rawRows: raw }
     }
@@ -438,7 +472,8 @@ async function buildReport(report: ReportId, filters: any) {
     case 'tx-freq': {
       const rows = await fetchTreatments({ from, to })
       const bucket = groupByMonth(rows, (t) => t.treatment_date)
-      const data = Object.entries(bucket).map(([ym, arr]) => ({ month: ym, count: arr.length }))
+      const data = sortYearMonthBE(Object.entries(bucket))
+        .map(([ym, arr]) => ({ month: ym, count: arr.length }))
       const raw = data.map((r) => ({ month: r.month, count: r.count }))
       return { title: 'สถิติความถี่การรักษา (รายเดือน)', columns: [ { header:'เดือน', dataKey:'month' }, { header:'จำนวน', dataKey:'count' } ], rows: data, rawRows: raw }
     }
@@ -446,7 +481,8 @@ async function buildReport(report: ReportId, filters: any) {
     case 'ap-mth': {
       const rows = await fetchAppointments({ from, to, type: filters.apType || '', place: filters.apPlace || '', status: filters.apStatus || 'all' })
       const bucket = groupByMonth(rows, (a) => a.appointment_date)
-      const data = Object.entries(bucket).map(([ym, arr]) => ({ month: ym, count: arr.length }))
+      const data = sortYearMonthBE(Object.entries(bucket))
+        .map(([ym, arr]) => ({ month: ym, count: arr.length }))
       const raw = data.map((r) => ({ month: r.month, count: r.count }))
       return { title: 'จำนวนนัดหมายรวม (รายเดือน)', columns: [ { header:'เดือน', dataKey:'month' }, { header:'จำนวน', dataKey:'count' } ], rows: data, rawRows: raw }
     }
@@ -494,7 +530,8 @@ async function buildReport(report: ReportId, filters: any) {
     case 'death-count': {
       const rows = await fetchDeaths({ from, to })
       const bucket = groupByMonth(rows, (r) => r.death_date)
-      const data = Object.entries(bucket).map(([ym, arr]) => ({ month: ym, count: arr.length }))
+      const data = sortYearMonthBE(Object.entries(bucket))
+        .map(([ym, arr]) => ({ month: ym, count: arr.length }))
       const raw = data.map((r) => ({ month: r.month, count: r.count }))
       return { title: 'จำนวนผู้ป่วยเสียชีวิต (รายเดือน)', columns: [ { header:'เดือน', dataKey:'month' }, { header:'จำนวน', dataKey:'count' } ], rows: data, rawRows: raw }
     }
@@ -557,29 +594,84 @@ export default function ReportsNoChartsFixed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report, JSON.stringify(filters)])
 
-  // กำหนด Type สำหรับออบเจกต์ใน columns เพื่อความชัดเจน
-  type Column = {
-    header: string;
-    dataKey: string;
-  };
+  type Column = { header: string; dataKey: string }
+
+  // รูปแบบต่อรายงาน (แนวหน้า/กว้างคอลัมน์/จัดวาง)
+  const PDF_LAYOUTS: Partial<Record<ReportId, {
+    widths?: (number | "auto")[];
+    aligns?: ("left" | "center" | "right")[];
+  }>> = {
+    'pt-register': {
+      // รวม ~182 มม.
+      widths: [24, 50, 13, 12, 14, 15, 15, 24, 22],
+      aligns: ['left','left','center','center','center','center','center','center','left']
+    },
+    'pt-new':        { widths: [36, 28], aligns: ['center','right'] },
+    'pt-demographic':{ widths: [32, 'auto', 26], aligns: ['left','left','right'] },
+    'pt-diseases':   { widths: ['auto', 26], aligns: ['left','right'] },
+    'tx-logs': {
+      // เดิมเคย landscape — ปรับให้พอดี portrait
+      widths: [20, 22, 18, 80, 40], // รวม ~180 มม.
+      aligns: ['left','center','center','left','left']
+    },
+    'tx-types':      { widths: ['auto', 26], aligns: ['left','right'] },
+    'tx-freq':       { widths: [36, 28], aligns: ['center','right'] },
+    'ap-mth':        { widths: [36, 28], aligns: ['center','right'] },
+    'ap-by-type':    { widths: ['auto', 26], aligns: ['left','right'] },
+    'ap-by-place':   { widths: ['auto', 26], aligns: ['left','right'] },
+    'ap-noshow':     { widths: ['auto', 32, 22], aligns: ['left','center','right'] },
+    'ap-status':     { widths: ['auto', 26], aligns: ['left','right'] },
+    'death-count':   { widths: [36, 28], aligns: ['center','right'] },
+    'death-causes':  { widths: ['auto', 26], aligns: ['left','right'] },
+    'death-age':     { widths: ['auto', 26], aligns: ['left','right'] },
+    'death-mgmt':    { widths: ['auto', 26], aligns: ['left','right'] },
+  }
 
   const handleExportPDF = async (columns: Column[], rows: any[], title: string) => {
-    if (!columns.length || !rows.length) {
-      console.error('ไม่มีข้อมูลสำหรับ export PDF')
-      return
-    }
+    if (!columns.length || !rows.length) return
+
     const headerRow = columns.map(c => c.header)
-    const bodyRows = rows.map(r => columns.map(c => String(r[c.dataKey] ?? '')))
-    try {
-      await exportPDF({
-        filename: `${title}__${toISO(new Date())}.pdf`,
-        columns: headerRow,
-        rows: bodyRows,
-        title: title,
-      })
-    } catch (e) {
-      console.error('เกิดข้อผิดพลาดในการ export PDF:', e)
+    const bodyRows  = rows.map(r => columns.map(c => String(r[c.dataKey] ?? '')))
+
+    // subtitle แสดงช่วงวันที่ + เงื่อนไขสำคัญ (ถ้ามี)
+    const parts: string[] = [`ช่วงวันที่: ${thDate(filters.from)} – ${thDate(filters.to)}`]
+    if (report === 'pt-register' && filters.ptStatus) parts.push(`สถานะ: ${filters.ptStatus}`)
+    if (report === 'tx-logs') {
+      if (filters.hn) parts.push(`HN: ${normalizeHN(filters.hn)}`)
+      if (filters.txType) parts.push(`ประเภท: ${filters.txType}`)
     }
+    if (['ap-mth','ap-by-type','ap-by-place','ap-noshow','ap-status'].includes(report)) {
+      if (filters.apType) parts.push(`ประเภทนัด: ${filters.apType}`)
+      if (filters.apPlace) parts.push(`สถานที่: ${filters.apPlace}`)
+      if (filters.apStatus && filters.apStatus !== 'all') parts.push(`สถานะ: ${filters.apStatus}`)
+    }
+    const subtitle = parts.join('  •  ')
+
+    // รูปแบบตามรายงาน + default อัตโนมัติ
+    const lay = PDF_LAYOUTS[report] || {}
+    const orientation: "portrait" | "landscape" = "portrait";
+    const columnWidths = lay.widths || Array(columns.length).fill('auto')
+    const columnAligns = lay.aligns || columns.map(() => 'left')
+
+    await exportPDF({
+      filename: `${title}__${toISO(new Date())}.pdf`,
+      title,
+      subtitle,
+      columns: headerRow,
+      rows: bodyRows,
+      orientation,
+      autoLandscape: false,
+      format: "a4",
+      margins: { top: 16, right: 12, bottom: 18, left: 12 },
+      logoUrl: LOGO_URL,
+      columnWidths,
+      columnAligns,
+      printAt: new Date(),
+      // ถ้าใช้ PDFExporter เวอร์ชันธีมโรงพยาบาล จะอ่านค่าเหล่านี้ได้:
+      hospitalName: HOSPITAL_NAME,
+      department: DEPARTMENT_NAME,
+      showConfidential: true,
+    } as any)
   }
 
   const handleExportCSV = (columns: Column[], rows: any[], title: string) => {
@@ -587,11 +679,9 @@ export default function ReportsNoChartsFixed() {
       console.error('ไม่มีข้อมูลสำหรับ export CSV')
       return
     }
-    // แปลง rows เป็น Array of Arrays และ escape ค่าสตริง
     const bodyRows = rows.map(r =>
       columns.map(c => {
         const value = r[c.dataKey] ?? ''
-        // Escape ค่าสตริงที่มีเครื่องหมายคอมมา, อัญประกาศ, หรือตัวขึ้นบรรทัดใหม่
         return typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))
           ? `"${value.replace(/"/g, '""')}"`
           : String(value)
@@ -601,7 +691,7 @@ export default function ReportsNoChartsFixed() {
       exportCSV({
         filename: `${title}__${toISO(new Date())}.csv`,
         columns: columns.map(c => ({ header: c.header, dataKey: c.dataKey })),
-        rows: bodyRows, // ส่ง rows ที่แปลงแล้ว
+        rows: bodyRows,
       })
     } catch (e) {
       console.error('เกิดข้อผิดพลาดในการ export CSV:', e)
@@ -614,21 +704,21 @@ export default function ReportsNoChartsFixed() {
     <div className="p-4 space-y-4 bg-[#F7F7Fb] rounded-[15px]">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">รายงาน (ส่งออก PDF/CSV)</h1>
+          <h1 className="text-[28px] font-bold text-gray-800">รายงาน (ส่งออก PDF/CSV)</h1>
           <p className="text-sm text-gray-500">ฟอร์แมตวันที่แบบไทย • ไม่มีกราฟ • รองรับฟอนต์ไทย</p>
         </div>
         <div className="flex gap-2">
           <button
             className="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
             onClick={() => handleExportPDF(columns, rows, title)}
-            disabled={!columns.length || !rows.length}
+            disabled={!columns.length || !rows.length || loading}
           >
             ส่งออก PDF
           </button>
           <button
             className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
             onClick={() => handleExportCSV(columns, rows, title)}
-            disabled={!columns.length || !rows.length}
+            disabled={!columns.length || !rows.length || loading}
           >
             ส่งออก CSV
           </button>
@@ -645,7 +735,7 @@ export default function ReportsNoChartsFixed() {
           </div>
           <div className="md:col-span-2 text-right flex gap-2 md:justify-end">
             <button className="px-3 py-2 rounded border text-gray-700 hover:bg-gray-50" onClick={clearFilters}>ล้างตัวกรอง</button>
-            <button className="px-3 py-2 rounded bg-gray-800 text-white hover:bg-black" onClick={load}>
+            <button className="px-3 py-2 rounded bg-gray-800 text-white hover:bg-black" onClick={load} disabled={loading}>
               {loading ? 'กำลังโหลด...' : 'ดึงข้อมูล'}
             </button>
           </div>

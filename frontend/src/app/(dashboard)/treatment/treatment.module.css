@@ -1,7 +1,7 @@
 /* Root layout */
 .wrapper { background-color:#F4f4f4; border-radius: 15; padding: 20px; display:grid; gap:24px; }
 .header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.title { font-size:24px; font-weight:600; }
+.title { font-size:28px; font-weight:600; }
 .subtitle { font-size:14px; color:#334155; }
 .resetBtn { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04); cursor:pointer; }
 .resetBtn:hover { background:#f8fafc; }
