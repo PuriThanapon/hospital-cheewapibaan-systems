@@ -22,10 +22,7 @@ import DeceasedForm from '@/app/components/forms/DeceasedForm';
 import DatePickerField from '@/app/components/DatePicker';
 import type { AppointmentFormValue } from '@/app/components/forms/AppointmentForm';
 import Link from 'next/link';
-import { collectSelectedDocs } from '@/app/lib/patientFiles';
-import { uploadPatientFiles } from '@/app/lib/uploadPatientFiles';
-import BaselineForm, { Baseline } from '@/app/components/forms/BaselineForm';
-import { hasBaselineData } from '@/app/lib/baseline'; // ถ้าคุณวาง util ตามตัวอย่าง
+import { hasBaselineData } from '@/app/lib/baseline'; // util เช็คว่ามี baseline data ไหม
 
 type Status = 'pending' | 'done' | 'cancelled';
 // react-select (SSR safe)
@@ -74,7 +71,7 @@ const RS_PROPS = {
   onKeyDown: (e: any) => { if (e.key === 'Enter') e.stopPropagation(); },
 } as const;
 
-// ฟิลเตอร์ options
+// ฟิลเตอร์ options (คงที่)
 const genderOptions = [
   { value: 'ชาย', label: 'ชาย' },
   { value: 'หญิง', label: 'หญิง' },
@@ -100,10 +97,14 @@ const statusOptions = [
   { value: 'เสียชีวิต', label: 'เสียชีวิต' },
   { value: 'จำหน่าย', label: 'จำหน่าย' },
 ];
-const treatatOptions = [
-  { value: 'โรงพยาบาล', label: 'โรงพยาบาล' },
-  { value: 'บ้าน', label: 'บ้าน' },
-];
+
+// ✅ ใช้ NEXT_PUBLIC_API_URL (และรองรับตัวแปรเก่าเป็นสำรอง) + ตัดท้ายน้ำ
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000')
+  .replace(/\/+$/, '');
+
+// ---- treat_at filter options: โหลดจาก settings/patient-form ให้ตรงกับ PatientForm
+const FALLBACK_TREAT_AT = ['โรงพยาบาล', 'บ้าน'];
+const toOpt = (x: string) => ({ value: x, label: x });
 
 type FileField =
   | 'patient_id_card'
@@ -120,14 +121,13 @@ const fields: Array<{ key: FileField; label: string }> = [
 ];
 
 // HTTP helper
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
-function joinUrl(base, path) {
+function joinUrl(base: string, path: string) {
   if (!base) return path;
   const b = base.replace(/\/$/, '');
   const p = path.startsWith('/') ? path : `/${path}`;
   return `${b}${p}`;
 }
-async function http(url, options: any = {}) {
+async function http(url: string, options: any = {}) {
   const finalUrl = /^https?:\/\//i.test(url) ? url : joinUrl(API_BASE, url);
 
   const headers = options.body instanceof FormData
@@ -149,7 +149,7 @@ async function http(url, options: any = {}) {
       } else {
         msg = await res.text();
       }
-    } catch {}
+    } catch { }
     const err: any = new Error(msg);
     err.status = res.status;
     throw err;
@@ -223,9 +223,9 @@ function buildPatientFormData(values: Record<string, any>) {
 }
 
 // Utils
-function formatThaiDateBE(dateStr) {
+function formatThaiDateBE(dateStr: string) {
   if (!dateStr) return '-';
-  let dt;
+  let dt: Date;
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     const [y, m, d] = dateStr.split('-').map(Number);
     dt = new Date(y, m - 1, d);
@@ -237,7 +237,7 @@ function formatThaiDateBE(dateStr) {
     day: 'numeric', month: 'long', year: 'numeric',
   }).format(dt);
 }
-function calculateAge(birthdateStr) {
+function calculateAge(birthdateStr: string) {
   if (!birthdateStr) return '-';
   const birthDate = new Date(birthdateStr);
   if (isNaN(birthDate.getTime())) return '-';
@@ -247,7 +247,7 @@ function calculateAge(birthdateStr) {
   if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
   return age;
 }
-function calculateAgeFromBirthdate(birthdate) {
+function calculateAgeFromBirthdate(birthdate: string) {
   if (!birthdate) return '-';
   const birth = new Date(birthdate);
   if (isNaN(birth.getTime())) return '-';
@@ -259,17 +259,17 @@ function calculateAgeFromBirthdate(birthdate) {
   }
   return years > 0 ? `${years} ปี` : `${months} เดือน`;
 }
-function toISODateLocal(val) {
+function toISODateLocal(val: any) {
   if (!val) return '';
   if (typeof val === 'string') return val;
   const d = val instanceof Date ? val : new Date(val);
-  if (isNaN(d)) return '';
+  if (isNaN(d as any)) return '';
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-function formatCardId(id) {
+function formatCardId(id?: string) {
   if (!id) return '-';
   const parts = id.split('-');
   if (parts.length > 1) return `HN ${parts[1]}`;
@@ -488,29 +488,28 @@ export default function PatientsPage() {
   const [tick, setTick] = useState(0);
 
   // data
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState('');
 
   // modals
   const [openAdd, setOpenAdd] = useState(false);
-  const [baselineAdd, setBaselineAdd] = useState<Baseline>({ patients_id: '' });
   const [openEdit, setOpenEdit] = useState<string | null>(null);
   const [openAppt, setOpenAppt] = useState<string | null>(null);
   const [openDeceased, setOpenDeceased] = useState<string | null>(null);
   const [openVerify, setOpenVerify] = useState(false);
-  const [verifyData, setVerifyData] = useState(null);
+  const [verifyData, setVerifyData] = useState<any>(null);
 
   // drafts
-  const [addDraft, setAddDraft] = useState({ status: 'มีชีวิต' });
-  const [editDraft, setEditDraft] = useState({});
-  const [deadDraft, setDeadDraft] = useState({});
-  const [deadErrors, setDeadErrors] = useState({});
+  const [addDraft, setAddDraft] = useState<any>({ status: 'มีชีวิต' });
+  const [editDraft, setEditDraft] = useState<any>({});
+  const [deadDraft, setDeadDraft] = useState<any>({});
+  const [deadErrors, setDeadErrors] = useState<any>({});
 
   // 🔗 refs สำหรับเรียก validate() จาก PatientForm
-  const addFormRef = useRef(null);
-  const editFormRef = useRef(null);
+  const addFormRef = useRef<any>(null);
+  const editFormRef = useRef<any>(null);
 
   type PatientFile = {
     id: number;
@@ -527,12 +526,29 @@ export default function PatientsPage() {
   const [stdFiles, setStdFiles] = useState<StandardField[]>([]);
   const [stdChecking, setStdChecking] = useState(false);
 
+  // treat_at options จาก settings
+  const [treatAtOptions, setTreatAtOptions] = useState(FALLBACK_TREAT_AT.map(toOpt));
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(joinUrl(API_BASE, '/api/settings/patient-form'), { cache: 'no-store' });
+        if (!alive) return;
+        if (res.ok) {
+          const js = await res.json();
+          const arr: string[] = js?.selectOptions?.treat_at || FALLBACK_TREAT_AT;
+          setTreatAtOptions(arr.map(toOpt));
+        }
+      } catch { /* ใช้ fallback ต่อไป */ }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // build query string
   const qs = useMemo(() => {
     const p = new URLSearchParams();
     if (query.trim()) p.set('q', query.trim());
-    Object.entries(filters).forEach(([k, v]) => { if (v) p.set(k, v); });
+    Object.entries(filters).forEach(([k, v]) => { if (v) p.set(k, v as string); });
     p.set('page', String(page));
     p.set('limit', String(limit));
     p.set('_t', String(tick));
@@ -577,7 +593,7 @@ export default function PatientsPage() {
     setPage(1); setTick(t => t + 1);
   };
   const activeFilterEntries = useMemo(() => Object.entries(filters).filter(([, v]) => !!v), [filters]);
-  const filterLabels = { treat_at: 'สถานที่รักษา', status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
+  const filterLabels: any = { treat_at: 'สถานที่รักษา', status: 'สถานะผู้ป่วย', gender: 'เพศ', blood_group: 'กรุ๊ปเลือด', bloodgroup_rh: 'Rh', patients_type: 'ประเภทผู้ป่วย', admit_from: 'รับเข้าตั้งแต่', admit_to: 'รับเข้าถึง' };
 
   // actions
   const refresh = () => setTick(t => t + 1);
@@ -587,7 +603,6 @@ export default function PatientsPage() {
     try {
       const { nextId } = await http('/api/patients/next-id');
       setAddDraft({ patients_id: nextId, status: 'มีชีวิต' });
-      setBaselineAdd({ patients_id: nextId, reason_in_dept: '', reason_admit: '', bedbound_cause: '', other_history: '' });
       setOpenAdd(true);
     } catch (e) {
       $swal.fire({ icon: 'error', title: 'ดึง HN ถัดไปไม่สำเร็จ', text: (e as any).message || '' });
@@ -609,10 +624,20 @@ export default function PatientsPage() {
       const created = await http('/api/patients', { method: 'POST', body: formData });
 
       const patients_id = (created as any)?.patients_id ?? formValues?.patients_id;
+
       await uploadAllPatientFiles(patients_id, formValues);
 
-      if (hasBaselineData(baselineAdd)) {
-        const payload = { ...baselineAdd, patients_id };
+      // บันทึก baseline ถ้ามีกรอกในฟอร์ม
+      if (hasBaselineData(formValues)) {
+        const payload = {
+          patients_id,
+          reason_in_dept: formValues.reason_in_dept ?? '',
+          reason_admit: formValues.reason_admit ?? '',
+          bedbound_cause: formValues.bedbound_cause ?? '',
+          other_history: formValues.other_history ?? '',
+          referral_hospital: formValues.referral_hospital ?? '',
+          referral_phone: formValues.referral_phone ?? '',
+        };
         await http(`/api/patients/${encodeURIComponent(patients_id)}/encounters/baseline`, {
           method: 'POST',
           body: JSON.stringify(payload),
@@ -627,7 +652,7 @@ export default function PatientsPage() {
     }
   };
 
-  const handleOpenEdit = async (patients_id) => {
+  const handleOpenEdit = async (patients_id: string) => {
     setOpenEdit(patients_id);
     try {
       const d = await http(`/api/patients/${encodeURIComponent(patients_id)}`);
@@ -730,12 +755,12 @@ export default function PatientsPage() {
   }
 
   function toHHmmSS(s?: string) {
-     if (!s) return '';
-     if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s;
-     const m = String(s).match(/^(\d{1,2}):(\d{2})$/);
-     if (!m) return s; // ปล่อยไปให้แบ็กเอนด์แจ้ง error ถ้าไม่ใช่รูปแบบเวลา
-     return `${m[1].padStart(2, '0')}:${m[2]}:00`;
-   }
+    if (!s) return '';
+    if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s;
+    const m = String(s).match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return s; // ปล่อยไปให้แบ็กเอนด์แจ้ง error ถ้าไม่ใช่รูปแบบเวลา
+    return `${m[1].padStart(2, '0')}:${m[2]}:00`;
+  }
 
   // แก้ payload ให้ตรงกับ “นัดหมายหลัก”
   const saveAppt = async () => {
@@ -746,16 +771,16 @@ export default function PatientsPage() {
       return;
     }
 
-    const hn       = (apptForm.hn || '').trim();
-    const date     = apptForm.date!;
-    const startS   = toHHmmSS(apptForm.start!);
-    const endS     = toHHmmSS(apptForm.end!);
-    const typeLbl  = (apptForm.type || '').trim();             // 'โรงพยาบาล' | 'บ้านผู้ป่วย'
-    const typeApi  = typeLbl === 'โรงพยาบาล' ? 'hospital' : 'home'; // map เป็นค่าที่แบ็กเอนด์ใช้
-    const place    = (apptForm.place || '').trim();
-    const note     = (apptForm.note || '').trim();
+    const hn = (apptForm.hn || '').trim();
+    const date = apptForm.date!;
+    const startS = toHHmmSS(apptForm.start!);
+    const endS = toHHmmSS(apptForm.end!);
+    const typeLbl = (apptForm.type || '').trim();             // 'โรงพยาบาล' | 'บ้านผู้ป่วย'
+    const typeApi = typeLbl === 'โรงพยาบาล' ? 'hospital' : 'home'; // map เป็นค่าที่แบ็กเอนด์ใช้
+    const place = (apptForm.place || '').trim();
+    const note = (apptForm.note || '').trim();
     const hospAddr = (apptForm as any).hospital_address ? String((apptForm as any).hospital_address).trim() : '';
-    const dept     = (apptForm as any).department ? String((apptForm as any).department).trim() : '';
+    const dept = (apptForm as any).department ? String((apptForm as any).department).trim() : '';
 
     // โครงสร้างเดียวกับหน้า “นัดหมายหลัก”
     const base = {
@@ -796,9 +821,9 @@ export default function PatientsPage() {
     }
   };
 
-  const [deceasedPatient, setDeceasedPatient] = useState(null);
+  const [deceasedPatient, setDeceasedPatient] = useState<any>(null);
 
-  const handleOpenDeceased = async (patients_id) => {
+  const handleOpenDeceased = async (patients_id: string) => {
     setOpenDeceased(patients_id);
     setDeadDraft({});
     setDeadErrors({});
@@ -968,8 +993,8 @@ export default function PatientsPage() {
             menuPortalTarget={menuPortalTarget}
             isClearable
             placeholder="ทั้งหมด"
-            options={treatatOptions}
-            value={treatatOptions.find(o => o.value === (filters as any).treat_at) ?? null}
+            options={treatAtOptions}
+            value={treatAtOptions.find(o => o.value === (filters as any).treat_at) ?? null}
             onChange={(opt) => { setFilters((f: any) => ({ ...f, treat_at: (opt as any)?.value || '' })); setPage(1); }}
           />
         </div>
@@ -1681,7 +1706,6 @@ export default function PatientsPage() {
                   </div>
 
                   <div className="p-6 space-y-6">
-                    {/* เอกสารมาตรฐานจากแฟ้มผู้ป่วย */}
                     {/* เอกสารมาตรฐาน (แสดงเฉพาะที่มีจริง) */}
                     <div>
                       <div className="text-sm text-slate-500 mb-2">เอกสารมาตรฐาน</div>

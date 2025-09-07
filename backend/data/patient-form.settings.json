@@ -1,0 +1,76 @@
+{
+  "requiredFields": [
+    "card_id",
+    "first_name",
+    "last_name",
+    "gender",
+    "blood_group",
+    "bloodgroup_rh",
+    "treat_at"
+  ],
+  "documents": {
+    "required": [
+      "patient_id_card",
+      "house_registration",
+      "adl_assessment"
+    ],
+    "optional": [
+      "patient_photo",
+      "relative_id_card",
+      "power_of_attorney",
+      "homeless_certificate",
+      "clinical_summary",
+      "assistance_letter"
+    ],
+    "hidden": []
+  },
+  "defaults": {
+    "patients_type": "ติดบ้าน",
+    "treat_at": "บ้าน"
+  },
+  "selectOptions": {
+    "pname": [
+      "นาย",
+      "นาง",
+      "น.ส.",
+      "เด็กชาย",
+      "เด็กหญิง"
+    ],
+    "gender": [
+      "ชาย",
+      "หญิง",
+      "ไม่ระบุ"
+    ],
+    "blood_group": [
+      "A",
+      "B",
+      "AB",
+      "O",
+      "O-"
+    ],
+    "bloodgroup_rh": [
+      "Rh+",
+      "Rh-"
+    ],
+    "patients_type": [
+      "ติดสังคม",
+      "ติดบ้าน",
+      "ติดเตียง"
+    ],
+    "treat_at": [
+      "โรงพยาบาล",
+      "บ้าน"
+    ]
+  },
+  "validation": {
+    "thaiId": {
+      "enabled": true
+    },
+    "phone": {
+      "pattern": "^0\\d{2}-\\d{3}-\\d{4}$"
+    }
+  },
+  "baseline": {
+    "enabled": true
+  }
+}

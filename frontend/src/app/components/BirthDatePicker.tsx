@@ -1,110 +1,164 @@
 'use client';
 
-import React, { useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
-export default function BirthDatePicker({ value, onChange, label }) {
+type BirthDatePickerProps = {
+  value?: string | Date | null;
+  onChange: (val: string | null) => void;
+  label?: string;
+  name?: string;
+  disabled?: boolean;
+  /** ค่าเริ่มต้น: ปัจจุบัน-110 ปี */
+  minYear?: number;
+  /** ค่าเริ่มต้น: ปีปัจจุบัน */
+  maxYear?: number;
+};
+
+const THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+];
+const THAI_DAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
+/** แปลงค่า value ให้เป็น Date แบบไม่พึ่งตัวแปลง timezone ของ new Date(string) */
+function parseToDate(val?: string | Date | null): Date | undefined {
+  if (!val) return undefined;
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return new Date(val.getFullYear(), val.getMonth(), val.getDate());
+  }
+  if (typeof val === 'string') {
+    const m = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return undefined;
+    const y = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const d = Number(m[3]);
+    const dt = new Date(y, mo, d);
+    if (!isNaN(dt.getTime())) return dt;
+  }
+  return undefined;
+}
+
+function fmtYYYYMMDD(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function fmtThai(date?: Date) {
+  if (!date) return '';
+  return `${date.getDate()} ${THAI_MONTHS[date.getMonth()]} ${date.getFullYear() + 543}`;
+}
+
+export default function BirthDatePicker({
+  value,
+  onChange,
+  label,
+  name,
+  disabled = false,
+  minYear,
+  maxYear,
+}: BirthDatePickerProps) {
+  const selectedDate = parseToDate(value);
+  const today = useMemo(() => new Date(), []);
+  const curYear = today.getFullYear();
+
+  const realMinYear = minYear ?? curYear - 110;
+  const realMaxYear = maxYear ?? curYear;
+
+  // state เดือน/ปีที่กำลังแสดง
   const [open, setOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState<number>((selectedDate ?? today).getMonth());
+  const [year, setYear] = useState<number>((selectedDate ?? today).getFullYear());
   const [showYearSelect, setShowYearSelect] = useState(false);
 
-  const selectedDate = value ? new Date(value) : undefined;
+  // เมื่อเปิดปฏิทิน ให้เลื่อนไปเดือน/ปีของค่าวันที่ที่เลือกไว้
+  useEffect(() => {
+    if (!open) return;
+    const base = selectedDate ?? today;
+    setMonth(base.getMonth());
+    setYear(base.getFullYear());
+  }, [open, selectedDate, today]);
 
-  const thaiMonths = [
-    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-  ];
-  const thaiDays = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+  // ปิดด้วย Esc
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
-  const getDaysInMonth = (month, year) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-    const days = [];
-    for (let i = 0; i < startingDayOfWeek; i++) days.push(null);
-    for (let day = 1; day <= daysInMonth; day++) days.push(day);
-    return days;
-  };
+  const days = useMemo(() => {
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    const pad = first.getDay(); // 0=Sun
+    const arr: Array<number | null> = Array.from({ length: pad }, () => null);
+    for (let d = 1; d <= last.getDate(); d++) arr.push(d);
+    return arr;
+  }, [month, year]);
 
-  const handleDateSelect = (day) => {
-    if (day) {
-      const newDate = new Date(currentYear, currentMonth, day);
-      onChange(formatDate(newDate));
-      setOpen(false);
-    }
-  };
-
-  const formatDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const formatDisplayDate = (date) => {
-    if (!date) return "";
-    const day = date.getDate();
-    const month = thaiMonths[date.getMonth()];
-    const year = date.getFullYear() + 543;
-    return `${day} ${month} ${year}`;
-  };
-
-  const navigateMonth = (direction) => {
-    if (direction === "prev") {
-      if (currentMonth === 0) {
-        setCurrentMonth(11);
-        setCurrentYear(currentYear - 1);
+  const navigateMonth = (dir: 'prev' | 'next') => {
+    if (dir === 'prev') {
+      if (month === 0) {
+        setMonth(11);
+        setYear(y => Math.max(realMinYear, y - 1));
       } else {
-        setCurrentMonth(currentMonth - 1);
+        setMonth(m => m - 1);
       }
     } else {
-      if (currentMonth === 11) {
-        setCurrentMonth(0);
-        setCurrentYear(currentYear + 1);
+      if (month === 11) {
+        setMonth(0);
+        setYear(y => Math.min(realMaxYear, y + 1));
       } else {
-        setCurrentMonth(currentMonth + 1);
+        setMonth(m => m + 1);
       }
     }
   };
 
-  const isSelected = (day) => {
-    if (!selectedDate || !day) return false;
-    return (
-      day === selectedDate.getDate() &&
-      currentMonth === selectedDate.getMonth() &&
-      currentYear === selectedDate.getFullYear()
-    );
+  const isSelected = (d?: number | null) =>
+    !!d &&
+    selectedDate &&
+    d === selectedDate.getDate() &&
+    month === selectedDate.getMonth() &&
+    year === selectedDate.getFullYear();
+
+  const isToday = (d?: number | null) =>
+    !!d &&
+    d === today.getDate() &&
+    month === today.getMonth() &&
+    year === today.getFullYear();
+
+  const pick = (d?: number | null) => {
+    if (!d) return;
+    const dt = new Date(year, month, d);
+    onChange(fmtYYYYMMDD(dt));
+    setOpen(false);
   };
-
-  const days = getDaysInMonth(currentMonth, currentYear);
-
-  // จำกัดช่วงปี (ย้อนหลัง 110 ปี ถึงปีปัจจุบัน)
-  const minYear = new Date().getFullYear() - 110;
-  const maxYear = new Date().getFullYear();
 
   return (
     <div className="relative">
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {label}
-        </label>
-      )}
+      {label && <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>}
 
-      <div
-        onClick={() => setOpen(!open)}
-        className="w-full px-3 py-3 border border-gray-300 rounded-lg bg-white cursor-pointer hover:border-blue-400 flex items-center justify-between"
+      {/* ซ่อนค่าไว้สำหรับ form submit ถ้าต้องการ */}
+      {name && <input type="hidden" name={name} value={selectedDate ? fmtYYYYMMDD(selectedDate) : ''} />}
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className={`w-full px-3 py-3 border rounded-lg bg-white flex items-center justify-between
+          ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-blue-400'}
+          border-gray-300`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
       >
-        <span
-          className={`text-sm ${
-            selectedDate ? "text-gray-900" : "text-gray-500"
-          }`}
-        >
-          {selectedDate ? formatDisplayDate(selectedDate) : "เลือกวันที่"}
+        <span className={`text-sm ${selectedDate ? 'text-gray-900' : 'text-gray-500'}`}>
+          {selectedDate ? fmtThai(selectedDate) : 'เลือกวันที่'}
         </span>
         <Calendar size={16} className="text-gray-400" />
-      </div>
+      </button>
 
       {open && (
         <>
@@ -112,55 +166,48 @@ export default function BirthDatePicker({ value, onChange, label }) {
           <div className="absolute z-50 bg-white shadow-xl border border-gray-200 rounded-lg mt-1 p-3 w-80">
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
-              <button
-                onClick={() => navigateMonth("prev")}
-                className="p-1 hover:bg-gray-100 rounded-md"
-              >
+              <button onClick={() => navigateMonth('prev')} className="p-1 hover:bg-gray-100 rounded-md" aria-label="เดือนก่อนหน้า">
                 <ChevronLeft size={16} className="text-gray-600" />
               </button>
 
               <button
-                onClick={() => setShowYearSelect(!showYearSelect)}
+                onClick={() => setShowYearSelect(s => !s)}
                 className="text-sm font-medium text-gray-700 hover:text-blue-600 flex items-center px-2 py-1 rounded hover:bg-blue-50"
+                aria-haspopup="listbox"
+                aria-expanded={showYearSelect}
               >
-                {thaiMonths[currentMonth]} {currentYear + 543}
+                {THAI_MONTHS[month]} {year + 543}
                 <ChevronDown size={14} className="ml-1" />
               </button>
 
-              <button
-                onClick={() => navigateMonth("next")}
-                className="p-1 hover:bg-gray-100 rounded-md"
-              >
+              <button onClick={() => navigateMonth('next')} className="p-1 hover:bg-gray-100 rounded-md" aria-label="เดือนถัดไป">
                 <ChevronRight size={16} className="text-gray-600" />
               </button>
             </div>
 
-            {/* Year/Month Selector */}
+            {/* Year / Month selector */}
             {showYearSelect && (
               <div className="mb-3 p-2 border border-gray-200 rounded-lg bg-gray-50">
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <select
-                    value={currentYear}
-                    onChange={(e) => setCurrentYear(parseInt(e.target.value))}
+                    value={year}
+                    onChange={e => setYear(parseInt(e.target.value, 10))}
                     className="text-xs p-1 border rounded"
                   >
-                    {Array.from(
-                      { length: maxYear - minYear + 1 },
-                      (_, i) => maxYear - i
-                    ).map((year) => (
-                      <option key={year} value={year}>
-                        {year + 543}
+                    {Array.from({ length: realMaxYear - realMinYear + 1 }, (_, i) => realMaxYear - i).map(y => (
+                      <option key={y} value={y}>
+                        {y + 543}
                       </option>
                     ))}
                   </select>
                   <select
-                    value={currentMonth}
-                    onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
+                    value={month}
+                    onChange={e => setMonth(parseInt(e.target.value, 10))}
                     className="text-xs p-1 border rounded"
                   >
-                    {thaiMonths.map((month, index) => (
-                      <option key={index} value={index}>
-                        {month}
+                    {THAI_MONTHS.map((m, i) => (
+                      <option key={i} value={i}>
+                        {m}
                       </option>
                     ))}
                   </select>
@@ -174,40 +221,42 @@ export default function BirthDatePicker({ value, onChange, label }) {
               </div>
             )}
 
-            {/* Calendar Grid */}
+            {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1 mb-3">
-              {thaiDays.map((day) => (
-                <div
-                  key={day}
-                  className="text-xs font-medium text-gray-500 text-center py-2"
-                >
-                  {day}
+              {THAI_DAYS.map(d => (
+                <div key={d} className="text-xs font-medium text-gray-500 text-center py-2">
+                  {d}
                 </div>
               ))}
 
-              {days.map((day, index) => (
+              {days.map((d, i) => (
                 <button
-                  key={index}
-                  onClick={() => handleDateSelect(day)}
-                  disabled={!day}
-                  className={`
-                    h-8 w-8 text-xs rounded-md flex items-center justify-center
-                    ${!day ? "invisible" : ""}
-                    ${
-                      isSelected(day)
-                        ? "bg-blue-500 text-white font-medium"
-                        : "hover:bg-gray-100 text-gray-700"
-                    }
-                  `}
+                  key={i}
+                  onClick={() => pick(d)}
+                  disabled={!d}
+                  className={[
+                    'h-8 w-8 text-xs rounded-md flex items-center justify-center',
+                    !d ? 'invisible' : '',
+                    isSelected(d) ? 'bg-blue-500 text-white font-medium' : 'hover:bg-gray-100 text-gray-700',
+                    isToday(d) && !isSelected(d) ? 'ring-1 ring-blue-300' : ''
+                  ].join(' ')}
                 >
-                  {day}
+                  {d}
                 </button>
               ))}
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end pt-2 border-t border-gray-100">
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100">
               <button
+                type="button"
+                onClick={() => { onChange(null); }}
+                className="text-xs px-3 py-1 text-red-600 hover:bg-red-50 rounded-md"
+              >
+                ล้างค่า
+              </button>
+              <button
+                type="button"
                 onClick={() => setOpen(false)}
                 className="text-xs px-3 py-1 text-gray-600 hover:bg-gray-100 rounded-md"
               >

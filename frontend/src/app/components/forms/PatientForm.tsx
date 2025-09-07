@@ -12,20 +12,29 @@ import { ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 import BaselineForm from '@/app/components/forms/BaselineForm';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+// ✅ ชี้ฐาน API ให้ตรงกับหน้า settings อื่น ๆ
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/+$/, '');
 
-/* ---------------- Utils ---------------- */
-function calculateAge(birthdateStr) {
+/* ===== Types for ref & props ===== */
+export type PatientFormHandle = {
+  validate: () => boolean;
+  getValues: () => any;
+};
+
+type PatientFormProps = {
+  value: any;
+  onChange: (next: any) => void;
+  errors?: Record<string, string | undefined>;
+};
+
+function calculateAge(birthdateStr?: string) {
   if (!birthdateStr) return '-';
   const birthDate = new Date(birthdateStr);
   if (isNaN(birthDate.getTime())) return '-';
   const today = new Date();
   let years = today.getFullYear() - birthDate.getFullYear();
   let months = today.getMonth() - birthDate.getMonth();
-  if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
-    years--;
-    months = 12 + months;
-  }
+  if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) { years--; months = 12 + months; }
   if (today.getDate() < birthDate.getDate() && months > 0) months--;
   if (years > 0) return `${years} ปี`;
   if (months > 0) return `${months} เดือน`;
@@ -34,90 +43,41 @@ function calculateAge(birthdateStr) {
 
 const animatedComponents = makeAnimated();
 const Select = dynamic(() => import('react-select'), { ssr: false });
-const menuPortalTarget = typeof window !== 'undefined' ? document.body : undefined;
 
-// Updated Select styles with medical theme
+/* ===== react-select theme ===== */
 const rsx = {
-  control: (base, state) => ({
-    ...base,
-    minHeight: 32,
-    borderRadius: 8,
+  control: (base: any, state: any) => ({
+    ...base, minHeight: 32, borderRadius: 8,
     borderColor: state.isFocused ? '#005A50' : '#d1d5db',
-    borderWidth: 2,
-    boxShadow: state.isFocused ? '0 0 0 3px rgba(0,90,80,0.1)' : 'none',
-    ':hover': { borderColor: '#005A50' },
-    color: '#374151',
-    backgroundColor: '#ffffff',
+    borderWidth: 2, boxShadow: state.isFocused ? '0 0 0 3px rgba(0,90,80,0.1)' : 'none',
+    ':hover': { borderColor: '#005A50' }, color: '#374151', backgroundColor: '#ffffff',
   }),
-  menuPortal: (base) => ({ ...base, color: '#374151', zIndex: 9999 }),
-  option: (base, state) => ({
+  menuPortal: (base: any) => ({ ...base, color: '#374151', zIndex: 9999 }),
+  option: (base: any, state: any) => ({
     ...base,
     backgroundColor: state.isSelected ? '#005A50' : state.isFocused ? '#f0fdf4' : 'white',
     color: state.isSelected ? 'white' : '#374151',
-    ':hover': {
-      backgroundColor: state.isSelected ? '#005A50' : '#ecfdf5',
-    },
+    ':hover': { backgroundColor: state.isSelected ? '#005A50' : '#ecfdf5' },
   }),
 };
-
 const ortherrsx = {
-  control: (base, state) => ({
-    ...base,
-    minHeight: 46,
-    borderRadius: 8,
+  control: (base: any, state: any) => ({
+    ...base, minHeight: 46, borderRadius: 8,
     borderColor: state.isFocused ? '#005A50' : '#d1d5db',
-    borderWidth: 2,
-    boxShadow: state.isFocused ? '0 0 0 3px rgba(0,90,80,0.1)' : 'none',
-    ':hover': { borderColor: '#005A50' },
-    color: '#374151',
-    backgroundColor: '#ffffff',
+    borderWidth: 2, boxShadow: state.isFocused ? '0 0 0 3px rgba(0,90,80,0.1)' : 'none',
+    ':hover': { borderColor: '#005A50' }, color: '#374151', backgroundColor: '#ffffff',
   }),
-  menuPortal: (base) => ({ ...base, color: '#374151', zIndex: 9999 }),
-  option: (base, state) => ({
+  menuPortal: (base: any) => ({ ...base, color: '#374151', zIndex: 9999 }),
+  option: (base: any, state: any) => ({
     ...base,
     backgroundColor: state.isSelected ? '#005A50' : state.isFocused ? '#f0fdf4' : 'white',
     color: state.isSelected ? 'white' : '#374151',
-    ':hover': {
-      backgroundColor: state.isSelected ? '#005A50' : '#ecfdf5',
-    },
+    ':hover': { backgroundColor: state.isSelected ? '#005A50' : '#ecfdf5' },
   }),
 };
 
-/* ---------------- Select options ---------------- */
-const patientTypeOptions = [
-  { value: 'ติดสังคม', label: 'ติดสังคม' },
-  { value: 'ติดบ้าน', label: 'ติดบ้าน' },
-  { value: 'ติดเตียง', label: 'ติดเตียง' },
-];
-const pnameOptions = [
-  { value: 'นาย', label: 'นาย' },
-  { value: 'นาง', label: 'นาง' },
-  { value: 'น.ส.', label: 'น.ส.' },
-  { value: 'เด็กชาย', label: 'เด็กชาย' },
-  { value: 'เด็กหญิง', label: 'เด็กหญิง' },
-];
-const genderOptions = [
-  { value: 'ชาย', label: 'ชาย' },
-  { value: 'หญิง', label: 'หญิง' },
-  { value: 'ไม่ระบุ', label: 'ไม่ระบุ' },
-];
-const bloodGroupOptions = [
-  { value: 'A', label: 'A' },
-  { value: 'B', label: 'B' },
-  { value: 'AB', label: 'AB' },
-  { value: 'O', label: 'O' },
-];
-const rhOptions = [
-  { value: 'Rh+', label: 'Rh+' },
-  { value: 'Rh-', label: 'Rh-' },
-];
-const treatatOptions = [
-  { value: 'โรงพยาบาล', label: 'โรงพยาบาล' },
-  { value: 'บ้าน', label: 'บ้าน' },
-];
-
-/* ---------------- Validation (เฉพาะ 7 ช่อง + เงื่อนไขผู้เสียชีวิต) ---------------- */
-const FIELD_META = {
+/* ===== Field meta (validation labels) ===== */
+const FIELD_META: Record<string, { label: string; type?: 'thaiId'; focusName?: string }> = {
   card_id: { label: 'เลขบัตรประชาชน', type: 'thaiId', focusName: 'card_id' },
   first_name: { label: 'ชื่อ', focusName: 'first_name' },
   last_name: { label: 'นามสกุล', focusName: 'last_name' },
@@ -128,47 +88,136 @@ const FIELD_META = {
 };
 const DEFAULT_REQUIRED = Object.keys(FIELD_META);
 
-// รายการเอกสารมาตรฐาน
-const DOC_OPTIONS = [
-  { key: 'patient_id_card', label: 'สำเนาบัตรประชาชนผู้ป่วย', accept: 'image/*,.pdf' },
-  { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ', accept: 'image/*,.pdf' },
-  { key: 'patient_photo', label: 'รูปถ่ายผู้ป่วย (สภาพปัจจุบัน)', accept: 'image/*' },
-  { key: 'relative_id_card', label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์', accept: 'image/*,.pdf' },
-  { key: 'assistance_letter', label: 'หนังสือขอความอนุเคราะห์', accept: 'image/*,.pdf' },
+/* ===== Document defaults (fallback) ===== */
+type DocType = { key: string; label: string; accept?: string; protected?: boolean };
+
+const DEFAULT_DOC_TYPES: DocType[] = [
+  { key: 'patient_id_card',   label: 'สำเนาบัตรประชาชนผู้ป่วย',                 accept: 'image/*,.pdf', protected: true },
+  { key: 'house_registration', label: 'สำเนาทะเบียนบ้านผู้ป่วย/ญาติ',             accept: 'image/*,.pdf', protected: true },
+  { key: 'patient_photo',     label: 'รูปถ่ายผู้ป่วย (สภาพปัจจุบัน)',             accept: 'image/*' },
+  { key: 'relative_id_card',  label: 'สำเนาบัตรประชาชนญาติ/ผู้ขอความอนุเคราะห์', accept: 'image/*,.pdf' },
+  { key: 'assistance_letter', label: 'หนังสือขอความอนุเคราะห์',                  accept: 'image/*,.pdf' },
   { key: 'power_of_attorney', label: 'หนังสือมอบอำนาจ / หนังสือรับรองบุคคลไร้ญาติ', accept: 'image/*,.pdf' },
-  { key: 'homeless_certificate', label: 'หนังสือรับรองบุคคลไร้ที่พึ่ง', accept: 'image/*,.pdf' },
-  { key: 'adl_assessment', label: 'แบบประเมิน ADL', accept: 'image/*,.pdf' },
-  { key: 'clinical_summary', label: 'ประวัติการรักษา (Clinical Summary)', accept: 'image/*,.pdf' },
+  { key: 'homeless_certificate', label: 'หนังสือรับรองบุคคลไร้ที่พึ่ง',           accept: 'image/*,.pdf' },
+  { key: 'adl_assessment',    label: 'แบบประเมิน ADL',                             accept: 'image/*,.pdf' },
+  { key: 'clinical_summary',  label: 'ประวัติการรักษา (Clinical Summary)',         accept: 'image/*,.pdf' },
 ];
 
-// ช่วยอ่านชื่อไฟล์สั้น ๆ
+/* ===== Settings (defaults + API merge) ===== */
+const DEFAULT_SETTINGS = {
+  requiredFields: DEFAULT_REQUIRED,
+  documents: {
+    types: DEFAULT_DOC_TYPES,
+    required: ['patient_id_card', 'house_registration'],
+    optional: [
+      'patient_photo', 'relative_id_card', 'assistance_letter',
+      'power_of_attorney', 'homeless_certificate', 'adl_assessment', 'clinical_summary'
+    ],
+    hidden: [] as string[],
+  },
+  defaults: { patients_type: 'ติดบ้าน', treat_at: 'บ้าน' },
+  selectOptions: {
+    pname: ['นาย', 'นาง', 'น.ส.', 'เด็กชาย', 'เด็กหญิง'],
+    gender: ['ชาย', 'หญิง', 'ไม่ระบุ'],
+    blood_group: ['A', 'B', 'AB', 'O'],
+    bloodgroup_rh: ['Rh+', 'Rh-'],
+    patients_type: ['ติดสังคม', 'ติดบ้าน', 'ติดเตียง'],
+    treat_at: ['โรงพยาบาล', 'บ้าน'],
+  },
+  validation: { thaiId: { enabled: true }, phone: { pattern: '^0\\d{2}-\\d{3}-\\d{4}$' } },
+  baseline: { enabled: true },
+};
+
+/* ===== Helpers ===== */
 const fileName = (f?: File | null) => (f ? f.name : '');
+const pad2 = (n: number) => n.toString().padStart(2, '0');
+function splitHHmm(val?: string): [number | null, number | null] {
+  if (!val || typeof val !== 'string') return [null, null];
+  const m = val.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return [null, null];
+  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+  const mm = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+  return [h, mm];
+}
 
-function validatePatientForm(values) {
+type ThaiTimeFieldProps = { value?: string; onChange: (val: string) => void; name?: string; minuteStep?: number };
+const ThaiTimeField: React.FC<ThaiTimeFieldProps> = ({ value, onChange, name, minuteStep = 5 }) => {
+  const [h, m] = splitHHmm(value);
+  const hours = React.useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+  const minutes = React.useMemo(() => {
+    const base = Array.from({ length: Math.ceil(60 / minuteStep) }, (_, i) => i * minuteStep);
+    if (m != null && !base.includes(m)) base.push(m);
+    return base.sort((a, b) => a - b);
+  }, [m, minuteStep]);
+  const handleHourChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nh = e.target.value === '' ? null : parseInt(e.target.value, 10);
+    const mm = m ?? 0;
+    if (nh == null) return onChange('');
+    onChange(`${pad2(nh)}:${pad2(mm)}`);
+  };
+  const handleMinuteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nm = e.target.value === '' ? null : parseInt(e.target.value, 10);
+    const hh = h ?? 0;
+    if (nm == null) return onChange('');
+    onChange(`${pad2(hh)}:${pad2(nm)}`);
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <input type="hidden" name={name} value={value || ''} />
+      <select className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all" value={h ?? ''} onChange={handleHourChange} aria-label="ชั่วโมง">
+        <option value="" disabled>เลือกชั่วโมง</option>
+        {hours.map((x) => <option key={x} value={x}>{pad2(x)}</option>)}
+      </select>
+      <span className="text-gray-500">:</span>
+      <select className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all" value={m ?? ''} onChange={handleMinuteChange} aria-label="นาที">
+        <option value="" disabled>เลือกนาที</option>
+        {minutes.map((x) => <option key={x} value={x}>{pad2(x)} นาที</option>)}
+      </select>
+      <span className="text-gray-600">น.</span>
+    </div>
+  );
+};
+
+/* list helpers */
+const normList = (arr?: string[]) => (arr || []).map(s => String(s).trim()).filter(Boolean);
+const normOr = (arr: string[] | undefined, fallback: string[]) => {
+  const list = normList(arr);
+  return list.length ? list : fallback;
+};
+
+/* ===== Validation ===== */
+function validatePatientForm(values: any, requiredKeys: string[], validationCfg: any) {
   const v = values || {};
-  const digits = (s) => (s || '').toString().replace(/\D/g, '');
-  const issues = [];
-  let firstFocusName = null;
+  const digits = (s: any) => (s || '').toString().replace(/\D/g, '');
+  const issues: string[] = [];
+  let firstFocusName: string | null = null;
 
-  const need = (key, meta = {}) => {
+  const need = (key: string, meta = {} as any) => {
     const { label = key, type, focusName } = meta;
     const raw = v[key];
     const val = (raw ?? '').toString().trim();
-
     if (!val) {
       issues.push(`• ${label} - กรุณากรอก`);
       if (!firstFocusName) firstFocusName = focusName || key;
       return;
     }
-    if (type === 'thaiId' && digits(val).length !== 13) {
+    if (type === 'thaiId' && validationCfg?.thaiId?.enabled && digits(val).length !== 13) {
       issues.push(`• ${label} ต้องมี 13 หลัก`);
       if (!firstFocusName) firstFocusName = focusName || key;
     }
   };
 
-  DEFAULT_REQUIRED.forEach((key) => need(key, FIELD_META[key]));
+  (requiredKeys || DEFAULT_REQUIRED).forEach((key) => {
+    if (FIELD_META[key]) need(key, FIELD_META[key]);
+  });
 
-  // ถ้าสถานะเสียชีวิต บังคับกรอก "วันที่เสียชีวิต"
+  if ((v.phone || '').trim() && validationCfg?.phone?.pattern) {
+    try {
+      const re = new RegExp(validationCfg.phone.pattern);
+      if (!re.test(v.phone)) issues.push('• โทรศัพท์ รูปแบบไม่ถูกต้อง (เช่น 0XX-XXX-XXXX)');
+    } catch {}
+  }
+
   if (String(v.status) === 'เสียชีวิต') {
     if (!v.death_date) {
       issues.push('• วันที่เสียชีวิต - กรุณากรอก');
@@ -179,90 +228,62 @@ function validatePatientForm(values) {
   return { ok: issues.length === 0, issues, firstFocusName };
 }
 
-// ---- Thai time helpers & field ----
-const pad2 = (n: number) => n.toString().padStart(2, '0');
-
-function splitHHmm(val?: string): [number | null, number | null] {
-  if (!val || typeof val !== 'string') return [null, null];
-  const m = val.match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return [null, null];
-  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
-  const mm = Math.min(59, Math.max(0, parseInt(m[2], 10)));
-  return [h, mm];
-}
-
-type ThaiTimeFieldProps = {
-  value?: string;                 // รูปแบบ HH:mm
-  onChange: (val: string) => void;
-  name?: string;                  // ใส่ไว้เพื่อให้ querySelector[name=...] โฟกัสได้
-  minuteStep?: number;            // ค่าเริ่มต้น 5 นาที
-};
-
-const ThaiTimeField: React.FC<ThaiTimeFieldProps> = ({ value, onChange, name, minuteStep = 5 }) => {
-  const [h, m] = splitHHmm(value);
-
-  const hours = React.useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
-  const minutes = React.useMemo(() => {
-    const base = Array.from({ length: Math.ceil(60 / minuteStep) }, (_, i) => i * minuteStep);
-    if (m != null && !base.includes(m)) base.push(m); // เผื่อค่าที่ไม่ตรง step
-    return base.sort((a, b) => a - b);
-  }, [m, minuteStep]);
-
-  const handleHourChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nh = e.target.value === '' ? null : parseInt(e.target.value, 10);
-    const mm = m ?? 0;
-    if (nh == null) return onChange('');
-    onChange(`${pad2(nh)}:${pad2(mm)}`);
-  };
-
-  const handleMinuteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nm = e.target.value === '' ? null : parseInt(e.target.value, 10);
-    const hh = h ?? 0;
-    if (nm == null) return onChange('');
-    onChange(`${pad2(hh)}:${pad2(nm)}`);
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      {/* เก็บค่าไว้ในฟิลด์ซ่อน เพื่อรองรับระบบโฟกัสด้วย name เดิม */}
-      <input type="hidden" name={name} value={value || ''} />
-      <select
-        className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
-        value={h ?? ''}
-        onChange={handleHourChange}
-        aria-label="ชั่วโมง"
-      >
-        <option value="" disabled>เลือกชั่วโมง</option>
-        {hours.map((x) => (
-          <option key={x} value={x}>{pad2(x)}</option>
-        ))}
-      </select>
-      <span className="text-gray-500">:</span>
-      <select
-        className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
-        value={m ?? ''}
-        onChange={handleMinuteChange}
-        aria-label="นาที"
-      >
-        <option value="" disabled>เลือกนาที</option>
-        {minutes.map((x) => (
-          <option key={x} value={x}>{pad2(x)} นาที</option>
-        ))}
-      </select>
-      <span className="text-gray-600">น.</span>
-    </div>
-  );
-};
-
-
 /* ---------------- Component ---------------- */
-const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = {} }, ref) {
+const PatientForm = forwardRef<PatientFormHandle, PatientFormProps>(function PatientForm(props, ref) {
+  const { value, onChange, errors = {} } = props;
   const v = value || {};
-  const set = (k) => (e) => onChange({ ...v, [k]: e.target.value });
+  const set = (k: string) => (e: any) => onChange({ ...v, [k]: e.target.value });
 
+  /* settings state */
+  const [settings, setSettings] = React.useState(DEFAULT_SETTINGS);
 
-  // ฟอร์แมตเลขบัตรประชาชน: X-XXXX-XXXXX-XX-X
-  const handleCardIdChange = (e) => {
+  /* ✅ fetch settings from API (no-cache + cache buster) */
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const url = `${API_BASE}/api/settings/patient-form?__ts=${Date.now()}`;
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!alive) return;
+        if (res.ok) {
+          const js = await res.json();
+          const inDocs = js?.documents || {};
+
+          // ✅ เคารพค่าจากเซิร์ฟเวอร์ แม้เป็นอาร์เรย์ว่าง
+          const mergedDocs = {
+            types: Array.isArray(inDocs.types) && inDocs.types.length ? inDocs.types : DEFAULT_SETTINGS.documents.types,
+            required: Array.isArray(inDocs.required) ? inDocs.required : DEFAULT_SETTINGS.documents.required,
+            optional: Array.isArray(inDocs.optional) ? inDocs.optional : DEFAULT_SETTINGS.documents.optional,
+            hidden:   Array.isArray(inDocs.hidden)   ? inDocs.hidden   : [],
+          };
+
+          setSettings(prev => ({
+            ...prev,
+            ...js,
+            documents: mergedDocs,
+            defaults: { ...prev.defaults, ...(js?.defaults || {}) },
+            validation: { ...prev.validation, ...(js?.validation || {}) },
+            selectOptions: { ...prev.selectOptions, ...(js?.selectOptions || {}) },
+          }));
+        }
+      } catch {
+        /* ใช้ defaults ต่อไป */
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  /* apply defaults once */
+  React.useEffect(() => {
+    const patch: any = {};
+    if (!v.patients_type && settings?.defaults?.patients_type) patch.patients_type = settings.defaults.patients_type;
+    if (!v.treat_at && settings?.defaults?.treat_at) patch.treat_at = settings.defaults.treat_at;
+    if (Object.keys(patch).length) onChange({ ...v, ...patch });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
+  /* formatters */
+  const handleCardIdChange = (e: any) => {
     let value = e.target.value.replace(/-/g, '').replace(/\D/g, '').slice(0, 13);
     let formatted = '';
     if (value.length > 0) formatted += value.slice(0, 1);
@@ -272,9 +293,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     if (value.length > 12) formatted += '-' + value.slice(12, 13);
     onChange({ ...v, card_id: formatted });
   };
-
-  // ฟอร์แมตเบอร์โทร: XXX-XXX-XXXX (ไม่ใช่ฟิลด์บังคับใน validate)
-  const handlePhoneNumberChange = (e) => {
+  const handlePhoneNumberChange = (e: any) => {
     let value = e.target.value.replace(/\D/g, '').slice(0, 10);
     let formatted = '';
     if (value.length > 0) formatted = value.slice(0, 3);
@@ -283,25 +302,58 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     onChange({ ...v, phone: formatted, phone_number: formatted });
   };
 
-  // ----- เอกสารแนบ -----
-  const flags = v.docFlags || {}; // { [key: string]: boolean }
+  /* Documents (flags & list) */
+  const flags = v.docFlags || {};
+  const requiredDocKeys = settings.documents.required || [];
+  const optionalDocKeys = settings.documents.optional || [];
+  const hiddenDocKeys = new Set(settings.documents.hidden || []);
+
+  const docTypes: DocType[] =
+    (settings.documents?.types && settings.documents.types.length)
+      ? settings.documents.types
+      : DEFAULT_DOC_TYPES;
+
+  const metaByKey = React.useMemo(
+    () => Object.fromEntries(docTypes.map(t => [t.key, t] as const)),
+    [docTypes]
+  );
+
+  const docOptions = React.useMemo(() => {
+    const mk = (key: string, required: boolean) => {
+      const meta = metaByKey[key]; if (!meta) return null;
+      return { key, label: meta.label || key, accept: meta.accept || 'image/*,.pdf', required };
+    };
+    const list: any[] = [];
+    for (const k of requiredDocKeys) if (!hiddenDocKeys.has(k)) { const x = mk(k, true);  if (x) list.push(x); }
+    for (const k of optionalDocKeys) if (!hiddenDocKeys.has(k)) { const x = mk(k, false); if (x) list.push(x); }
+    return list;
+  }, [metaByKey, requiredDocKeys.join('|'), optionalDocKeys.join('|'), settings.documents.hidden?.join('|')]);
+
+  /* auto-check required docs */
+  React.useEffect(() => {
+    const nextFlags = { ...(v.docFlags || {}) };
+    let changed = false;
+    for (const k of requiredDocKeys) {
+      if (!nextFlags[k]) { nextFlags[k] = true; changed = true; }
+    }
+    if (changed) onChange({ ...v, docFlags: nextFlags });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requiredDocKeys.join('|')]);
 
   const toggleDoc = (key: string, checked: boolean) => {
+    if (requiredDocKeys.includes(key)) return;
     const nextFlags = { ...flags, [key]: checked };
     const next: any = { ...v, docFlags: nextFlags };
-    // ถ้ายกเลิกเช็ค -> เคลียร์ไฟล์ทิ้งด้วย
     if (!checked) next[key] = null;
     onChange(next);
   };
-
   const setFileFor = (key: string, file?: File | null) => {
     onChange({ ...v, [key]: file ?? null });
   };
 
-  // "เอกสารอื่นๆ" : [{ label, file }]
+  /* Other docs (free-form) */
   const otherDocs: Array<{ label?: string; file?: File | null }> = v.other_docs || [];
   const setOtherDocs = (list: any[]) => onChange({ ...v, other_docs: list });
-
   const addOtherDoc = () => setOtherDocs([...(otherDocs || []), { label: '', file: null }]);
   const updateOtherDoc = (idx: number, patch: Partial<{ label: string; file: File | null }>) => {
     const next = (otherDocs || []).slice();
@@ -314,22 +366,21 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     setOtherDocs(next);
   };
 
-  // ออโต้เช็คให้ถ้ามีไฟล์อยู่แล้ว
+  /* auto-check flags if already has file */
   React.useEffect(() => {
     const filled: any = {};
-    DOC_OPTIONS.forEach(({ key }) => {
-      if (v[key]) filled[key] = true;
-    });
+    docTypes.forEach((t) => { if ((v as any)[t.key]) filled[t.key] = true; });
     if (Object.keys(filled).length > 0) {
       onChange({ ...v, docFlags: { ...(v.docFlags || {}), ...filled } });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // once
 
-  // Expose ให้ parent ใช้งาน
-  useImperativeHandle(ref, () => ({
+  /* expose ref methods */
+  useImperativeHandle(ref, (): PatientFormHandle => ({
     validate: () => {
-      const res = validatePatientForm(v);
+      const required = Array.isArray(settings.requiredFields) ? settings.requiredFields : DEFAULT_REQUIRED;
+      const res = validatePatientForm(v, required, settings.validation || {});
       if (!res.ok) {
         Swal.fire({
           icon: 'error',
@@ -339,7 +390,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           confirmButtonColor: '#005A50',
         }).then(() => {
           if (res.firstFocusName) {
-            const el = document.querySelector(`[name="${res.firstFocusName}"]`);
+            const el = document.querySelector(`[name="${res.firstFocusName}"]`) as any;
             if (el) el.focus();
           }
         });
@@ -350,40 +401,31 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
     getValues: () => ({ ...v }),
   }));
 
-  // มีประวัติเบื้องต้นอยู่แล้วหรือไม่ (รองรับทั้ง flag และตรวจจากฟิลด์)
+  /* Baseline availability */
   const localHasBaseline =
-  v?.baseline_exists === true ||
-  Boolean(
-    (v.reason_in_dept || '').trim() ||
-    (v.reason_admit || '').trim() ||
-    (v.bedbound_cause || '').trim() ||
-    (v.other_history || '').trim() ||
-    (v.referral_hospital || '').trim() ||
-    (v.referral_phone || '').trim()
-  );
-
-  // ==== NEW: ตรวจว่ามีประวัติเบื้องต้นในระบบไหม (จาก API) ====
+    v?.baseline_exists === true ||
+    Boolean(
+      (v.reason_in_dept || '').trim() ||
+      (v.reason_admit || '').trim() ||
+      (v.bedbound_cause || '').trim() ||
+      (v.other_history || '').trim() ||
+      (v.referral_hospital || '').trim() ||
+      (v.referral_phone || '').trim()
+    );
   const [remoteHasBaseline, setRemoteHasBaseline] = React.useState<boolean | null>(null);
-
   React.useEffect(() => {
     const hn = v?.patients_id;
     if (!API_BASE || !hn) { setRemoteHasBaseline(null); return; }
-
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(
-          `${API_BASE}/api/patients/${encodeURIComponent(hn)}/encounters/baseline`,
-          { cache: 'no-store' }
-        );
+        const res = await fetch(`${API_BASE}/api/patients/${encodeURIComponent(hn)}/encounters/baseline?__ts=${Date.now()}`, { cache: 'no-store' });
         if (!alive) return;
-
         if (res.ok) {
           const js = await res.json();
           const bl = js?.data?.baseline ?? js?.data ?? null;
           const exist = Boolean(
-            bl &&
-            (
+            bl && (
               (bl.reason_in_dept || '').trim() ||
               (bl.reason_admit || '').trim() ||
               (bl.bedbound_cause || '').trim() ||
@@ -402,11 +444,20 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
         setRemoteHasBaseline(null);
       }
     })();
-
     return () => { alive = false; };
   }, [v?.patients_id]);
-
   const hasBaseline = (remoteHasBaseline ?? localHasBaseline);
+
+  /* Select options */
+  const so = settings?.selectOptions || DEFAULT_SETTINGS.selectOptions;
+  const toOpts = (list: string[]) => list.map((x) => ({ value: x, label: x }));
+
+  const pnameOptions        = toOpts(normOr(so.pname,         DEFAULT_SETTINGS.selectOptions.pname));
+  const genderOptions       = toOpts(normOr(so.gender,        DEFAULT_SETTINGS.selectOptions.gender));
+  const bloodGroupOptions   = toOpts(normOr(so.blood_group,   DEFAULT_SETTINGS.selectOptions.blood_group));
+  const rhOptions           = toOpts(normOr(so.bloodgroup_rh, DEFAULT_SETTINGS.selectOptions.bloodgroup_rh));
+  const patientTypeOptions  = toOpts(normOr(so.patients_type, DEFAULT_SETTINGS.selectOptions.patients_type));
+  const treatAtOptions      = toOpts(normOr(so.treat_at,      DEFAULT_SETTINGS.selectOptions.treat_at));
 
   return (
     <div className="space-y-8 bg-gray-50 p-6">
@@ -420,9 +471,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
       {/* ข้อมูลพื้นฐาน */}
       <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
         <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
-          <div className="p-2 bg-[#005A50] rounded-lg">
-            <FileText size={20} className="text-white" />
-          </div>
+          <div className="p-2 bg-[#005A50] rounded-lg"><FileText size={20} className="text-white" /></div>
           ข้อมูลพื้นฐาน
           <span className="text-sm font-normal text-gray-500 ml-auto">Basic Information</span>
         </h3>
@@ -447,11 +496,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="ประเภทผู้ป่วย" error={errors.patients_type} icon={<Heart size={16} />}>
             <Select
               components={animatedComponents}
-              styles={{
-                ...rsx,
-                menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu: (base) => ({ ...base, zIndex: 12050 }),
-              }}
+              styles={{ ...rsx, menuPortal: (base: any) => ({ ...base, zIndex: 12050 }), menu: (base: any) => ({ ...base, zIndex: 12050 }) }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
               menuShouldBlockScroll
@@ -460,19 +505,16 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               placeholder="-- เลือกประเภทผู้ป่วย --"
               options={patientTypeOptions}
               value={patientTypeOptions.find((o) => o.value === v.patients_type) ?? null}
-              onChange={(opt) => onChange({ ...v, patients_type: opt?.value ?? '' })}
+              onChange={(opt: any) => onChange({ ...v, patients_type: opt?.value ?? '' })}
               name="patients_type"
-              onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
+              onKeyDown={(e: any) => { if (e.key === 'Enter') e.stopPropagation(); }}
             />
           </InputField>
 
-          {/* สถานะผู้ป่วย (อ่านอย่างเดียว) */}
           <InputField label="สถานะผู้ป่วย">
             <input
               className={`w-full px-4 py-3 rounded-lg border-2 bg-gray-50 text-sm font-medium
-                ${v.status === 'เสียชีวิต'
-                  ? 'border-red-300 text-red-700'
-                  : 'border-gray-300 text-gray-700'}`}
+                ${v.status === 'เสียชีวิต' ? 'border-red-300 text-red-700' : 'border-gray-300 text-gray-700'}`}
               value={v.status || 'มีชีวิต'}
               readOnly
               name="status"
@@ -482,62 +524,49 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
       </div>
 
       {/* ประวัติเบื้องต้น */}
-      {/* {!hasBaseline ? (
-        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
-          <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
-            <div className="p-2 bg-[#005A50] rounded-lg">
-              <ClipboardList size={20} className="text-white" />
-            </div>
-            ประวัติเบื้องต้น
-            <span className="text-sm font-normal text-gray-500 ml-auto">Baseline (optional)</span>
-          </h3>
-
-          <BaselineForm
-            value={{
-              patients_id: v.patients_id || '',
-              reason_in_dept: v.reason_in_dept ?? '',
-              reason_admit: v.reason_admit ?? '',
-              bedbound_cause: v.bedbound_cause ?? '',
-              other_history: v.other_history ?? '',
-              referral_hospital: v.referral_hospital ?? '',
-              referral_phone: v.referral_phone ?? '',
-            }}
-            onChange={(b) => onChange({ ...v, ...b })}
-          />
-
-          <p className="mt-3 text-xs text-gray-500">
-            * ไม่บังคับ กรอกเท่าที่ทราบในเบื้องต้น ระบบจะบันทึกไปเป็นประวัติเบื้องต้นของผู้ป่วย
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
-          <h3 className="text-xl font-bold text-[#005A50] mb-3 flex items-center gap-3">
-            <div className="p-2 bg-[#005A50] rounded-lg">
-              <ClipboardList size={20} className="text-white" />
-            </div>
-            ประวัติเบื้องต้น
-          </h3>
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 text-sm">
-            พบว่ามีประวัติเบื้องต้นแล้ว กรุณาแก้ไขในหน้า{' '}
-            <Link
-              href={`/patient/${encodeURIComponent(v.patients_id || '')}/encounters`}
-              className="font-semibold underline"
-            >
+      {settings?.baseline?.enabled && (
+        !hasBaseline ? (
+          <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+            <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
+              <div className="p-2 bg-[#005A50] rounded-lg"><ClipboardList size={20} className="text-white" /></div>
               ประวัติเบื้องต้น
-            </Link>{' '}
-            โดยตรง
+              <span className="text-sm font-normal text-gray-500 ml-auto">Baseline (optional)</span>
+            </h3>
+            <BaselineForm
+              value={{
+                patients_id: v.patients_id || '',
+                reason_in_dept: v.reason_in_dept ?? '',
+                reason_admit: v.reason_admit ?? '',
+                bedbound_cause: v.bedbound_cause ?? '',
+                other_history: v.other_history ?? '',
+                referral_hospital: v.referral_hospital ?? '',
+                referral_phone: v.referral_phone ?? '',
+              }}
+              onChange={(b: any) => onChange({ ...v, ...b })}
+            />
+            <p className="mt-3 text-xs text-gray-500">* ไม่บังคับ กรอกเท่าที่ทราบในเบื้องต้น ระบบจะบันทึกเป็นประวัติเบื้องต้นของผู้ป่วย</p>
           </div>
-        </div>
-      )} */}
+        ) : (
+          <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
+            <h3 className="text-xl font-bold text-[#005A50] mb-3 flex items-center gap-3">
+              <div className="p-2 bg-[#005A50] rounded-lg"><ClipboardList size={20} className="text-white" /></div>
+              ประวัติเบื้องต้น
+            </h3>
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 text-sm">
+              พบว่ามีประวัติเบื้องต้นแล้ว กรุณาแก้ไขในหน้า{' '}
+              <Link href={`/patient/${encodeURIComponent(v.patients_id || '')}/encounters`} className="font-semibold underline">
+                ประวัติเบื้องต้น
+              </Link>{' '}โดยตรง
+            </div>
+          </div>
+        )
+      )}
 
       {/* ข้อมูลส่วนตัว */}
       <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
         <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
-          <div className="p-2 bg-[#005A50] rounded-lg">
-            <User size={20} className="text-white" />
-          </div>
+          <div className="p-2 bg-[#005A50] rounded-lg"><User size={20} className="text-white" /></div>
           ข้อมูลส่วนตัว
-          <span className="text-sm font-normal text-gray-500 ml-auto">Personal Information</span>
         </h3>
 
         {/* เลขบัตรประชาชน */}
@@ -563,22 +592,18 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="คำนำหน้า" error={errors.pname}>
             <Select
               components={animatedComponents}
-              styles={{
-                ...rsx,
-                menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu: (base) => ({ ...base, zIndex: 12050 }),
-              }}
+              styles={{ ...rsx, menuPortal: (base: any) => ({ ...base, zIndex: 12050 }), menu: (base: any) => ({ ...base, zIndex: 12050 }) }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
               menuShouldBlockScroll
               isSearchable={false}
               isClearable={false}
               placeholder="เลือกคำนำหน้า"
-              options={pnameOptions}
-              value={pnameOptions.find((o) => o.value === v.pname) ?? null}
-              onChange={(opt) => onChange({ ...v, pname: opt?.value ?? '' })}
+              options={toOpts(normOr(so.pname, DEFAULT_SETTINGS.selectOptions.pname))}
+              value={toOpts(normOr(so.pname, DEFAULT_SETTINGS.selectOptions.pname)).find((o) => o.value === v.pname) ?? null}
+              onChange={(opt: any) => onChange({ ...v, pname: opt?.value ?? '' })}
               name="pname"
-              onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
+              onKeyDown={(e: any) => { if (e.key === 'Enter') e.stopPropagation(); }}
             />
           </InputField>
 
@@ -610,22 +635,18 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="เพศ" required error={errors.gender}>
             <Select
               components={animatedComponents}
-              styles={{
-                ...ortherrsx,
-                menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu: (base) => ({ ...base, zIndex: 12050 }),
-              }}
+              styles={{ ...ortherrsx, menuPortal: (base: any) => ({ ...base, zIndex: 12050 }), menu: (base: any) => ({ ...base, zIndex: 12050 }) }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
               menuShouldBlockScroll
               isSearchable={false}
               isClearable={false}
               placeholder="-- เลือกเพศ --"
-              options={genderOptions}
-              value={genderOptions.find((o) => o.value === v.gender) ?? null}
-              onChange={(opt) => onChange({ ...v, gender: opt?.value ?? '' })}
+              options={toOpts(normOr(so.gender, DEFAULT_SETTINGS.selectOptions.gender))}
+              value={toOpts(normOr(so.gender, DEFAULT_SETTINGS.selectOptions.gender)).find((o) => o.value === v.gender) ?? null}
+              onChange={(opt: any) => onChange({ ...v, gender: opt?.value ?? '' })}
               name="gender"
-              onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
+              onKeyDown={(e: any) => { if (e.key === 'Enter') e.stopPropagation(); }}
             />
           </InputField>
 
@@ -728,9 +749,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
       {/* ข้อมูลทางการแพทย์ */}
       <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
         <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
-          <div className="p-2 bg-[#005A50] rounded-lg">
-            <Droplets size={20} className="text-white" />
-          </div>
+          <div className="p-2 bg-[#005A50] rounded-lg"><Droplets size={20} className="text-white" /></div>
           ข้อมูลทางการแพทย์
           <span className="text-sm font-normal text-gray-500 ml-auto">Medical Information</span>
         </h3>
@@ -739,44 +758,36 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="กรุ๊ปเลือด" required error={errors.blood_group} icon={<Droplets size={16} />}>
             <Select
               components={animatedComponents}
-              styles={{
-                ...ortherrsx,
-                menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu: (base) => ({ ...base, zIndex: 12050 }),
-              }}
+              styles={{ ...ortherrsx, menuPortal: (base: any) => ({ ...base, zIndex: 12050 }), menu: (base: any) => ({ ...base, zIndex: 12050 }) }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
               menuShouldBlockScroll
               isSearchable={false}
               isClearable={false}
               placeholder="-- เลือกกรุ๊ปเลือด --"
-              options={bloodGroupOptions}
-              value={bloodGroupOptions.find((o) => o.value === v.blood_group) ?? null}
-              onChange={(opt) => onChange({ ...v, blood_group: opt?.value ?? '' })}
+              options={toOpts(normOr(so.blood_group, DEFAULT_SETTINGS.selectOptions.blood_group))}
+              value={toOpts(normOr(so.blood_group, DEFAULT_SETTINGS.selectOptions.blood_group)).find((o) => o.value === v.blood_group) ?? null}
+              onChange={(opt: any) => onChange({ ...v, blood_group: opt?.value ?? '' })}
               name="blood_group"
-              onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
+              onKeyDown={(e: any) => { if (e.key === 'Enter') e.stopPropagation(); }}
             />
           </InputField>
 
           <InputField label="Rh Factor" required error={errors.bloodgroup_rh}>
             <Select
               components={animatedComponents}
-              styles={{
-                ...ortherrsx,
-                menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu: (base) => ({ ...base, zIndex: 12050 }),
-              }}
+              styles={{ ...ortherrsx, menuPortal: (base: any) => ({ ...base, zIndex: 12050 }), menu: (base: any) => ({ ...base, zIndex: 12050 }) }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
               menuShouldBlockScroll
               isSearchable={false}
               isClearable={false}
               placeholder="-- เลือกประเภท Rh --"
-              options={rhOptions}
-              value={rhOptions.find((o) => o.value === v.bloodgroup_rh) ?? null}
-              onChange={(opt) => onChange({ ...v, bloodgroup_rh: opt?.value ?? '' })}
+              options={toOpts(normOr(so.bloodgroup_rh, DEFAULT_SETTINGS.selectOptions.bloodgroup_rh))}
+              value={toOpts(normOr(so.bloodgroup_rh, DEFAULT_SETTINGS.selectOptions.bloodgroup_rh)).find((o) => o.value === v.bloodgroup_rh) ?? null}
+              onChange={(opt: any) => onChange({ ...v, bloodgroup_rh: opt?.value ?? '' })}
               name="bloodgroup_rh"
-              onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
+              onKeyDown={(e: any) => { if (e.key === 'Enter') e.stopPropagation(); }}
             />
           </InputField>
 
@@ -794,56 +805,43 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           <InputField label="รักษาที่" required error={errors.treat_at}>
             <Select
               components={animatedComponents}
-              styles={{
-                ...ortherrsx,
-                menuPortal: (base) => ({ ...base, zIndex: 12050 }),
-                menu: (base) => ({ ...base, zIndex: 12050 }),
-              }}
+              styles={{ ...ortherrsx, menuPortal: (base: any) => ({ ...base, zIndex: 12050 }), menu: (base: any) => ({ ...base, zIndex: 12050 }) }}
               menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
               menuPosition="fixed"
               menuShouldBlockScroll
               isSearchable={false}
               isClearable={false}
               placeholder="-- เลือกสถานที่รักษา --"
-              options={treatatOptions}
-              value={treatatOptions.find((o) => o.value === v.treat_at) ?? null}
-              onChange={(opt) => onChange({ ...v, treat_at: opt?.value ?? '' })}
+              options={toOpts(normOr(so.treat_at, DEFAULT_SETTINGS.selectOptions.treat_at))}
+              value={toOpts(normOr(so.treat_at, DEFAULT_SETTINGS.selectOptions.treat_at)).find((o: any) => o.value === v.treat_at) ?? null}
+              onChange={(opt: any) => onChange({ ...v, treat_at: opt?.value ?? '' })}
               name="treat_at"
-              onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
+              onKeyDown={(e: any) => { if (e.key === 'Enter') e.stopPropagation(); }}
             />
+            <div className="mt-1 text-xs text-gray-500">
+              ต้องการเพิ่ม/แก้ไขตัวเลือก? <Link className="underline" href="/settings/patient/patient-form#treat_at">ไปที่ตั้งค่า</Link>
+            </div>
           </InputField>
         </div>
       </div>
 
-      {/* ===== ข้อมูลการเสียชีวิต (แสดงเมื่อสถานะ = เสียชีวิต) ===== */}
+      {/* ข้อมูลการเสียชีวิต */}
       {v.status === 'เสียชีวิต' && (
         <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
           <h3 className="text-xl font-bold text-red-700 mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
-            <div className="p-2 bg-red-600 rounded-lg">
-              <Heart size={20} className="text-white" />
-            </div>
+            <div className="p-2 bg-red-600 rounded-lg"><Heart size={20} className="text-white" /></div>
             ข้อมูลการเสียชีวิต
             <span className="text-sm font-normal text-gray-500 ml-auto">Death Information</span>
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <InputField label="วันที่เสียชีวิต" icon={<Calendar size={16} />}>
-              <DatePickerField
-                value={v.death_date}
-                onChange={(val) => onChange({ ...v, death_date: val })}
-                name="death_date"
-              />
+              <DatePickerField value={v.death_date} onChange={(val) => onChange({ ...v, death_date: val })} name="death_date" />
             </InputField>
 
             <InputField label="เวลาเสียชีวิต">
-              <ThaiTimeField
-                value={v.death_time}
-                onChange={(val) => onChange({ ...v, death_time: val })}
-                name="death_time"
-                minuteStep={5} // ปรับเป็น 1 ถ้าต้องการเลือกทีละนาที
-              />
+              <ThaiTimeField value={v.death_time} onChange={(val) => onChange({ ...v, death_time: val })} name="death_time" minuteStep={5} />
             </InputField>
-
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -873,31 +871,29 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
       {/* เอกสารแนบที่จำเป็น */}
       <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
         <h3 className="text-xl font-bold text-[#005A50] mb-6 flex items-center gap-3 pb-3 border-b border-gray-200">
-          <div className="p-2 bg-[#005A50] rounded-lg">
-            <FileUp size={20} className="text-white" />
-          </div>
+          <div className="p-2 bg-[#005A50] rounded-lg"><FileUp size={20} className="text-white" /></div>
           เอกสารประกอบการยื่นเรื่อง
           <span className="text-sm font-normal text-gray-500 ml-auto">Required Documents</span>
         </h3>
 
-        {/* คำแนะนำ */}
         <div className="bg-[#005A50]/5 border border-[#005A50]/20 rounded-lg p-4 mb-6">
-          <p className="text-sm text-[#005A50] font-medium">
-            📋 คำแนะนำ: เลือกเช็คเอกสารที่ต้องการแนบ จากนั้นทำการอัปโหลดไฟล์ในช่องที่ปรากฏขึ้น
-          </p>
+          <p className="text-sm text-[#005A50] font-medium">📋 คำแนะนำ: เลือกเช็คเอกสารที่ต้องการแนบ จากนั้นอัปโหลดไฟล์</p>
         </div>
 
-        {/* กล่องเช็คเลือกเอกสาร */}
+        {/* checkbox list */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-          {DOC_OPTIONS.map(({ key, label }) => (
+          {docOptions.map(({ key, label, required }) => (
             <label key={key} className="flex items-start gap-3 p-4 rounded-lg bg-gray-50 border-2 border-gray-200 hover:border-[#005A50]/30 hover:bg-[#005A50]/5 transition-all duration-200 cursor-pointer">
               <input
                 type="checkbox"
                 className="w-5 h-5 mt-0.5 text-[#005A50] border-2 border-gray-300 rounded focus:ring-[#005A50] focus:ring-2"
                 checked={!!flags[key]}
                 onChange={(e) => toggleDoc(key, e.target.checked)}
+                disabled={required}
               />
-              <span className="text-sm leading-relaxed text-gray-700">{label}</span>
+              <span className="text-sm leading-relaxed text-gray-700">
+                {label} {required && <span className="ml-2 inline-block text-xs px-2 py-0.5 rounded bg-rose-100 text-rose-700">บังคับ</span>}
+              </span>
             </label>
           ))}
 
@@ -909,7 +905,10 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
               checked={!!flags.other}
               onChange={(e) => {
                 const checked = e.target.checked;
-                toggleDoc('other', checked);
+                const nextFlags = { ...(v.docFlags || {}), other: checked };
+                const next = { ...v, docFlags: nextFlags };
+                if (!checked) (next as any).other_docs = [];
+                onChange(next);
                 if (checked && (!otherDocs || otherDocs.length === 0)) addOtherDoc();
               }}
             />
@@ -920,14 +919,12 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
           </label>
         </div>
 
-        {/* ช่องอัปโหลดของรายการที่เช็คไว้ */}
-        {DOC_OPTIONS.filter(d => flags[d.key]).length > 0 && (
+        {/* อัปโหลดเอกสารของรายการที่เช็คไว้ */}
+        {docOptions.filter(d => flags[d.key]).length > 0 && (
           <div className="space-y-6 mb-8">
-            <h4 className="text-lg font-semibold text-[#005A50] border-l-4 border-[#005A50] pl-4">
-              อัปโหลดเอกสารที่เลือก
-            </h4>
+            <h4 className="text-lg font-semibold text-[#005A50] border-l-4 border-[#005A50] pl-4">อัปโหลดเอกสารที่เลือก</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {DOC_OPTIONS.filter(d => flags[d.key]).map(({ key, label, accept }) => (
+              {docOptions.filter(d => flags[d.key]).map(({ key, label }) => (
                 <div key={key} className="bg-gray-50 p-6 rounded-xl border border-gray-200">
                   <div className="text-sm font-semibold text-[#005A50] mb-3 flex items-center gap-2">
                     <div className="w-2 h-2 bg-[#005A50] rounded-full"></div>
@@ -935,21 +932,15 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
                   </div>
                   <input
                     type="file"
-                    accept={accept}
+                    accept={metaByKey[key]?.accept || 'image/*,.pdf'}
                     className="w-full px-4 py-3 border-2 border-dashed border-[#005A50]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#005A50] focus:border-[#005A50] bg-white transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-[#005A50] file:text-white hover:file:bg-[#004A43]"
-                    onChange={(e) => setFileFor(key, e.target.files?.[0] || null)}
+                    onChange={(e: any) => setFileFor(key, e.target.files?.[0] || null)}
                   />
                   {v[key] && (
                     <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                       <div className="text-xs text-green-700 flex items-center justify-between">
                         <span>✅ เลือกแล้ว: <span className="font-mono font-medium">{fileName(v[key])}</span></span>
-                        <button
-                          type="button"
-                          className="ml-3 text-red-600 hover:text-red-800 hover:underline font-medium"
-                          onClick={() => setFileFor(key, null)}
-                        >
-                          ลบไฟล์
-                        </button>
+                        <button type="button" className="ml-3 text-red-600 hover:text-red-800 hover:underline font-medium" onClick={() => setFileFor(key, null)}>ลบไฟล์</button>
                       </div>
                     </div>
                   )}
@@ -962,9 +953,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
         {/* เอกสารอื่นๆ (หลายแถว) */}
         {flags.other && (
           <div className="space-y-4">
-            <h4 className="text-lg font-semibold text-[#005A50] border-l-4 border-[#005A50] pl-4">
-              เอกสารอื่นๆ
-            </h4>
+            <h4 className="text-lg font-semibold text-[#005A50] border-l-4 border-[#005A50] pl-4">เอกสารอื่นๆ</h4>
             {(otherDocs || []).map((row, idx) => (
               <div key={idx} className="bg-gray-50 p-6 rounded-xl border border-gray-200">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
@@ -983,7 +972,7 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
                       type="file"
                       accept="image/*,.pdf"
                       className="w-full px-4 py-3 border-2 border-dashed border-[#005A50]/30 rounded-lg bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-[#005A50] file:text-white hover:file:bg-[#004A43]"
-                      onChange={(e) => updateOtherDoc(idx, { file: e.target.files?.[0] || null })}
+                      onChange={(e: any) => updateOtherDoc(idx, { file: e.target.files?.[0] || null })}
                     />
                     {row.file && (
                       <div className="mt-2 text-xs text-green-700 bg-green-50 p-2 rounded">
@@ -1016,11 +1005,11 @@ const PatientForm = forwardRef(function PatientForm({ value, onChange, errors = 
         )}
 
         {/* สรุปเอกสาร */}
-        {(DOC_OPTIONS.filter(d => flags[d.key]).length > 0 || flags.other) && (
+        {(docOptions.filter(d => flags[d.key]).length > 0 || flags.other) && (
           <div className="mt-8 p-6 bg-[#005A50]/5 border border-[#005A50]/20 rounded-xl">
             <h4 className="text-sm font-semibold text-[#005A50] mb-3">📋 เอกสารที่เลือก:</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {DOC_OPTIONS.filter(d => flags[d.key]).map(({ key, label }) => (
+              {docOptions.filter(d => flags[d.key]).map(({ key, label }) => (
                 <div key={key} className="flex items-center gap-2 text-sm">
                   <span className={`w-2 h-2 rounded-full ${v[key] ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                   <span className={v[key] ? 'text-green-700 font-medium' : 'text-gray-600'}>{label}</span>

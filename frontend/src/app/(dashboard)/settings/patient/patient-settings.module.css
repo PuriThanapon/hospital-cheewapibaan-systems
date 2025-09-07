@@ -1,0 +1,83 @@
+.page {
+  min-height: 100vh;
+  padding: 20px;
+  background: #f8fafc; /* slate-50 */
+}
+
+/* ===== Hero ===== */
+.hero {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.heroInner { display: flex; flex-direction: column; gap: 6px; }
+.heroTitleWrap { display: flex; align-items: center; gap: 10px; color: #0f172a; }
+.heroTitle { margin: 0; font-size: 18px; font-weight: 700; }
+.heroSub { margin: 0; font-size: 12px; color: #64748b; }
+
+/* ===== Container & Grid ===== */
+.container { max-width: 1100px; margin: 0 auto; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (min-width: 768px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) {
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ===== Cards ===== */
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.cardHeader {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  padding: 14px;
+}
+.iconWrap {
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: #f0f9ff;      /* sky-50 */
+  color: #0369a1;           /* sky-800 */
+  border: 1px solid #bae6fd;/* sky-200 */
+}
+.cardHeadText { min-width: 0; }
+.cardTitle { font-weight: 700; color: #0f172a; }
+.cardDesc  { color: #64748b; font-size: 12px; margin-top: 2px; }
+
+.cardActions {
+  padding: 12px 14px 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #0369a1; /* sky-700 */
+  color: #fff;
+  border: 1px solid #0369a1;
+  text-decoration: none;
+  transition: transform .03s ease, box-shadow .15s ease;
+}
+.primaryBtn:hover {
+  box-shadow: 0 8px 18px rgba(3,105,161,.18);
+  transform: translateY(-1px);
+}
