@@ -244,7 +244,6 @@ function FilterControls({ report, filters, setFilters }: { report: ReportId; fil
           <select className="border rounded px-2 py-1" value={filters.ptStatus || ''} onChange={(e) => setFilters({ ...filters, ptStatus: e.target.value })}>
             <option value="">ทั้งหมด</option>
             <option value="มีชีวิต">มีชีวิต</option>
-            <option value="จำหน่าย">จำหน่าย</option>
             <option value="เสียชีวิต">เสียชีวิต</option>
           </select>
         </div>

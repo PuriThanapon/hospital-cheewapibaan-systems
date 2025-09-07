@@ -5,6 +5,7 @@ const router = express.Router();
 const drugCodesRoutes   = require('./drug_codes.routes');
 const deathController   = require('../controllers/deaths.controller');
 const homeNeedsController = require('../controllers/home_needs.controller');
+const bedSettingsRoutes = require('./bed_setting.routes');
 
 // แพ้ยา
 const allergiesRoutes = require('./allergies.routes');
@@ -54,6 +55,8 @@ router.use('/notification',     require('./notification.routes'));
 router.use('/home_needs',       require('./home_needs.routes'));
 router.use('/patient_diagnosis',require('./diagnosis.routes'));
 router.use('/encounters',       require('./encounters.routes'));
+router.use('/bed-settings',     bedSettingsRoutes);   // /api/bed-settings/*
+router.use('/bed_settings',     bedSettingsRoutes);
 router.use('/beds',             require('./beds.routes'));
 router.use('/bed_stays',        require('./bed_stays.routes'));
 router.use('/careplans',        require('./careplan.routes'));
