@@ -16,6 +16,12 @@ type TemplateDoc = {
   filename?: string | null;
   created_at?: string;
   updated_at?: string;
+
+  // รองรับหลายแหล่งเก็บไฟล์ (ต้องให้ backend SELECT มาด้วย)
+  storage?: 'db' | 'supabase' | 'drive' | null;
+  sb_bucket?: string | null;
+  sb_path?: string | null;
+  drive_file_id?: string | null;
 };
 
 // ✔ ใช้เป็นแหล่งข้อมูลของ select
@@ -47,26 +53,16 @@ const http = async (url: string, options: any = {}) => {
   return res.text();
 };
 
-// พิมพ์ผ่าน iframe (เหมาะกับ PDF/Image)
-function printByIframe(url: string) {
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.src = url;
-  iframe.onload = () => {
-    setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } finally {
-        document.body.removeChild(iframe);
-      }
-    }, 250);
+// Badge แสดงแหล่งที่มา
+function StorageBadge({ storage }: { storage?: TemplateDoc['storage'] }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    db:       { label: 'จากฐานข้อมูล',    cls: 'bg-gray-100 text-gray-700' },
+    supabase: { label: 'จาก Supabase',     cls: 'bg-emerald-100 text-emerald-700' },
+    drive:    { label: 'จาก Google Drive', cls: 'bg-indigo-100 text-indigo-700' },
   };
-  document.body.appendChild(iframe);
+  const x = storage ? map[storage] : undefined;
+  if (!x) return null;
+  return <span className={`text-[11px] px-2 py-0.5 rounded ${x.cls}`}>{x.label}</span>;
 }
 
 export default function TemplatesPage() {
@@ -76,7 +72,7 @@ export default function TemplatesPage() {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState(''); // ✔ ใช้กับ select ตัวกรอง
 
-  // upload form state
+  // upload form state (อัปโหลด “เก็บลง DB” เท่านั้น)
   const [openUpload, setOpenUpload] = useState(false);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState(''); // ✔ ใช้กับ select ในโมดัล
@@ -209,7 +205,10 @@ export default function TemplatesPage() {
                 <FileText size={18} className="text-blue-600"/>
               </div>
               <div className="flex-1">
-                <div className="font-semibold">{r.title}</div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="font-semibold">{r.title}</div>
+                  <StorageBadge storage={r.storage}/>
+                </div>
                 <div className="text-xs text-gray-500">
                   {r.category ? `หมวด: ${r.category}` : 'ไม่มีหมวดหมู่'}
                 </div>
@@ -219,7 +218,7 @@ export default function TemplatesPage() {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
               <a
                 href={fileUrl(r.id)}
                 target="_blank"
@@ -232,12 +231,13 @@ export default function TemplatesPage() {
               <a
                 href={fileUrl(r.id, { download: true })}
                 target="_blank"
-                rel="noopener"
-                download
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border hover:bg-gray-50"
-                >
+                title="ดาวน์โหลด"
+              >
                 <Download size={16}/> ดาวน์โหลด
               </a>
+
               <button
                 className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50"
                 onClick={() => handleDelete(r.id)}
@@ -250,7 +250,7 @@ export default function TemplatesPage() {
         ))}
       </div>
 
-      {/* Upload Modal */}
+      {/* Upload Modal (อัปโหลดเข้า DB เท่านั้น) */}
       {openUpload && (
         <div className="fixed inset-0 z-[12000] bg-black/50 flex items-center justify-center">
           <div className="w-[92vw] max-w-lg bg-white rounded-xl p-5">
@@ -267,7 +267,7 @@ export default function TemplatesPage() {
                 />
               </div>
 
-              {/* ✔ เปลี่ยนเป็น select สำหรับเลือกหมวดหมู่ */}
+              {/* ✔ select สำหรับเลือกหมวดหมู่ */}
               <div>
                 <div className="text-sm mb-1">หมวดหมู่</div>
                 <select
