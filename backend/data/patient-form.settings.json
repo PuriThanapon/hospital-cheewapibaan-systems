@@ -12,10 +12,10 @@
     "required": [
       "patient_id_card",
       "house_registration",
-      "adl_assessment"
+      "adl_assessment",
+      "patient_photo"
     ],
     "optional": [
-      "patient_photo",
       "relative_id_card",
       "power_of_attorney",
       "homeless_certificate",

@@ -1,0 +1,41 @@
+{
+  "columns": {
+    "order": [
+      "hn",
+      "name",
+      "gender",
+      "age",
+      "blood",
+      "type",
+      "treat_at",
+      "status",
+      "verify",
+      "edit",
+      "add_appt",
+      "history",
+      "allergies",
+      "diagnosis",
+      "deceased",
+      "delete"
+    ],
+    "visible": {
+      "hn": true,
+      "name": true,
+      "gender": true,
+      "age": true,
+      "blood": true,
+      "type": true,
+      "treat_at": true,
+      "status": true,
+      "verify": true,
+      "edit": true,
+      "add_appt": true,
+      "history": true,
+      "allergies": true,
+      "diagnosis": true,
+      "deceased": true,
+      "delete": true
+    }
+  },
+  "pageSize": 10
+}

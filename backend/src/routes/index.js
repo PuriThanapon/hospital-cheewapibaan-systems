@@ -39,9 +39,9 @@ router
 // ✅ Settings endpoints
 // อ่านค่าตั้งค่าแบบฟอร์มผู้ป่วย
 router.get('/settings/patient-form', settingsCtrl.getPatientForm);
-// บันทึก/อัปเดตค่าตั้งค่าแบบฟอร์มผู้ป่วย
 router.put('/settings/patient-form', settingsCtrl.updatePatientForm);
-
+router.get('/settings/patient-table', settingsCtrl.getPatientTable);
+router.put('/settings/patient-table', settingsCtrl.updatePatientTable);
 // ---------------- Sub-routers ----------------
 router.use('/patients',         require('./patients.routes'));
 router.use('/patient-files',    require('./patient_files.routes'));

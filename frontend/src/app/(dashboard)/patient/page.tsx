@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import styles from './patient.module.css';
 import {
   Search, X, Plus, Pencil, Eye, CalendarPlus, Skull, RefreshCw,
-  User, Calendar, FileText, CheckCircle, AlertCircle, Heart,
-  Phone, MapPin, Droplets, IdCard,
+  User, Calendar, FileText, CheckCircle, AlertCircle,
+  Phone, MapPin, Droplets,
   MapPinPlusInside,
   Trash2, // ⬅️ ปุ่มลบ
 } from 'lucide-react';
@@ -30,7 +30,7 @@ const Select = dynamic(() => import('react-select'), { ssr: false });
 const animatedComponents = makeAnimated();
 const menuPortalTarget = typeof window !== 'undefined' ? document.body : undefined;
 const rsx = {
-  control: (base, state) => ({
+  control: (base: any, state: any) => ({
     ...base,
     width: 200,
     minHeight: 32,
@@ -40,7 +40,7 @@ const rsx = {
     ':hover': { borderColor: '#60a5fa' },
     color: '#000000'
   }),
-  menuPortal: (base) => ({ ...base, color: '#000000', zIndex: 9999 }),
+  menuPortal: (base: any) => ({ ...base, color: '#000000', zIndex: 9999 }),
 };
 
 const $swal = Swal.mixin({
@@ -97,6 +97,64 @@ const statusOptions = [
   { value: 'เสียชีวิต', label: 'เสียชีวิต' },
   { value: 'จำหน่าย', label: 'จำหน่าย' },
 ];
+
+// ===== Table settings mapping =====
+type ColKey =
+  | 'hn' | 'name' | 'gender' | 'age' | 'blood' | 'type' | 'treat_at' | 'status'
+  | 'verify' | 'edit' | 'add_appt' | 'history' | 'allergies' | 'diagnosis' | 'deceased' | 'delete';
+
+const ALL_COL_KEYS: ColKey[] = [
+  'hn','name','gender','age','blood','type','treat_at','status',
+  'verify','edit','add_appt','history','allergies','diagnosis','deceased','delete',
+];
+
+const HEADER_LABELS: Record<ColKey, string> = {
+  hn: 'HN',
+  name: 'ชื่อ-นามสกุล',
+  gender: 'เพศ',
+  age: 'อายุ',
+  blood: 'กรุ๊ปเลือด',
+  type: 'ประเภท',
+  treat_at: 'สถานที่รักษา',
+  status: 'สถานะ',
+  verify: 'ตรวจสอบ',
+  edit: 'แก้ไข',
+  add_appt: 'เพิ่มนัด',
+  history: 'ประวัติ',
+  allergies: 'แพ้ยา',
+  diagnosis: 'โรคประจำตัว',
+  deceased: 'เสียชีวิต',
+  delete: 'ลบ',
+};
+
+type TableCfg = {
+  columns: { order: ColKey[]; visible: Record<ColKey, boolean> };
+  pageSize: number;
+};
+
+const DEFAULT_TABLE_CFG: TableCfg = {
+  columns: {
+    order: [...ALL_COL_KEYS],
+    visible: Object.fromEntries(ALL_COL_KEYS.map(k => [k, true])) as Record<ColKey, boolean>,
+  },
+  pageSize: 20,
+};
+
+// รองรับ alias จากหน้าตั้งค่าเก่า
+const KEY_ALIASES: Record<string, ColKey> = {
+  patients_type: 'type',
+  add_appointment: 'add_appt',
+  addAppointment: 'add_appt',
+  view: 'verify',
+  remove: 'delete',
+};
+const normalizeKey = (k: string): ColKey | null => {
+  const raw = (k || '').trim() as ColKey;
+  if ((ALL_COL_KEYS as readonly string[]).includes(raw)) return raw;
+  const aliased = KEY_ALIASES[k];
+  if (aliased && (ALL_COL_KEYS as readonly string[]).includes(aliased)) return aliased;
+  return null;
+};
 
 // ✅ ใช้ NEXT_PUBLIC_API_URL (และรองรับตัวแปรเก่าเป็นสำรอง) + ตัดท้ายน้ำ
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000')
@@ -269,12 +327,6 @@ function toISODateLocal(val: any) {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-function formatCardId(id?: string) {
-  if (!id) return '-';
-  const parts = id.split('-');
-  if (parts.length > 1) return `HN ${parts[1]}`;
-  return id;
-}
 
 // ---- helpers for download ----
 function decodeRFC5987(v: string) {
@@ -330,7 +382,6 @@ async function viewPatientAttachment(
       didOpen: () => Swal.showLoading(),
     });
 
-    // ใช้ fetch -> blob -> เปิดด้วย blob URL เพื่อกันกรณี Content-Disposition เป็น attachment
     const res = await fetch(url, { method: 'GET' });
     if (!res.ok) {
       let msg = 'ไม่พบไฟล์/เปิดดูไม่ได้';
@@ -340,7 +391,6 @@ async function viewPatientAttachment(
     const blob = await res.blob();
     const objUrl = URL.createObjectURL(blob);
     window.open(objUrl, '_blank', 'noopener,noreferrer');
-    // เคลียร์ URL ทีหลัง
     setTimeout(() => URL.revokeObjectURL(objUrl), 5 * 60 * 1000);
 
     Swal.close();
@@ -410,7 +460,7 @@ const EXTRA_DOC_LABELS: Record<string, string> = {
   homeless_certificate: 'หนังสือรับรองบุคคลไร้ที่พึ่ง',
   adl_assessment: 'แบบประเมิน ADL',
   clinical_summary: 'ประวัติการรักษา (Clinical Summary)',
-  destitute_certificate: 'หนังสือรับรองผู้ยากไร้', // <- คีย์นี้ “ไม่มีใน ALLOWED_TYPES”
+  destitute_certificate: 'หนังสือรับรองผู้ยากไร้',
 };
 
 async function uploadAllPatientFiles(patients_id: string, formValue: any) {
@@ -422,8 +472,8 @@ async function uploadAllPatientFiles(patients_id: string, formValue: any) {
     const f: File | undefined = formValue?.[key];
     if (!f) continue;
     const fd = new FormData();
-    fd.append('doc_type', 'other');                 // 👈 กัน ENUM
-    fd.append('label', EXTRA_DOC_LABELS[key]);      // 👈 ให้รู้ว่าไฟล์ประเภทอะไร
+    fd.append('doc_type', 'other');
+    fd.append('label', EXTRA_DOC_LABELS[key]);
     if (formValue?.appointment_id != null) fd.append('appointment_id', String(formValue.appointment_id));
     fd.append('file', f, f.name);
 
@@ -456,11 +506,9 @@ const STANDARD_FIELDS: Readonly<StandardField[]> = ['patient_id_card', 'house_re
 async function existsStandardFile(patientsId: string, field: StandardField): Promise<boolean> {
   const url = joinUrl(API_BASE, `/api/patients/${encodeURIComponent(patientsId)}/file/${field}`);
   try {
-    // ลอง HEAD ก่อน (เบาและเร็ว)
     const head = await fetch(url, { method: 'HEAD' });
     if (head.ok) return true;
     if (head.status === 404) return false;
-    // ถ้าเซิร์ฟเวอร์ไม่รองรับ HEAD → ตกมา GET แบบเบา (ถ้ารองรับ Range)
     const get = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' } });
     return get.ok; // 200 หรือ 206 ถือว่ามี
   } catch {
@@ -484,8 +532,15 @@ export default function PatientsPage() {
     treat_at: '', gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: ''
   });
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [tick, setTick] = useState(0);
+
+  // ✨ ตาราง: config จาก settings/patient-table
+  const [tableCfg, setTableCfg] = useState<TableCfg>(DEFAULT_TABLE_CFG);
+  const displayedKeys = useMemo(
+    () => tableCfg.columns.order.filter(k => tableCfg.columns.visible[k]),
+    [tableCfg]
+  );
 
   // data
   const [rows, setRows] = useState<any[]>([]);
@@ -540,6 +595,51 @@ export default function PatientsPage() {
           setTreatAtOptions(arr.map(toOpt));
         }
       } catch { /* ใช้ fallback ต่อไป */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // โหลด config ตารางจาก backend
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(joinUrl(API_BASE, '/api/settings/patient-table'), { cache: 'no-store' });
+        if (!alive) return;
+        if (res.ok) {
+          const js = await res.json();
+
+          // sanitize: order & visible (+ normalize alias)
+          const orderFromApi: string[] = Array.isArray(js?.columns?.order) ? js.columns.order : [];
+          const orderNorm = orderFromApi
+            .map(k => normalizeKey(k))
+            .filter(Boolean) as ColKey[];
+          const order: ColKey[] = [
+            ...orderNorm,
+            ...ALL_COL_KEYS.filter(k => !orderNorm.includes(k)),
+          ];
+
+          const visRaw = (js?.columns?.visible && typeof js.columns.visible === 'object') ? js.columns.visible : {};
+          const visMap: Partial<Record<ColKey, boolean>> = {};
+          for (const [k, v] of Object.entries(visRaw)) {
+            const nk = normalizeKey(k);
+            if (nk) visMap[nk] = Boolean(v);
+          }
+          const visible = Object.fromEntries(
+            ALL_COL_KEYS.map(k => [k, visMap[k] ?? true])
+          ) as Record<ColKey, boolean>;
+
+          const cfg: TableCfg = {
+            columns: { order, visible },
+            pageSize: Number(js?.pageSize || 20),
+          };
+
+          setTableCfg(cfg);
+          setLimit(cfg.pageSize); // ← จำนวนแถวต่อหน้า
+        }
+      } catch {
+        // ใช้ DEFAULT_TABLE_CFG ถ้าโหลดไม่สำเร็จ
+      }
     })();
     return () => { alive = false; };
   }, []);
@@ -944,6 +1044,107 @@ export default function PatientsPage() {
     });
   }, [rows]);
 
+  const isActionCol = (k: ColKey) =>
+    ['verify','edit','add_appt','history','allergies','diagnosis','deceased','delete'].includes(k);
+
+  function renderCell(key: ColKey, r: any) {
+    const allergyCount = Number((r as any).allergy_count ?? (r as any).allergies_count ?? 0);
+    const hasAllergy = (r as any).has_allergy === true || allergyCount > 0;
+
+    const allergyBtnStyle: React.CSSProperties = hasAllergy
+      ? { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' }
+      : { background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb' };
+
+    switch (key) {
+      case 'hn':
+        return <span className={styles.mono}>{r.patients_id}</span>;
+
+      case 'name':
+        return (
+          <>
+            {r.pname || ''}{r.first_name} {r.last_name}
+            {hasAllergy && (
+              <span
+                title={`แพ้ยา ${allergyCount} รายการ`}
+                style={{ display:'inline-block', width:8, height:8, marginLeft:6, verticalAlign:'middle', borderRadius:9999, background:'#ef4444' }}
+              />
+            )}
+          </>
+        );
+
+      case 'gender':   return r.gender || '-';
+      case 'age':      return calculateAgeFromBirthdate(r.birthdate || '-');
+      case 'blood':    return <>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</>;
+      case 'type':     return r.patients_type || '-';
+      case 'treat_at': return r.treat_at || '-';
+      case 'status':   return <Pill alive={r.status !== 'เสียชีวิต'} />;
+
+      case 'verify':
+        return (
+          <button className={styles.iconBtn} title="ตรวจสอบ" onClick={() => handleVerify(r.patients_id)}>
+            <Eye size={16} />
+          </button>
+        );
+
+      case 'edit':
+        return (
+          <button className={styles.iconBtn} title="แก้ไข" onClick={() => handleOpenEdit(r.patients_id)}>
+            <Pencil size={16} />
+          </button>
+        );
+
+      case 'add_appt':
+        return (
+          <button className={styles.iconBtn} title="เพิ่มนัด" onClick={() => handleOpenAppt(r.patients_id)} disabled={r.status === 'เสียชีวิต'}>
+            <CalendarPlus size={16} />
+          </button>
+        );
+
+      case 'history':
+        return (
+          <Link href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`} className={styles.iconBtn} title="ประวัติ">
+            <FileText size={16} />
+          </Link>
+        );
+
+      case 'allergies':
+        return (
+          <Link
+            href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
+              `${r.pname || ''}${r.first_name} {r.last_name}`.replace(/\s+/g, ' ').trim()
+            )}`}
+            className={`${styles.iconBtn} ${styles.iconBadgeWrap}`}
+            style={allergyBtnStyle}
+            title={hasAllergy ? `แพ้ยา ${allergyCount} รายการ` : 'ไม่มีข้อมูลแพ้ยา'}
+          >
+            <AlertCircle size={16} />
+            {hasAllergy && <span className={styles.iconBadge}>{allergyCount}</span>}
+          </Link>
+        );
+
+      case 'diagnosis':
+        return (
+          <Link href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`} className={styles.iconBtn} title="โรคประจำตัว">
+            <FileText size={16} />
+          </Link>
+        );
+
+      case 'deceased':
+        return (
+          <button className={styles.iconBtn} title="เสียชีวิต" onClick={() => handleOpenDeceased(r.patients_id)} disabled={r.status === 'เสียชีวิต'}>
+            <Skull size={16} />
+          </button>
+        );
+
+      case 'delete':
+        return (
+          <button className={`${styles.iconBtn} ${styles.iconDanger}`} title="ลบ" onClick={() => handleDelete(r.patients_id)}>
+            <Trash2 size={16} />
+          </button>
+        );
+    }
+  }
+
   return (
     <div className={styles.wrapper}>
       {/* Header */}
@@ -1103,151 +1304,33 @@ export default function PatientsPage() {
         <table className={styles.table}>
           <thead className={styles.thead}>
             <tr>
-              <th className={styles.th}>HN</th>
-              <th className={styles.th}>ชื่อ-นามสกุล</th>
-              <th className={styles.th}>เพศ</th>
-              <th className={styles.th}>อายุ</th>
-              <th className={styles.th}>กรุ๊ปเลือด</th>
-              <th className={styles.th}>ประเภท</th>
-              <th className={styles.th}>สถานที่รักษา</th>
-              <th className={styles.th}>สถานะ</th>
-              <th className={`${styles.th} ${styles.thAction}`}>ตรวจสอบ</th>
-              <th className={`${styles.th} ${styles.thAction}`}>แก้ไข</th>
-              <th className={`${styles.th} ${styles.thAction}`}>เพิ่มนัด</th>
-              <th className={`${styles.th} ${styles.thAction}`}>ประวัติ</th>
-              <th className={`${styles.th} ${styles.thAction}`}>แพ้ยา</th>
-              <th className={`${styles.th} ${styles.thAction}`}>โรคประจำตัว</th>
-              <th className={`${styles.th} ${styles.thAction}`}>เสียชีวิต</th>
-              <th className={`${styles.th} ${styles.thAction} ${styles.thDanger}`}>ลบ</th>
+              {displayedKeys.map((k) => (
+                <th
+                  key={k}
+                  className={
+                    isActionCol(k)
+                      ? `${styles.th} ${styles.thAction} ${k === 'delete' ? styles.thDanger : ''}`
+                      : styles.th
+                  }
+                >
+                  {HEADER_LABELS[k]}
+                </th>
+              ))}
             </tr>
           </thead>
+
           <tbody>
-            {(orderedRows || []).map((r: any) => {
-              const allergyCount = Number((r as any).allergy_count ?? (r as any).allergies_count ?? 0);
-              const hasAllergy = (r as any).has_allergy === true || allergyCount > 0;
-
-              // สไตล์ปุ่มแพ้ยา (inline เพื่อลดการแก้ไฟล์ CSS)
-              const allergyBtnStyle: React.CSSProperties = hasAllergy
-                ? { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' }
-                : { background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb' };
-
-              return (
-                <tr key={r.patients_id}>
-                  <td className={styles.td}><span className={styles.mono}>{r.patients_id}</span></td>
-                  <td className={styles.td}>
-                    {r.pname || ''}{r.first_name} {r.last_name}
-                    {hasAllergy && (
-                      <span
-                        title={`แพ้ยา ${allergyCount} รายการ`}
-                        style={{
-                          display: 'inline-block',
-                          width: 8,
-                          height: 8,
-                          marginLeft: 6,
-                          verticalAlign: 'middle',
-                          borderRadius: 9999,
-                          background: '#ef4444'
-                        }}
-                      />
-                    )}
+            {(orderedRows || []).map((r: any) => (
+              <tr key={r.patients_id}>
+                {displayedKeys.map((k) => (
+                  <td key={k} className={isActionCol(k) ? styles.tdIcon : styles.td}>
+                    {renderCell(k, r)}
                   </td>
-                  <td className={styles.td}>{r.gender || '-'}</td>
-                  <td className={styles.td}>{calculateAgeFromBirthdate(r.birthdate || '-')}</td>
-                  <td className={styles.td}>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</td>
-                  <td className={styles.td}>{r.patients_type || '-'}</td>
-                  <td className={styles.td}>{r.treat_at || '-'}</td>
-                  <td className={styles.td}><Pill alive={r.status !== 'เสียชีวิต'} /></td>
-                  <td className={styles.tdIcon}>
-                    <button
-                      className={`${styles.iconBtn}`}
-                      title="ตรวจสอบ" aria-label="ตรวจสอบ"
-                      onClick={() => handleVerify(r.patients_id)}
-                    >
-                      <Eye size={16} />
-                    </button>
-                  </td>
-
-                  <td className={styles.tdIcon}>
-                    <button
-                      className={styles.iconBtn}
-                      title="แก้ไข" aria-label="แก้ไข"
-                      onClick={() => handleOpenEdit(r.patients_id)}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                  </td>
-
-                  <td className={styles.tdIcon}>
-                    <button
-                      className={styles.iconBtn}
-                      title="เพิ่มนัด" aria-label="เพิ่มนัด"
-                      onClick={() => handleOpenAppt(r.patients_id)}
-                      disabled={r.status === 'เสียชีวิต'}
-                    >
-                      <CalendarPlus size={16} />
-                    </button>
-                  </td>
-
-                  <td className={styles.tdIcon}>
-                    <Link
-                      href={`/patient/${encodeURIComponent(r.patients_id)}/encounters`}
-                      className={styles.iconBtn}
-                      title="ประวัติ" aria-label="ประวัติ"
-                    >
-                      <FileText size={16} />
-                    </Link>
-                  </td>
-
-                  <td className={styles.tdIcon}>
-                    <Link
-                      href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
-                        `${r.pname || ''}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
-                      )}`}
-                      className={`${styles.iconBtn} ${styles.iconBadgeWrap}`}
-                      style={allergyBtnStyle}
-                      title={hasAllergy ? `แพ้ยา ${allergyCount} รายการ` : 'ไม่มีข้อมูลแพ้ยา'}
-                      aria-label="แพ้ยา"
-                    >
-                      <AlertCircle size={16} />
-                      {hasAllergy && <span className={styles.iconBadge}>{allergyCount}</span>}
-                    </Link>
-                  </td>
-
-                  <td className={styles.tdIcon}>
-                    <Link
-                      href={`/patient/${encodeURIComponent(r.patients_id)}/diagnosis`}
-                      className={styles.iconBtn}
-                      title="โรคประจำตัว" aria-label="โรคประจำตัว"
-                    >
-                      <FileText size={16} />
-                    </Link>
-                  </td>
-
-                  <td className={styles.tdIcon}>
-                    <button
-                      className={styles.iconBtn}
-                      title="เสียชีวิต" aria-label="เสียชีวิต"
-                      onClick={() => handleOpenDeceased(r.patients_id)}
-                      disabled={r.status === 'เสียชีวิต'}
-                    >
-                      <Skull size={16} />
-                    </button>
-                  </td>
-
-                  <td className={styles.tdIcon}>
-                    <button
-                      className={`${styles.iconBtn} ${styles.iconDanger}`}
-                      title="ลบ" aria-label="ลบ"
-                      onClick={() => handleDelete(r.patients_id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+                ))}
+              </tr>
+            ))}
             {!loading && rows.length === 0 && (
-              <tr><td className={styles.td} colSpan={10}>ไม่พบข้อมูลตามเงื่อนไข</td></tr>
+              <tr><td className={styles.td} colSpan={displayedKeys.length}>ไม่พบข้อมูลตามเงื่อนไข</td></tr>
             )}
           </tbody>
         </table>
@@ -1518,7 +1601,7 @@ export default function PatientsPage() {
         ) : (
           /* ===== NEW LAYOUT ===== */
           <div className="space-y-6">
-            {/* Top header strip (compact & readable) */}
+            {/* Top header strip */}
             <div className="rounded-2xl border border-slate-200 bg-white">
               <div className="flex flex-col lg:flex-row lg:items-center gap-4 p-6">
                 <div className="flex-1">
@@ -1546,9 +1629,9 @@ export default function PatientsPage() {
               </div>
             </div>
 
-            {/* Main 2-column content: Left summary (sticky) + Right detail */}
+            {/* Main 2-column content */}
             <div className="grid lg:grid-cols-12 gap-6">
-              {/* LEFT: Patient Summary (sticky inside modal scroll) */}
+              {/* LEFT */}
               <aside className="lg:col-span-4">
                 <div className="sticky top-2 space-y-4">
                   {/* ID & Quick Facts */}
@@ -1593,7 +1676,7 @@ export default function PatientsPage() {
                     </div>
                   </div>
 
-                  {/* Quick Actions (documents / history) */}
+                  {/* Quick Actions */}
                   <div className="rounded-2xl border border-slate-200 bg-white p-5">
                     <div className="text-sm text-slate-500 mb-2">การทำงานเร็ว</div>
                     <div className="flex flex-wrap gap-2">
@@ -1622,7 +1705,7 @@ export default function PatientsPage() {
                 </div>
               </aside>
 
-              {/* RIGHT: Sections */}
+              {/* RIGHT */}
               <section className="lg:col-span-8 space-y-6">
                 {/* 1) Personal */}
                 <div className="rounded-2xl border border-slate-200 bg-white">
@@ -1706,7 +1789,7 @@ export default function PatientsPage() {
                   </div>
 
                   <div className="p-6 space-y-6">
-                    {/* เอกสารมาตรฐาน (แสดงเฉพาะที่มีจริง) */}
+                    {/* เอกสารมาตรฐาน */}
                     <div>
                       <div className="text-sm text-slate-500 mb-2">เอกสารมาตรฐาน</div>
 
