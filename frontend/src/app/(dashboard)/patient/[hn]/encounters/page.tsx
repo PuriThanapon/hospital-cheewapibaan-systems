@@ -8,14 +8,27 @@ import Modal from '@/app/components/ui/Modal';
 import DatePickerField from '@/app/components/DatePicker';
 import {
   ClipboardList, Edit3, Plus, Save, User, X, Calendar, Pill,
-  FileText, Activity, ArrowLeft, Stethoscope, Heart, Phone, Building2
+  FileText, Activity, ArrowLeft, Stethoscope, Heart, Phone, Building2, FileDown
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import BaselineForm, { Baseline as BaselineFormType } from '@/app/components/forms/BaselineForm';
 
+// ⬇️ Exporters
+import exportPDF from '@/app/components/PDFExporter';
+import exportCSV from '@/app/components/CSVExporter';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
 const join = (p: string) => (p.startsWith('http') ? p : `${API_BASE}${p}`);
+
+// ⬇️ Branding จาก ENV (แก้ได้ตามต้องการ)
+const HOSPITAL_NAME    = process.env.NEXT_PUBLIC_HOSPITAL_NAME    || 'โรงพยาบาลวัดห้วยปลากั้งเพื่อสังคม';
+const HOSPITAL_DEPT    = process.env.NEXT_PUBLIC_DEPARTMENT_NAME  || 'แผนกชีวาภิบาล';
+const HOSPITAL_ADDRESS = process.env.NEXT_PUBLIC_HOSPITAL_ADDRESS || '553 11 ตำบล บ้านดู่ อำเภอเมืองเชียงราย เชียงราย 57100';
+const HOSPITAL_LOGO    = process.env.NEXT_PUBLIC_HOSPITAL_LOGO    || '/logo.png';
+const REPORT_DOC_CODE  = process.env.NEXT_PUBLIC_REPORT_DOC_CODE  || '';
+const REPORT_VERSION   = process.env.NEXT_PUBLIC_REPORT_VERSION   || '';
+const REPORT_WATERMARK = process.env.NEXT_PUBLIC_REPORT_WATERMARK || ''; // เช่น 'CONFIDENTIAL'
 
 const toast = Swal.mixin({
   toast: true, position: 'top-end', timer: 2200, showConfirmButton: false,
@@ -28,8 +41,8 @@ type Baseline = {
   reason_admit?: string | null;
   bedbound_cause?: string | null;
   other_history?: string | null;
-  referral_hospital?: string | null;  // ✅ ใหม่
-  referral_phone?: string | null;     // ✅ ใหม่
+  referral_hospital?: string | null;
+  referral_phone?: string | null;
 };
 
 type Treatment = {
@@ -104,8 +117,8 @@ export default function EncountersPage() {
     reason_admit: '',
     bedbound_cause: '',
     other_history: '',
-    referral_hospital: '',  // ✅
-    referral_phone: '',     // ✅
+    referral_hospital: '',
+    referral_phone: '',
   });
 
   // Treatment modal state
@@ -119,6 +132,12 @@ export default function EncountersPage() {
     medication: '',
     note: '',
   });
+
+  // === Report / Export states ===
+  const [reportOpen, setReportOpen] = useState(false);
+  const [rFrom, setRFrom] = useState<string>('');
+  const [rTo, setRTo] = useState<string>('');
+  const [rIncludeNotes, setRIncludeNotes] = useState<boolean>(true);
 
   // ให้ patients_id อัปเดตตาม hn เสมอ
   useEffect(() => {
@@ -179,7 +198,6 @@ export default function EncountersPage() {
   async function saveBaseline() {
     setBlSaving(true);
     try {
-      // เตรียม payload ให้ครบฟิลด์
       const payload = {
         reason_in_dept: bl.reason_in_dept || null,
         reason_admit: bl.reason_admit || null,
@@ -229,6 +247,107 @@ export default function EncountersPage() {
     const s = `${pname.pname ?? ''}${pname.first_name ?? ''} ${pname.last_name ?? ''}`;
     return s.replace(/\s+/g, ' ').trim();
   }, [pname]);
+
+  // ===== Helpers for Export =====
+  const sevTH = (s: 'mild'|'moderate'|'severe') => (s === 'mild' ? 'เบา' : s === 'moderate' ? 'ปานกลาง' : 'รุนแรง');
+
+  const filteredTreatments = useMemo(() => {
+    return (treatments || []).filter(t => {
+      if (rFrom && t.symptom_date < rFrom) return false;
+      if (rTo && t.symptom_date > rTo) return false;
+      return true;
+    });
+  }, [treatments, rFrom, rTo]);
+
+  async function exportReportPDF() {
+    const filename = `${hn}_encounters_${rFrom || ''}_${rTo || ''}.pdf`;
+    const columns = ['วันที่', 'อาการ', 'ความรุนแรง', 'ยา/วิธีการรักษา', ...(rIncludeNotes ? ['หมายเหตุ'] : [])];
+    const rows = filteredTreatments.map(t => [
+      t.symptom_date,
+      t.symptom,
+      sevTH(t.severity),
+      t.medication || '',
+      ...(rIncludeNotes ? [t.note || ''] : []),
+    ]);
+
+    const subtitle =
+      (rFrom || rTo)
+        ? `ช่วงวันที่: ${rFrom || '-'} ถึง ${rTo || '-'}`
+        : 'ช่วงวันที่: ทั้งหมด';
+
+    try {
+      await exportPDF({
+        filename,
+        columns,
+        rows,
+        title: `ประวัติการรักษา — ${fullName || hn}`,
+        subtitle,
+        hospitalName: HOSPITAL_NAME,
+        department: HOSPITAL_DEPT,
+        address: HOSPITAL_ADDRESS,
+        logoUrl: HOSPITAL_LOGO,
+        docCode: REPORT_DOC_CODE,
+        version: REPORT_VERSION,
+        printedBy: '',
+        printAt: new Date(),
+        columnAligns: ['left','left','center','left', ...(rIncludeNotes?['left']:[])],
+        showConfidential: true,
+        watermarkText: REPORT_WATERMARK || '',
+        note: baseline
+          ? [
+              baseline.reason_in_dept && `เหตุผลที่อยู่แผนก: ${baseline.reason_in_dept}`,
+              baseline.reason_admit && `สาเหตุที่เข้าแผนก: ${baseline.reason_admit}`,
+              baseline.bedbound_cause && `สาเหตุติดเตียง: ${baseline.bedbound_cause}`,
+              baseline.other_history && `อื่น ๆ: ${baseline.other_history}`,
+              (baseline.referral_hospital || baseline.referral_phone) &&
+                `ต้นสังกัด: ${baseline.referral_hospital || '-'}  โทร: ${baseline.referral_phone || '-'}`
+            ].filter(Boolean).join('\n')
+          : '',
+        pdfAuthor: HOSPITAL_NAME,
+        pdfSubject: 'รายงานประวัติการรักษา',
+        pdfKeywords: 'hospital,report,thai',
+      });
+    } catch (e) {
+      console.error(e);
+      Swal.fire({ icon: 'error', title: 'พิมพ์/ส่งออก PDF ไม่สำเร็จ', text: (e as any)?.message || '' });
+    }
+  }
+
+  function exportReportCSV() {
+    const cnt = filteredTreatments.length;
+    if (cnt === 0) {
+      toast.fire({ icon: 'info', title: 'ไม่มีข้อมูลในช่วงที่เลือก' });
+      return;
+    }
+
+    const fileName = `${hn}_encounters_${rFrom || ''}_${rTo || ''}.csv`;
+
+    // ✅ CSVExporter (default) ต้องการ columns เป็นอ็อบเจ็กต์ { header } และ rows เป็น Array-of-Array
+    const columns = [
+      { header: 'วันที่' },
+      { header: 'อาการ' },
+      { header: 'ความรุนแรง' },
+      { header: 'ยา/วิธีการรักษา' },
+      ...(rIncludeNotes ? [{ header: 'หมายเหตุ' }] : []),
+    ];
+
+    const sanitize = (v: any) => String(v ?? '').replace(/"/g, '""'); // ป้องกันเครื่องหมายคำพูดในข้อมูล
+
+    const rows = filteredTreatments.map(t => [
+      sanitize(t.symptom_date),
+      sanitize(t.symptom),
+      sanitize(sevTH(t.severity)),
+      sanitize(t.medication || ''),
+      ...(rIncludeNotes ? [sanitize(t.note || '')] : []),
+    ]);
+
+    try {
+      exportCSV({ filename: fileName, columns, rows });
+    } catch (e) {
+      console.error(e);
+      Swal.fire({ icon: 'error', title: 'ส่งออก CSV ไม่สำเร็จ', text: (e as any)?.message || '' });
+    }
+  }
 
   if (!hn) {
     return (
@@ -297,6 +416,13 @@ export default function EncountersPage() {
                 {fullName && <span className="font-medium">{fullName}</span>}
               </div>
             </div>
+
+            <button
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors flex items-center gap-2"
+              onClick={() => setReportOpen(true)}
+            >
+              <FileDown className="w-4 h-4" /> ออกรายงาน
+            </button>
 
             <button
               className="px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 hover:opacity-90"
@@ -593,6 +719,66 @@ export default function EncountersPage() {
                 value={tr.note || ''}
                 onChange={e => setTr(s => ({...s, note:e.target.value}))}
               />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ===== REPORT / EXPORT MODAL ===== */}
+      {reportOpen && (
+        <Modal
+          open
+          size="lg"
+          onClose={() => setReportOpen(false)}
+          onConfirm={() => {}}
+          title="ออกรายงานประวัติการรักษา"
+          footer={
+            <div className="flex flex-wrap gap-3 justify-end">
+              <button
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                onClick={() => setReportOpen(false)}
+              >
+                ปิด
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg text-white hover:opacity-90"
+                style={{ backgroundColor: '#005A50' }}
+                onClick={exportReportPDF}
+              >
+                พิมพ์ / บันทึกเป็น PDF
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900"
+                onClick={exportReportCSV}
+              >
+                ดาวน์โหลด CSV
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">จากวันที่</label>
+                <DatePickerField value={rFrom} onChange={setRFrom} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ถึงวันที่</label>
+                <DatePickerField value={rTo} onChange={setRTo} />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={rIncludeNotes}
+                onChange={e => setRIncludeNotes(e.target.checked)}
+              />
+              รวมคอลัมน์ “หมายเหตุ”
+            </label>
+
+            <div className="text-xs text-gray-500">
+              * หากไม่เลือกช่วงวันที่ ระบบจะออกรายการทั้งหมด
             </div>
           </div>
         </Modal>
