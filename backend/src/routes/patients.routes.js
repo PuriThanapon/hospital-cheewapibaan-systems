@@ -31,6 +31,7 @@ router.get('/:id/encounters/summary',   encounters.getSummary);
 router.get('/:id/encounters/baseline',  encounters.getBaseline);     // ✅ เพิ่ม GET baseline
 router.post('/:id/encounters/baseline', encounters.upsertBaseline);
 router.post('/:id/encounters/treatments', encounters.addTreatment);
+router.get('/exists', ctrl.existsByCardId);
 
 // ---------- รายการเดียว ----------
 router.get('/:id', ctrl.getOnePatient);

@@ -24,6 +24,22 @@ function normalizePatientsIdFromQuery(q) {
   return `HN-${digits.padStart(8, '0')}`;
 }
 
+function normalizeCardId(input) {
+  return String(input || '').replace(/\D/g, '').slice(0, 13);
+}
+
+// Thai ID checksum: sum(d[i]*w[i]) with weights 13..2, check = (11 - (sum % 11)) % 10
+function isValidThaiCardId(raw) {
+  const id = normalizeCardId(raw);
+  if (id.length !== 13) return false;
+  const digits = id.split('').map(n => parseInt(n, 10));
+  if (digits.some(Number.isNaN)) return false;
+  const sum = digits.slice(0, 12).reduce((acc, d, i) => acc + d * (13 - i), 0);
+  const check = (11 - (sum % 11)) % 10;
+  return check === digits[12];
+}
+
+
 async function getLatestPatientId() {
   const r = await pool.query(
     `SELECT patients_id FROM patients ORDER BY patients_id DESC LIMIT 1`
@@ -63,7 +79,20 @@ const fileFrom = (files, field) => {
 };
 
 /* ---------------- controllers ---------------- */
-
+// ✅ นับจำนวนผู้ป่วยสุทธิจาก patients ที่มีสถานะ "มีชีวิต" เท่านั้น
+async function getCurrentDeptNetCount() {
+  try {
+    const { rows } = await pool.query(`
+      SELECT COUNT(*)::int AS c
+      FROM patients
+      WHERE status = 'มีชีวิต'
+    `);
+    return rows?.[0]?.c ?? 0;
+  } catch (e) {
+    console.error('count alive patients failed:', e);
+    return 0;
+  }
+}
 // GET /api/patients/next-id
 async function getNextPatientId(req, res, next) {
   try {
@@ -76,6 +105,40 @@ async function getNextPatientId(req, res, next) {
     }
     res.json({ nextId: `HN-${String(nextNo).padStart(8, '0')}` });
   } catch (e) { next(e); }
+}
+
+// GET /api/patients/exists?card_id=XXXX
+async function existsByCardId(req, res, next) {
+  try {
+    const q = req.query.card_id;
+    if (q === undefined) {
+      return res.status(400).json({ message: 'ต้องระบุ ?card_id' });
+    }
+
+    const normalized = normalizeCardId(q);
+    const valid = isValidThaiCardId(q);
+
+    // ถ้า format/ checksum ไม่ผ่าน ให้ตอบ 200 (valid=false) เพื่อไม่ให้หน้าเว็บล้ม
+    let exists = false;
+    if (valid) {
+      // เก็บ/ค้นหาแบบ normalize (ไม่มีขีด)
+      const r = await pool.query(
+        `SELECT 1 FROM patients WHERE card_id = $1 LIMIT 1`,
+        [normalized]
+      );
+      exists = r.rowCount > 0;
+    }
+
+    return res.json({
+      ok: true,
+      query: String(q),
+      card_id: normalized,
+      valid,
+      exists,
+    });
+  } catch (e) {
+    next(e);
+  }
 }
 
 // GET /api/patients
@@ -125,8 +188,9 @@ async function listPatients(req, res, next) {
         COALESCE(p.disease,'')        ILIKE $${i} OR
         COALESCE(p.religion,'')       ILIKE $${i} OR
         COALESCE(p.phone_number,'')   ILIKE $${i} OR
-        COALESCE(p.card_id,'')        ILIKE $${i}
-      )`);
+        COALESCE(p.card_id,'')        ILIKE $${i} OR
+        regexp_replace(COALESCE(p.card_id,''), '\\D', '', 'g') LIKE regexp_replace($${i}, '\\D', '', 'g')
+        )`);
       vals.push(`%${q}%`);
       i++;
     }
@@ -217,6 +281,7 @@ async function downloadPatientFile(req, res, next) {
 async function createPatient(req, res, next) {
   try {
     const b = req.body || {};
+    const card_id = b.card_id ? normalizeCardId(b.card_id) : null;
     const pid = toPatientsId(b.patients_id || b.hn);
     if (!pid) return res.status(400).json({ message: 'ต้องระบุ patients_id หรือ hn' });
 
@@ -258,7 +323,7 @@ async function createPatient(req, res, next) {
     `;
     const params = [
       pid,
-      b.pname, b.first_name, b.last_name, b.card_id, b.gender, b.address, b.birthdate, b.nationality,
+      b.pname, b.first_name, b.last_name, card_id, b.gender, b.address, b.birthdate, b.nationality,
       b.patients_type, b.blood_group, b.bloodgroup_rh, phone_number, b.height, b.weight, 'มีชีวิต',
       b.admittion_date, b.disease, b.religion, b.treat_at,
 
@@ -277,12 +342,15 @@ async function createPatient(req, res, next) {
       const groupId = process.env.LINE_GROUP_ID;
       if (groupId) {
         const nowTH = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+        let totalNow = 0;
+        try { totalNow = await getCurrentDeptNetCount(); } catch (_) {}
         const msg =
-          `🆕 เพิ่มผู้ป่วยใหม่
+        `🆕 เพิ่มผู้ป่วยใหม่
         HN: ${row.patients_id}
         ชื่อ: ${row.first_name ?? ''} ${row.last_name ? row.last_name[0] + '.' : ''}
         ประเภท: ${row.patients_type ?? '-'}
-        เวลา: ${nowTH}`;
+        เวลา: ${nowTH}
+        👥 ผู้ป่วยสุทธิในแผนก (ตอนนี้): ${totalNow} คน`;
         await pushText(groupId, msg);
       }
     } catch (e) {
@@ -294,12 +362,15 @@ async function createPatient(req, res, next) {
       const userId = process.env.LINE_USER_ID;
       if (userId) {
         const nowTH = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+        let totalNow = 0;
+        try { totalNow = await getCurrentDeptNetCount(); } catch (_) {}
         const msg =
     `🆕 เพิ่มผู้ป่วยใหม่
     HN: ${row.patients_id}
     ชื่อ: ${row.first_name ?? ''} ${row.last_name ? row.last_name[0] + '.' : ''}
     ประเภท: ${row.patients_type ?? '-'}
-    เวลา: ${nowTH}`;
+    เวลา: ${nowTH}
+    👥 ผู้ป่วยสุทธิในแผนก (ตอนนี้): ${totalNow} คน`;
 
         await pushText(userId, msg);
       }
@@ -566,4 +637,5 @@ module.exports = {
   // lookup (ลืม HN)
   search,
   recent,
+  existsByCardId,
 };
