@@ -101,6 +101,8 @@ type Appointment = {
   end_time: string
   appointment_type?: string
   place?: string
+  hospital_address?: string
+  department?: string
   status: Status
   note?: string
 }
@@ -131,14 +133,29 @@ async function fetchPatients(params: { from?: string; to?: string; status?: stri
 
 async function fetchTreatments(params: { from?: string; to?: string; hn?: string; type?: string; limit?: number }) {
   const p = new URLSearchParams()
-  if (params.from) p.set('from', params.from)
-  if (params.to) p.set('to', params.to)
-  if (params.hn) p.set('hn', params.hn)
-  if (params.type) p.set('type', params.type)
+  // normalize  กันทุกชื่อพารามิเตอร์ที่ backend อาจใช้
+  const from = params.from || ''
+  const to   = params.to   || ''
+  const hn   = params.hn ? normalizeHN(params.hn) : ''
+  const type = (params.type || '').trim()
+
+  if (from) { p.set('from', from); p.set('date_from', from); p.set('start', from) }
+  if (to)   { p.set('to', to);     p.set('date_to', to);     p.set('end', to) }
+  if (hn)   { p.set('hn', hn); p.set('patients_id', hn); p.set('patient_id', hn) }
+  if (type) { p.set('type', type); p.set('treatment_type', type) }
   p.set('page', '1')
   p.set('limit', String(params.limit ?? 5000))
+
   const data = await http<{ data: Treatment[] }>(`/api/treatment?${p.toString()}`)
-  return data.data || []
+  const rows = data?.data || []
+
+  // เฟลเซฟ: ฟิลเตอร์ซ้ำฝั่ง client เผื่อ backend ไม่รองรับบางพารามิเตอร์
+  const inRange = (t: Treatment) => (!from && !to) ? true : inDateRange(t.treatment_date, from, to)
+  return rows.filter((t) => {
+    const byHN   = hn   ? (normalizeHN(t.patients_id) === hn) : true
+    const byType = type ? ((t.treatment_type || '').trim() === type) : true
+    return inRange(t) && byHN && byType
+  })
 }
 
 async function fetchAppointments(params: { from?: string; to?: string; type?: string; place?: string; status?: Status | 'all'; limit?: number }) {
@@ -276,14 +293,6 @@ function FilterControls({ report, filters, setFilters }: { report: ReportId; fil
       {(['ap-detail','ap-mth','ap-by-type','ap-by-place','ap-noshow','ap-status'] as ReportId[]).includes(report) && (
         <>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600">ประเภทนัด</label>
-            <input className="border rounded px-2 py-1" value={filters.apType || ''} onChange={(e) => setFilters({ ...filters, apType: e.target.value })} placeholder="ตรวจติดตาม/ทำแผล/..." />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600">สถานที่</label>
-            <input className="border rounded px-2 py-1" value={filters.apPlace || ''} onChange={(e) => setFilters({ ...filters, apPlace: e.target.value })} placeholder="OPD/ห้องทำแผล/..." />
-          </div>
-          <div className="flex flex-col">
             <label className="text-xs text-gray-600">สถานะนัด</label>
             <select className="border rounded px-2 py-1" value={filters.apStatus || 'all'} onChange={(e) => setFilters({ ...filters, apStatus: e.target.value })}>
               <option value="all">ทั้งหมด</option>
@@ -398,6 +407,8 @@ async function buildReport(report: ReportId, filters: any) {
         time: timeRangeText(a.start_time, a.end_time),
         type: a.appointment_type || '-',
         place: a.place || '-',
+        hospital_address: a.hospital_address || '-',
+        department: a.department || '-',
         status: statusMap[a.status] || a.status || '-',
         note: a.note || '-',
       }))
@@ -407,6 +418,8 @@ async function buildReport(report: ReportId, filters: any) {
         start_time: a.start_time, end_time: a.end_time,
         appointment_type: a.appointment_type || '',
         place: a.place || '',
+        hospital_address: a.hospital_address || '',
+        department: a.department || '',
         status: a.status,
         note: a.note || '',
       }))
@@ -418,6 +431,8 @@ async function buildReport(report: ReportId, filters: any) {
           { header: 'เวลา', dataKey: 'time' },
           { header: 'ประเภทนัด', dataKey: 'type' },
           { header: 'สถานที่', dataKey: 'place' },
+          { header: 'ที่อยู่โรงพยาบาล', dataKey: 'hospital_address' },
+          { header: 'แผนก', dataKey: 'department' },
           { header: 'สถานะ', dataKey: 'status' },
           { header: 'หมายเหตุ', dataKey: 'note' },
         ],
@@ -501,7 +516,11 @@ async function buildReport(report: ReportId, filters: any) {
     }
 
     case 'tx-logs': {
-      const rows = await fetchTreatments({ from, to, hn: filters.hn || '', type: filters.txType || '' })
+      const rows = await fetchTreatments({
+      from, to,
+      hn: normalizeHN(filters.hn || ''),
+      type: (filters.txType || '').trim()
+    })
       const data = rows.map((t) => ({
         hn: t.patients_id,
         date: formatDate(t.treatment_date),
@@ -655,8 +674,8 @@ export default function ReportsNoChartsFixed() {
   }>> = {
     'ap-detail': {
       // รวม ~182 มม. (A4 portrait)
-      widths: [22, 24, 20, 36, 30, 24, 'auto'],
-      aligns: ['left','center','center','left','left','center','left']
+      widths: [18, 22, 18, 28, 22, 22, 40, 18, 'auto'],
+      aligns: ['left','center','center','left','left','left','left','center','left']
     },
     'pt-register': {
       // รวม ~182 มม.
