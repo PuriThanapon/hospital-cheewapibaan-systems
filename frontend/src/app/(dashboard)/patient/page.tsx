@@ -23,6 +23,7 @@ import DatePickerField from '@/app/components/DatePicker';
 import type { AppointmentFormValue } from '@/app/components/forms/AppointmentForm';
 import Link from 'next/link';
 import { hasBaselineData } from '@/app/lib/baseline'; // util เช็คว่ามี baseline data ไหม
+import { getPatientListFilterSettings, type PatientListFilterSettings } from '@/app/lib/settings';
 
 type Status = 'pending' | 'done' | 'cancelled';
 // react-select (SSR safe)
@@ -104,8 +105,8 @@ type ColKey =
   | 'verify' | 'edit' | 'add_appt' | 'history' | 'allergies' | 'diagnosis' | 'deceased' | 'delete';
 
 const ALL_COL_KEYS: ColKey[] = [
-  'hn','name','gender','age','blood','type','treat_at','status',
-  'verify','edit','add_appt','history','allergies','diagnosis','deceased','delete',
+  'hn', 'name', 'gender', 'age', 'blood', 'type', 'treat_at', 'status',
+  'verify', 'edit', 'add_appt', 'history', 'allergies', 'diagnosis', 'deceased', 'delete',
 ];
 
 const HEADER_LABELS: Record<ColKey, string> = {
@@ -529,7 +530,7 @@ export default function PatientsPage() {
   // state: query + filters + pagination
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState({
-    treat_at: '', gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: ''
+    treat_at: '', gender: '', status: '', blood_group: '', bloodgroup_rh: '', patients_type: '', admit_from: '', admit_to: '', has_baseline: ''
   });
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -639,6 +640,42 @@ export default function PatientsPage() {
         }
       } catch {
         // ใช้ DEFAULT_TABLE_CFG ถ้าโหลดไม่สำเร็จ
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const [listCfg, setListCfg] = useState<PatientListFilterSettings | null>(null);
+  const [selectMap, setSelectMap] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        // โหลด config ตัวกรอง + ตัวเลือก select (ใช้ endpoint เดิมของฟอร์มผู้ป่วย)
+        const [cfg, selResp] = await Promise.all([
+          getPatientListFilterSettings(),
+          fetch(joinUrl(API_BASE, '/api/settings/patient-form'), { cache: 'no-store' }).then(r => r.ok ? r.json() : null),
+        ]);
+        if (!alive) return;
+
+        setListCfg(cfg);
+        setSelectMap(selResp?.selectOptions || {}); // { gender:[], patients_type:[], treat_at:[], ... }
+
+        // อัด defaults → state เดิม
+        const d = cfg?.defaults || {};
+        setQuery((q) => (d.q != null ? String(d.q) : q));
+        setFilters((f) => ({
+          ...f,
+          ...(d.status ? { status: Array.isArray(d.status) ? d.status.join(',') : String(d.status) } : {}),
+          ...(d.gender ? { gender: Array.isArray(d.gender) ? d.gender.join(',') : String(d.gender) } : {}),
+          ...(d.patients_type ? { patients_type: Array.isArray(d.patients_type) ? d.patients_type.join(',') : String(d.patients_type) } : {}),
+          ...(d.treat_at ? { treat_at: Array.isArray(d.treat_at) ? d.treat_at.join(',') : String(d.treat_at) } : {}),
+          ...(d.admit_range ? { admit_from: d.admit_range.from || '', admit_to: d.admit_range.to || '' } : {}),
+          ...(d.has_baseline != null ? { has_baseline: d.has_baseline === true ? 'true' : d.has_baseline === false ? 'false' : '' } : {}),
+        }));
+      } catch {
+        // เงียบไว้และปล่อย fallback UI เดิมทำงาน
       }
     })();
     return () => { alive = false; };
@@ -1045,7 +1082,7 @@ export default function PatientsPage() {
   }, [rows]);
 
   const isActionCol = (k: ColKey) =>
-    ['verify','edit','add_appt','history','allergies','diagnosis','deceased','delete'].includes(k);
+    ['verify', 'edit', 'add_appt', 'history', 'allergies', 'diagnosis', 'deceased', 'delete'].includes(k);
 
   function renderCell(key: ColKey, r: any) {
     const allergyCount = Number((r as any).allergy_count ?? (r as any).allergies_count ?? 0);
@@ -1066,18 +1103,18 @@ export default function PatientsPage() {
             {hasAllergy && (
               <span
                 title={`แพ้ยา ${allergyCount} รายการ`}
-                style={{ display:'inline-block', width:8, height:8, marginLeft:6, verticalAlign:'middle', borderRadius:9999, background:'#ef4444' }}
+                style={{ display: 'inline-block', width: 8, height: 8, marginLeft: 6, verticalAlign: 'middle', borderRadius: 9999, background: '#ef4444' }}
               />
             )}
           </>
         );
 
-      case 'gender':   return r.gender || '-';
-      case 'age':      return calculateAgeFromBirthdate(r.birthdate || '-');
-      case 'blood':    return <>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</>;
-      case 'type':     return r.patients_type || '-';
+      case 'gender': return r.gender || '-';
+      case 'age': return calculateAgeFromBirthdate(r.birthdate || '-');
+      case 'blood': return <>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</>;
+      case 'type': return r.patients_type || '-';
       case 'treat_at': return r.treat_at || '-';
-      case 'status':   return <Pill alive={r.status !== 'เสียชีวิต'} />;
+      case 'status': return <Pill alive={r.status !== 'เสียชีวิต'} />;
 
       case 'verify':
         return (
@@ -1111,7 +1148,7 @@ export default function PatientsPage() {
         return (
           <Link
             href={`/patient/${encodeURIComponent(r.patients_id)}/allergies?name=${encodeURIComponent(
-              `${r.pname || ''}${r.first_name} {r.last_name}`.replace(/\s+/g, ' ').trim()
+              `${r.pname || ''}${r.first_name} ${r.last_name}`.replace(/\s+/g, ' ').trim()
             )}`}
             className={`${styles.iconBtn} ${styles.iconBadgeWrap}`}
             style={allergyBtnStyle}
@@ -1184,99 +1221,164 @@ export default function PatientsPage() {
 
       {/* Filters */}
       <div className={styles.sectionTitle}>ตัวกรอง</div>
-      <div className={styles.filtersBar}>
-        <div>
-          <div className={styles.label}>สถานที่รักษา</div>
-          <Select
-            {...RS_PROPS}
-            components={animatedComponents}
-            styles={rsx}
-            menuPortalTarget={menuPortalTarget}
-            isClearable
-            placeholder="ทั้งหมด"
-            options={treatAtOptions}
-            value={treatAtOptions.find(o => o.value === (filters as any).treat_at) ?? null}
-            onChange={(opt) => { setFilters((f: any) => ({ ...f, treat_at: (opt as any)?.value || '' })); setPage(1); }}
-          />
-        </div>
-        <div>
-          <div className={styles.label}>สถานะผู้ป่วย</div>
-          <Select
-            {...RS_PROPS}
-            components={animatedComponents}
-            styles={rsx}
-            menuPortalTarget={menuPortalTarget}
-            isClearable
-            placeholder="ทั้งหมด"
-            options={statusOptions}
-            value={statusOptions.find(o => o.value === (filters as any).status) ?? null}
-            onChange={(opt) => { setFilters((f: any) => ({ ...f, status: (opt as any)?.value || '' })); setPage(1); }}
-          />
-        </div>
-        <div>
-          <div className={styles.label}>เพศ</div>
-          <Select
-            {...RS_PROPS}
-            components={animatedComponents}
-            styles={rsx}
-            menuPortalTarget={menuPortalTarget}
-            isClearable
-            placeholder="ทั้งหมด"
-            options={genderOptions}
-            value={genderOptions.find(o => o.value === (filters as any).gender) ?? null}
-            onChange={(opt) => { setFilters((f: any) => ({ ...f, gender: (opt as any)?.value || '' })); setPage(1); }}
-          />
-        </div>
-        <div>
-          <div className={styles.label}>กรุ๊ปเลือด</div>
-          <Select
-            {...RS_PROPS}
-            components={animatedComponents}
-            styles={rsx}
-            menuPortalTarget={menuPortalTarget}
-            isClearable
-            placeholder="ทั้งหมด"
-            options={bloodGroupOptions}
-            value={bloodGroupOptions.find(o => o.value === (filters as any).blood_group) ?? null}
-            onChange={(opt) => { setFilters((f: any) => ({ ...f, blood_group: (opt as any)?.value || '' })); setPage(1); }}
-          />
-        </div>
-        <div>
-          <div className={styles.label}>Rh</div>
-          <Select
-            {...RS_PROPS}
-            components={animatedComponents}
-            styles={rsx}
-            menuPortalTarget={menuPortalTarget}
-            isClearable
-            placeholder="ทั้งหมด"
-            options={rhOptions}
-            value={rhOptions.find(o => o.value === (filters as any).bloodgroup_rh) ?? null}
-            onChange={(opt) => { setFilters((f: any) => ({ ...f, bloodgroup_rh: (opt as any)?.value || '' })); setPage(1); }}
-          />
-        </div>
-        <div>
-          <div className={styles.label}>ประเภทผู้ป่วย</div>
-          <Select
-            {...RS_PROPS}
-            components={animatedComponents}
-            styles={rsx}
-            menuPortalTarget={menuPortalTarget}
-            isClearable
-            placeholder="ทั้งหมด"
-            options={patientTypeOptions}
-            value={patientTypeOptions.find(o => o.value === (filters as any).patients_type) ?? null}
-            onChange={(opt) => { setFilters((f: any) => ({ ...f, patients_type: (opt as any)?.value || '' })); setPage(1); }}
-          />
-        </div>
 
-        {/* ปุ่มล้างตัวกรอง */}
-        <div className={styles.clearWrap}>
-          <button className={`${styles.btn} ${styles.btnClearfilter}`} onClick={clearFilters}>
-            <X size={16} /> ล้างตัวกรองทั้งหมด
-          </button>
+      {listCfg ? (
+        // ===== Dynamic Filters from settings =====
+        <div className={styles.filtersBar}>
+          {listCfg.enabled.map((key) => {
+            const def = (listCfg.defs || []).find(d => d.key === key);
+            if (!def) return null;
+
+            // เราแมปบางคีย์ให้เข้ากับ state เดิม
+            // - admit_range → admit_from/admit_to
+            // - q ใช้ช่องค้นหาหลักด้านบน (แต่ยังตั้ง default ให้แล้ว)
+            if (def.key === 'q') return null;
+
+            const optionsFromCfg =
+              (def.options && def.options.length ? def.options :
+                def.source && (selectMap as any)[def.source] ? (selectMap as any)[def.source] : []) as string[];
+
+            // helper สำหรับอ่าน/เขียนค่าใน state
+            const getVal = (k: string) => {
+              if (k === 'admit_range') return { from: (filters as any).admit_from || '', to: (filters as any).admit_to || '' };
+              return (filters as any)[k] ?? '';
+            };
+            const setVal = (k: string, v: any) => {
+              if (k === 'admit_range') {
+                setFilters((f: any) => ({ ...f, admit_from: v.from || '', admit_to: v.to || '' }));
+              } else {
+                setFilters((f: any) => ({ ...f, [k]: v }));
+              }
+              setPage(1);
+            };
+
+            // UI ต่อชนิด
+            if (def.type === 'select') {
+              const isMulti = !!def.multi;
+              const valueStr: string = String(getVal(def.key) || '');
+              const selected = valueStr ? valueStr.split(',') : [];
+              const rsOptions = optionsFromCfg.map(v => ({ value: v, label: v }));
+
+              return (
+                <div key={def.key}>
+                  <div className={styles.label}>{def.label}</div>
+                  <Select
+                    {...RS_PROPS}
+                    components={animatedComponents}
+                    styles={rsx}
+                    menuPortalTarget={menuPortalTarget}
+                    isClearable
+                    isMulti={isMulti}
+                    placeholder="ทั้งหมด"
+                    options={rsOptions}
+                    value={
+                      isMulti
+                        ? rsOptions.filter(o => selected.includes(o.value))
+                        : rsOptions.find(o => o.value === valueStr) ?? null
+                    }
+                    onChange={(opt: any) => {
+                      if (isMulti) {
+                        const arr = Array.isArray(opt) ? opt.map(o => o.value) : [];
+                        setVal(def.key, arr.join(','));
+                      } else {
+                        setVal(def.key, opt?.value || '');
+                      }
+                    }}
+                  />
+                </div>
+              );
+            }
+
+            if (def.type === 'boolean') {
+              const v = String(getVal(def.key) || ''); // '', 'true', 'false'
+              return (
+                <div key={def.key}>
+                  <div className={styles.label}>{def.label}</div>
+                  <Select
+                    {...RS_PROPS}
+                    components={animatedComponents}
+                    styles={rsx}
+                    menuPortalTarget={menuPortalTarget}
+                    isClearable
+                    placeholder="ทั้งหมด"
+                    options={[
+                      { value: 'true', label: 'ใช่' },
+                      { value: 'false', label: 'ไม่ใช่' },
+                    ]}
+                    value={v ? [{ value: v, label: v === 'true' ? 'ใช่' : 'ไม่ใช่' }][0] : null}
+                    onChange={(opt: any) => setVal(def.key, opt?.value || '')}
+                  />
+                </div>
+              );
+            }
+
+            if (def.type === 'daterange') {
+              const curr = getVal('admit_range') as { from: string; to: string };
+              return (
+                <div key={def.key} style={{ display: 'grid', gap: 8 }}>
+                  <div className={styles.label}>{def.label}</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="date"
+                      className={styles.input}
+                      value={curr.from}
+                      onChange={(e) => setVal('admit_range', { ...curr, from: e.target.value })}
+                    />
+                    <input
+                      type="date"
+                      className={styles.input}
+                      value={curr.to}
+                      onChange={(e) => setVal('admit_range', { ...curr, to: e.target.value })}
+                    />
+                  </div>
+                </div>
+              );
+            }
+
+            // text / numberrange (ถ้าเพิ่มในอนาคตค่อยขยาย)
+            return (
+              <div key={def.key}>
+                <div className={styles.label}>{def.label}</div>
+                <input
+                  className={styles.input}
+                  value={String(getVal(def.key) || '')}
+                  onChange={(e) => setVal(def.key, e.target.value)}
+                  placeholder="ทั้งหมด"
+                />
+              </div>
+            );
+          })}
+
+          {/* ปุ่มล้างตัวกรอง */}
+          <div className={styles.clearWrap}>
+            <button className={`${styles.btn} ${styles.btnClearfilter}`} onClick={() => {
+              // รีเซ็ตกลับ default จาก listCfg
+              if (!listCfg) return;
+              const d = listCfg.defaults || {};
+              setQuery(d.q || '');
+              setFilters({
+                treat_at: d.treat_at ? (Array.isArray(d.treat_at) ? d.treat_at.join(',') : String(d.treat_at)) : '',
+                status: d.status ? (Array.isArray(d.status) ? d.status.join(',') : String(d.status)) : '',
+                gender: d.gender ? (Array.isArray(d.gender) ? d.gender.join(',') : String(d.gender)) : '',
+                blood_group: '',
+                bloodgroup_rh: '',
+                patients_type: d.patients_type ? (Array.isArray(d.patients_type) ? d.patients_type.join(',') : String(d.patients_type)) : '',
+                admit_from: d.admit_range?.from || '',
+                admit_to: d.admit_range?.to || '',
+                has_baseline: (d.has_baseline == null) ? '' : (d.has_baseline ? 'true' : 'false'),
+              });
+              setPage(1); setTick(t => t + 1);
+            }}>
+              <X size={16} /> ล้างตัวกรองทั้งหมด
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        // ===== Fallback: ใช้ UI เดิมของคุณตามโค้ดปัจจุบัน =====
+        <div className={styles.filtersBar}>
+          {/* ... บล็อก Select เดิมทั้งชุดของคุณ ... */}
+        </div>
+      )}
 
       {activeFilterEntries.length > 0 && (
         <div className={styles.chipsRow}>

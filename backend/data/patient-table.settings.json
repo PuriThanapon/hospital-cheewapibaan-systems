@@ -2,9 +2,9 @@
   "columns": {
     "order": [
       "hn",
-      "name",
       "gender",
       "age",
+      "name",
       "blood",
       "type",
       "treat_at",
