@@ -195,6 +195,7 @@ const REPORTS = [
   { id: 'tx-logs',       label: 'บันทึกการรักษา' },
   { id: 'tx-types',      label: 'ประเภทการรักษา' },
   { id: 'tx-freq',       label: 'สถิติความถี่การรักษา (รายเดือน)' },
+  { id: 'ap-detail',     label: 'สรุปรายละเอียดการนัดหมายทั้งหมด' },
   { id: 'ap-mth',        label: 'จำนวนนัดหมายรวม (รายเดือน)' },
   { id: 'ap-by-type',    label: 'นัดหมายตามประเภท' },
   { id: 'ap-by-place',   label: 'นัดหมายตามสถานที่' },
@@ -272,7 +273,7 @@ function FilterControls({ report, filters, setFilters }: { report: ReportId; fil
         </>
       )}
 
-      {(['ap-mth','ap-by-type','ap-by-place','ap-noshow','ap-status'] as ReportId[]).includes(report) && (
+      {(['ap-detail','ap-mth','ap-by-type','ap-by-place','ap-noshow','ap-status'] as ReportId[]).includes(report) && (
         <>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600">ประเภทนัด</label>
@@ -367,11 +368,63 @@ function inDateRange(dateStr?: string, from?: string, to?: string) {
   return true
 }
 
+function timeRangeText(start?: string, end?: string) {
+  const s = (start || '').slice(0,5)
+  const e = (end || '').slice(0,5)
+  if (!s && !e) return '-'
+  if (s && !e) return s
+  if (!s && e) return e
+  return `${s}–${e}`
+}
+
 async function buildReport(report: ReportId, filters: any) {
   const from = filters.from || ''
   const to = filters.to || ''
 
   switch (report) {
+    case 'ap-detail': {
+      const rows = await fetchAppointments({
+        from, to,
+        type:  filters.apType  || '',
+        place: filters.apPlace || '',
+        status: (filters.apStatus || 'all')
+      })
+      const statusMap: Record<string,string> = {
+        pending: 'รอดำเนินการ', done: 'เสร็จสิ้น', cancelled: 'ยกเลิก'
+      }
+      const data = rows.map((a) => ({
+        hn: a.patients_id,
+        date: formatDate(a.appointment_date),
+        time: timeRangeText(a.start_time, a.end_time),
+        type: a.appointment_type || '-',
+        place: a.place || '-',
+        status: statusMap[a.status] || a.status || '-',
+        note: a.note || '-',
+      }))
+      const raw = rows.map((a) => ({
+        patients_id: a.patients_id,
+        appointment_date: a.appointment_date,
+        start_time: a.start_time, end_time: a.end_time,
+        appointment_type: a.appointment_type || '',
+        place: a.place || '',
+        status: a.status,
+        note: a.note || '',
+      }))
+      return {
+        title: 'สรุปรายละเอียดการนัดหมายทั้งหมด',
+        columns: [
+          { header: 'HN', dataKey: 'hn' },
+          { header: 'วันที่นัด', dataKey: 'date' },
+          { header: 'เวลา', dataKey: 'time' },
+          { header: 'ประเภทนัด', dataKey: 'type' },
+          { header: 'สถานที่', dataKey: 'place' },
+          { header: 'สถานะ', dataKey: 'status' },
+          { header: 'หมายเหตุ', dataKey: 'note' },
+        ],
+        rows: data,
+        rawRows: raw,
+      }
+    }
     case 'pt-register': {
       const rows = await fetchPatients({ from, to, status: filters.ptStatus || '' })
       const data = rows.map((p) => ({
@@ -600,6 +653,11 @@ export default function ReportsNoChartsFixed() {
     widths?: (number | "auto")[];
     aligns?: ("left" | "center" | "right")[];
   }>> = {
+    'ap-detail': {
+      // รวม ~182 มม. (A4 portrait)
+      widths: [22, 24, 20, 36, 30, 24, 'auto'],
+      aligns: ['left','center','center','left','left','center','left']
+    },
     'pt-register': {
       // รวม ~182 มม.
       widths: [24, 50, 13, 12, 14, 15, 15, 24, 22],
