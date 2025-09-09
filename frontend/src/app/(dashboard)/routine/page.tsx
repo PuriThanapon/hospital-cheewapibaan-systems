@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './routine.module.css'
 import Swal from 'sweetalert2'
 
@@ -49,7 +49,7 @@ async function http(url: string, options: any = {}, timeoutMs = 12000) {
       try {
         const j = await res.json();
         msg = j.message || j.error || msg;
-      } catch {}
+      } catch { }
       const err: any = new Error(msg);
       err.status = res.status;
       throw err;
@@ -63,7 +63,6 @@ async function http(url: string, options: any = {}, timeoutMs = 12000) {
     clearTimeout(tid);
   }
 }
-
 
 /* ---------- Utils ---------- */
 const isoDow = (d: Date) => (d.getDay() === 0 ? 7 : d.getDay())
@@ -92,17 +91,29 @@ function normalize(items: RoutineItem[]): RoutineItem[] {
   }))
 }
 
-// ด้านบนไฟล์
+/* ---------- Toast (แก้ให้แสดงนานขึ้น + pause เมื่อ hover) ---------- */
+const TOAST_DURATION_MS = 10_000; // 10 วินาที
 const toast = Swal.mixin({
   toast: true,
   position: 'top-end',
   showConfirmButton: false,
-  timer: 1800,
+  timer: TOAST_DURATION_MS,
   timerProgressBar: true,
+  didOpen: (el) => {
+    el.addEventListener('mouseenter', Swal.stopTimer);
+    el.addEventListener('mouseleave', Swal.resumeTimer);
+  },
 });
 
-/* ---------- API wrappers (ยึดโครงเดียวกับหน้า “ผู้ป่วย”) ---------- */
-const apiList   = () => http('/api/routines').then((d) => normalize(d || []))
+const ymdLocal = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+/* ---------- API wrappers ---------- */
+const apiList = () => http('/api/routines').then((d) => normalize(d || []))
 const apiCreate = (payload: Omit<RoutineItem, 'routine_id'>) =>
   http('/api/routines', { method: 'POST', body: JSON.stringify(payload) })
 const apiUpdate = (id: number, payload: Partial<Omit<RoutineItem, 'routine_id'>>) =>
@@ -130,15 +141,78 @@ export default function DailyRoutinePage() {
   })
   const [saving, setSaving] = useState(false)
 
+  // ==== Sound setup (inside component) ====
+  const dingRef = useRef<HTMLAudioElement | null>(null);
+  const [audioReady, setAudioReady] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+
   useEffect(() => {
-    ;(async () => {
+    // ใช้ absolute URL ป้องกัน basePath/assetPrefix เพี้ยน
+    const src = new URL('/sounds/chime.wav', window.location.origin).toString();
+    const el = new Audio(src);
+    el.preload = 'auto';
+    el.volume = 0.9;
+
+    const onReady = () => setAudioReady(true);
+    const onError = () => console.warn('[audio] load error', el.error);
+
+    el.addEventListener('canplaythrough', onReady, { once: true });
+    el.addEventListener('error', onError);
+
+    dingRef.current = el;
+
+    return () => {
+      el.removeEventListener('canplaythrough', onReady);
+      el.removeEventListener('error', onError);
+      dingRef.current = null;
+    };
+  }, []);
+
+  // ปลดล็อก autoplay ด้วย user gesture ครั้งเดียว
+  useEffect(() => {
+    function unlockOnce() {
+      const a = dingRef.current;
+      if (!a) return;
+      a.muted = true;
+      a.play()
+        .then(() => {
+          a.pause();
+          a.currentTime = 0;
+          a.muted = false;
+          setAudioUnlocked(true);
+        })
+        .catch((e) => console.debug('[audio] unlock fail (retry on next gesture)', e));
+    }
+    window.addEventListener('pointerdown', unlockOnce, { once: true });
+    return () => window.removeEventListener('pointerdown', unlockOnce);
+  }, []);
+
+  async function playDing() {
+    const a = dingRef.current;
+    if (!a) { console.warn('[audio] no element'); return; }
+    try {
+      if (!audioReady) {
+        // เผื่อบางเครื่องยังไม่ buffer เสร็จ
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      a.currentTime = 0;
+      await a.play();
+    } catch (err) {
+      console.warn('[audio] play() failed', err);
+      if (!audioUnlocked) {
+        toast.fire({ icon: 'info', title: 'แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียงแจ้งเตือน' });
+      }
+    }
+  }
+
+  // โหลดรายการ
+  useEffect(() => {
+    (async () => {
       try {
         const list = await apiList()
         setItems(list)
       } catch (e: any) {
-        // โหมดตัวอย่าง
-        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1800 })
-          .fire({ icon: 'info', title: 'โหมดตัวอย่าง: ใช้ข้อมูลจำลอง' })
+        toast.fire({ icon: 'info', title: 'โหมดตัวอย่าง: ใช้ข้อมูลจำลอง' })
         setItems(
           normalize([
             { routine_id: 1, title: 'ตื่นนอน', time: '06:00', days_of_week: [1] },
@@ -156,6 +230,70 @@ export default function DailyRoutinePage() {
     })()
   }, [])
 
+  // ขอสิทธิ์ Notification ครั้งแรก
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => { });
+    }
+  }, []);
+
+  // แจ้งเตือนตามเวลา
+  const firedRef = useRef<{ ymd: string; keys: Set<string> }>({ ymd: '', keys: new Set() });
+  const DEFAULT_LEAD_MIN = 0;       // ล่วงหน้า (นาที) ตอนเทส
+  const CHECK_EVERY_MS = 15_000;  // เช็คทุก 15 วิ
+  const WINDOW_SEC = 59;      // อนุโลม ±59 วินาที
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const now = new Date();
+      const today = ymdLocal(now);
+      const todayDow = isoDow(now); // 1..7
+
+      // รีเซ็ตกันซ้ำเมื่อขึ้นวันใหม่
+      if (firedRef.current.ymd !== today) {
+        firedRef.current = { ymd: today, keys: new Set() };
+      }
+
+      // เลือกรายการของ "วันจริงวันนี้"
+      const todayList = (items || []).filter(it =>
+        !it.days_of_week || it.days_of_week.includes(todayDow)
+      );
+
+      for (const it of todayList) {
+        const targetHHMM = toHHMM(it.time);
+        const [hh, mm] = targetHHMM.split(':').map(Number);
+
+        // เวลา "จริง" ของกิจวัตรวันนี้
+        const startAt = new Date(`${today}T00:00:00`);
+        startAt.setHours(hh || 0, mm || 0, 0, 0);
+
+        // ---- 1) แจ้งเตือนตรงเวลา (±WINDOW_SEC) ----
+        const deltaStartSec = Math.abs((startAt.getTime() - now.getTime()) / 1000);
+        if (deltaStartSec <= WINDOW_SEC) {
+          const key = `${it.routine_id}-${today}-${targetHHMM}-start`;
+          if (!firedRef.current.keys.has(key)) {
+            firedRef.current.keys.add(key);
+            toast.fire({ icon: 'info', title: `${targetHHMM} • ${it.title}` });
+            try {
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('เตือนกิจวัตร', {
+                  body: `${targetHHMM} • ${it.title}${it.note ? ' • ' + it.note : ''}`,
+                  tag: key,
+                  requireInteraction: true,
+                });
+              }
+              void playDing();
+            } catch { }
+          }
+        }
+
+      }
+    }, CHECK_EVERY_MS);
+
+    return () => clearInterval(iv);
+  }, [items]);
+
+  // คำนวณรายการแสดงผล (ตามแท็บ จ–อา ที่ผู้ใช้เลือกดู)
   const todays = useMemo(() => {
     return items
       .filter((it) => !it.days_of_week || it.days_of_week.includes(day))
@@ -203,118 +341,106 @@ export default function DailyRoutinePage() {
     })
   }
 
-async function handleDelete(item: RoutineItem) {
-  const { isConfirmed } = await Swal.fire({
-    title: 'ลบกิจวัตร?',
-    text: `${item.title} เวลา ${toHHMM(item.time)}`,
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: 'ลบ',
-    cancelButtonText: 'ยกเลิก',
-    confirmButtonColor: '#e11d48',
-  });
-  if (!isConfirmed) return;
+  async function handleDelete(item: RoutineItem) {
+    const { isConfirmed } = await Swal.fire({
+      title: 'ลบกิจวัตร?',
+      text: `${item.title} เวลา ${toHHMM(item.time)}`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'ลบ',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#e11d48',
+    });
+    if (!isConfirmed) return;
 
-  const snapshot = items.slice();                      // เผื่อ revert
-  setItems(arr => arr.filter(x => x.routine_id !== item.routine_id)); // optimistic
+    const snapshot = items.slice();
+    setItems(arr => arr.filter(x => x.routine_id !== item.routine_id)); // optimistic
 
-  void Swal.fire({
-    title: 'กำลังลบ...',
-    allowOutsideClick: false,
-    allowEscapeKey: false,
-    showConfirmButton: false,
-    didOpen: () => Swal.showLoading(),
-  });
+    void Swal.fire({
+      title: 'กำลังลบ...',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => Swal.showLoading(),
+    });
 
-  try {
-    await apiDelete(item.routine_id);
-  } catch (e: any) {
-    setItems(snapshot);                                // ล้มเหลว → ย้อนกลับ
-    try { Swal.close(); } catch {}
-    await Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: e?.message || '' });
-    return;                                            // ออกจากฟังก์ชันทันที
-  } finally {
-    try { Swal.close(); } catch {}
-  }
-
-  // สำเร็จ → แค่โชว์ toast (อย่าให้พัง)
-  try { toast.fire({ icon: 'success', title: 'ลบแล้ว' }); } catch {}
-}
-
-
-
-  /* แก้เฉพาะ handleSave ให้เป็นแบบนี้ */
-async function handleSave(e: React.FormEvent) {
-  e.preventDefault();
-  if (saving) return; // กันกดซ้ำ
-
-  const hhmm = toHHMM(form.time);
-  if (!form.title.trim()) {
-    await Swal.fire({ icon: 'warning', title: 'ข้อมูลไม่ครบ', text: 'กรุณากรอกชื่อกิจวัตร' });
-    return;
-  }
-  if (!isValidHHMM(hhmm)) {
-    await Swal.fire({ icon: 'warning', title: 'เวลาไม่ถูกต้อง', text: 'ใช้รูปแบบ HH:MM เช่น 06:00 หรือ 18:30' });
-    return;
-  }
-
-  const payload: Omit<RoutineItem, 'routine_id'> = {
-    title: form.title.trim(),
-    time: hhmm,
-    days_of_week: form.days_of_week.length ? form.days_of_week : null, // null = ทุกวัน
-    note: form.note?.trim() ? form.note.trim() : null,
-  };
-
-  setSaving(true);
-  const swal = Swal.fire({
-    title: editing ? 'กำลังบันทึกการแก้ไข...' : 'กำลังเพิ่มกิจวัตร...',
-    allowOutsideClick: false,
-    allowEscapeKey: false,
-    didOpen: () => Swal.showLoading(),
-    showConfirmButton: false,
-  });
-
-  // เก็บ snapshot เพื่อ revert ถ้าพัง
-  const prevItems = items.slice();
-
-  try {
-    if (editing) {
-      // optimistic update
-      setItems(arr => arr.map(x => x.routine_id === editing.routine_id ? ({ ...x, ...payload } as any) : x));
-
-      // ใส่ timeout ที่ http (12s) – ถ้าช้า/เงียบจะ abort
-      const updated = await apiUpdate(editing.routine_id, payload);
-      setItems(arr => arr.map(x => x.routine_id === updated.routine_id ? updated : x));
-    } else {
-      // optimistic create
-      const tempId = Date.now();
-      const tempItem: RoutineItem = { routine_id: tempId, ...(payload as any) };
-      setItems(arr => [...arr, tempItem]);
-
-      const created = await apiCreate(payload); // มี timeout จาก http()
-      setItems(arr => arr.map(x => (x.routine_id === tempId ? (created as RoutineItem) : x)));
+    try {
+      await apiDelete(item.routine_id);
+    } catch (e: any) {
+      setItems(snapshot);
+      try { Swal.close(); } catch { }
+      await Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: e?.message || '' });
+      return;
+    } finally {
+      try { Swal.close(); } catch { }
     }
 
-    Swal.close();
-    setIsOpen(false);
-    Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1800 })
-      .fire({ icon: 'success', title: 'บันทึกสำเร็จ' });
-  } catch (err: any) {
-    // revert UI กลับก่อน
-    setItems(prevItems);
-    Swal.close();
+    try { toast.fire({ icon: 'success', title: 'ลบแล้ว' }); } catch { }
+  }
 
-    const isAbort = err?.name === 'AbortError';
-    const msg =
-      isAbort
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+
+    const hhmm = toHHMM(form.time);
+    if (!form.title.trim()) {
+      await Swal.fire({ icon: 'warning', title: 'ข้อมูลไม่ครบ', text: 'กรุณากรอกชื่อกิจวัตร' });
+      return;
+    }
+    if (!isValidHHMM(hhmm)) {
+      await Swal.fire({ icon: 'warning', title: 'เวลาไม่ถูกต้อง', text: 'ใช้รูปแบบ HH:MM เช่น 06:00 หรือ 18:30' });
+      return;
+    }
+
+    const payload: Omit<RoutineItem, 'routine_id'> = {
+      title: form.title.trim(),
+      time: hhmm,
+      days_of_week: form.days_of_week.length ? form.days_of_week : null,
+      note: form.note?.trim() ? form.note.trim() : null,
+    };
+
+    setSaving(true);
+    const swal = Swal.fire({
+      title: editing ? 'กำลังบันทึกการแก้ไข...' : 'กำลังเพิ่มกิจวัตร...',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => Swal.showLoading(),
+      showConfirmButton: false,
+    });
+
+    const prevItems = items.slice();
+
+    try {
+      if (editing) {
+        setItems(arr => arr.map(x => x.routine_id === editing.routine_id ? ({ ...x, ...payload } as any) : x));
+        const updated = await apiUpdate(editing.routine_id, payload);
+        setItems(arr => arr.map(x => x.routine_id === updated.routine_id ? updated : x));
+      } else {
+        const tempId = Date.now();
+        const tempItem: RoutineItem = { routine_id: tempId, ...(payload as any) };
+        setItems(arr => [...arr, tempItem]);
+
+        const created = await apiCreate(payload);
+        setItems(arr => arr.map(x => (x.routine_id === tempId ? (created as RoutineItem) : x)));
+      }
+
+      Swal.close();
+      setIsOpen(false);
+      toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' });
+    } catch (err: any) {
+      setItems(prevItems);
+      Swal.close();
+
+      const isAbort = err?.name === 'AbortError';
+      const msg = isAbort
         ? 'การเชื่อมต่อช้าหรือเซิร์ฟเวอร์ไม่ตอบสนอง (timeout)'
         : (err?.message || 'บันทึกไม่สำเร็จ');
 
-    await Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: msg });
-  } finally {
-    setSaving(false);
+      await Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: msg });
+    } finally {
+      setSaving(false);
+    }
   }
-}
 
   return (
     <div className={styles.page}>
@@ -337,6 +463,10 @@ async function handleSave(e: React.FormEvent) {
             >
               ตาราง 24 ชม.
             </button>
+            {/* ปุ่มทดสอบเสียง (ปลดคอมเมนต์ถ้าต้องการ) */}
+            {/* <button onClick={() => playDing()} className={styles.btnSecondary}>
+              ทดสอบเสียง
+            </button> */}
             <button onClick={openCreate} className={styles.primaryBtn}>
               + เพิ่มกิจวัตร
             </button>
@@ -484,9 +614,7 @@ async function handleSave(e: React.FormEvent) {
                   {DAY_VALUES.map((d) => (
                     <label
                       key={d}
-                      className={`${styles.dayPick} ${
-                        form.days_of_week.includes(d) ? styles.dayPickOn : ''
-                      }`}
+                      className={`${styles.dayPick} ${form.days_of_week.includes(d) ? styles.dayPickOn : ''}`}
                     >
                       <input
                         type="checkbox"
