@@ -719,6 +719,15 @@ export default function PatientsPage() {
 
     try {
       const formValues = (addFormRef.current as any).getValues();
+      
+      if (formValues.card_id) {
+        const dup = await http(`/api/patients/exists?card_id=${encodeURIComponent(formValues.card_id)}`);
+        if (dup?.exists) {
+          await $swal.fire({ icon: 'warning', title: 'ข้อมูลซ้ำ', text: 'เลขบัตรนี้ถูกใช้แล้ว' });
+          return;
+        }
+      }
+
       const formData = buildPatientFormData(formValues);
 
       const created = await http('/api/patients', { method: 'POST', body: formData });
@@ -773,6 +782,15 @@ export default function PatientsPage() {
 
     try {
       const formValues = (editFormRef.current as any).getValues();
+      if (formValues.card_id && formValues.card_id !== (editDraft as any)?.card_id) {
+        const dup = await http(
+          `/api/patients/exists?card_id=${encodeURIComponent(formValues.card_id)}&exclude_id=${encodeURIComponent(openEdit!)}`
+        );
+        if (dup?.exists) {
+          await $swal.fire({ icon: 'warning', title: 'ข้อมูลซ้ำ', text: 'เลขบัตรนี้ถูกใช้แล้ว' });
+          return;
+        }
+      }
       const formData = buildPatientFormData(formValues);
 
       await http(`/api/patients/${encodeURIComponent(openEdit!)}`, {

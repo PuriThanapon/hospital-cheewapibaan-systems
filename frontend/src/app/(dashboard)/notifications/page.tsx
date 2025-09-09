@@ -1,11 +1,20 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, Clock, MapPin, Calendar, User, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import styles from "./notifications.module.css";
-import dynamic from 'next/dynamic';
 
-const Select = dynamic(() => import('react-select'), { ssr: false });
+// -------------------- ENV & URL --------------------
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  'http://localhost:5000';
 
+const joinUrl = (base: string, path: string) => {
+  const b = base.replace(/\/$/, '');
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${b}${p}`;
+};
+
+// -------------------- Types --------------------
 type Appointment = {
   appointment_id: string;
   pname?: string | null;
@@ -18,18 +27,11 @@ type Appointment = {
   department?: string | null;
   place?: string | null;
   status?: string | null;   // 'done' | 'pending' | ...
-  type?: string | null;     // 'hospital' | 'home' | (อื่น ๆ)
+  type?: string | null;     // 'hospital' | 'home' | ...
+  days_overdue?: number | null; // มีค่าเมื่อโหมดค้างเกินกำหนด
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
-
-const joinUrl = (base: string, path: string) => {
-  const b = base.replace(/\/$/, '');
-  const p = path.startsWith('/') ? path : `/${path}`;
-  return `${b}${p}`;
-};
-
-// ----- utils -----
+// -------------------- Utils --------------------
 function todayYMD_TZ(tz = 'Asia/Bangkok') {
   return new Intl.DateTimeFormat('sv-SE', {
     timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -41,6 +43,7 @@ function onlyHHmm(s?: string | null) {
   const m = str.match(/^(\d{2}:\d{2})/);
   return m ? m[1] : str.slice(0, 5);
 }
+
 function TYPE_VALUE_FROM_LABEL(label?: string | null) {
   const s = (label ?? '').toString().trim().toLowerCase();
   if (!s) return '';
@@ -54,28 +57,21 @@ function TYPE_LABEL_TH(type?: string | null) {
   if (t === 'home') return 'บ้านผู้ป่วย';
   return type || 'ไม่ระบุประเภท';
 }
-
-// เดา type เมื่อ backend ไม่ชัด
 function inferType(r: any): string {
   const raw = r.appointment_type ?? r.type ?? r.appointmentType ?? '';
   const norm = TYPE_VALUE_FROM_LABEL(raw);
   if (norm) return norm;
 
-  // ถ้ามีสัญญาณเป็นโรงพยาบาล
   const hospitalAddress = r.hospital_address ?? r.hospital ?? r.hospital_name ?? '';
   const dept = r.department ?? r.dept ?? r.department_name ?? '';
   const displayPlace = r.display_place ?? '';
   if (String(hospitalAddress || dept || '').trim()) return 'hospital';
   if (String(displayPlace).match(/โรงพยาบาล|^รพ\.?|Hospital/i)) return 'hospital';
 
-  // เป็นบ้าน ถ้ามี home/place/address ลักษณะบ้าน
   const place = r.place ?? r.home_address ?? r.address ?? '';
   if (String(place).match(/บ้าน|บ้านผู้ป่วย/i)) return 'home';
-
-  return ''; // ไม่รู้
+  return '';
 }
-
-// -------- mapper: API -> Appointment --------
 function mapRow(r: any): Appointment {
   return {
     appointment_id: String(r.appointment_id ?? r.id ?? r.appointment_code ?? ''),
@@ -85,20 +81,14 @@ function mapRow(r: any): Appointment {
     date: r.date ?? r.appointment_date ?? null,
     start: onlyHHmm(r.start ?? r.start_time ?? null),
     end: onlyHHmm(r.end ?? r.end_time ?? null),
-
-    // รองรับหลายชื่อฟิลด์
     hospital_address: r.hospital_address ?? r.hospital ?? r.hospital_name ?? null,
     department: r.department ?? r.dept ?? r.department_name ?? null,
-
-    // บางระบบยัดข้อความรวมไว้ใน display_place
     place: r.display_place ?? r.place ?? r.home_address ?? r.address ?? null,
-
     status: r.status ?? null,
     type: inferType(r),
+    days_overdue: r.days_overdue != null ? Number(r.days_overdue) : null,
   };
 }
-
-// ข้อความสถานที่ตาม type
 function getLocationText(a: Appointment) {
   const t = TYPE_VALUE_FROM_LABEL(a.type);
   const addr = (a.hospital_address || '').trim();
@@ -107,17 +97,14 @@ function getLocationText(a: Appointment) {
 
   if (t === 'hospital') {
     if (addr || dept) return [addr || 'โรงพยาบาล', dept].filter(Boolean).join(' · ');
-    if (place && place !== 'บ้านผู้ป่วย') return place; // บาง backend รวมไว้ใน display_place
+    if (place && place !== 'บ้านผู้ป่วย') return place;
     return 'โรงพยาบาล';
   }
   if (t === 'home') {
     return place || 'บ้านผู้ป่วย';
   }
-  // ไม่ทราบ type — เอาที่มี
   return place || addr || 'ไม่ระบุสถานที่';
 }
-
-// ----- status -----
 function normalizeStatus(raw?: string | null) {
   const s = (raw ?? '').trim().toLowerCase();
   if (!s) return 'unknown';
@@ -139,7 +126,6 @@ const getStatusConfig = (raw?: string | null) => {
       return { icon: Clock, className: 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-600 border border-gray-200', dotColor: 'bg-gray-400', text: raw || 'ไม่ระบุ' };
   }
 };
-
 const formatThaiDate = (dateStr: string) => {
   const date = new Date(dateStr);
   return new Intl.DateTimeFormat('th-TH', {
@@ -147,28 +133,53 @@ const formatThaiDate = (dateStr: string) => {
   }).format(date);
 };
 
+// -------------------- Page --------------------
+type ViewMode = 'today' | 'overdue';
+
 export default function NotificationsPage() {
   const [list, setList] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
+  const [view, setView] = useState<ViewMode>('today');
 
   const today = useMemo(() => todayYMD_TZ('Asia/Bangkok'), []);
-  
+
+  async function fetchList(mode: ViewMode, dateYmd: string) {
+    const path =
+      mode === 'overdue'
+        ? '/api/notification/overdue'
+        : `/api/notification/timeline?from=${encodeURIComponent(dateYmd)}&to=${encodeURIComponent(dateYmd)}`;
+    const res = await fetch(joinUrl(API_BASE, path), { cache: 'no-store' });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const j = await res.json();
+    const raw = Array.isArray(j?.data) ? j.data : [];
+    return raw.map(mapRow);
+  }
+
+  async function autoCancelDryRun() {
+    const res = await fetch(joinUrl(API_BASE, '/api/notification/auto-cancel-overdue?dry=1'), { method: 'POST' });
+    const j = await res.json();
+    window.alert(`รายการที่จะถูกยกเลิก (เกิน 7 วัน & ยังรอ): ${j?.would_update ?? 0} รายการ`);
+  }
+
+  async function autoCancelConfirm() {
+    const ok = window.confirm('ยืนยันยกเลิกนัดที่ค้างเกิน 7 วันทั้งหมด?');
+    if (!ok) return;
+    const res = await fetch(joinUrl(API_BASE, '/api/notification/auto-cancel-overdue'), { method: 'POST' });
+    const j = await res.json();
+    window.alert(`ยกเลิกแล้ว: ${j?.updated ?? 0} รายการ`);
+    const mapped = await fetchList('overdue', today);
+    setList(mapped);
+  }
+
   useEffect(() => {
     let alive = true;
     (async () => {
       setLoading(true);
       setErr('');
       try {
-        const url = joinUrl(API_BASE, `/api/notification/timeline?from=${encodeURIComponent(today)}&to=${encodeURIComponent(today)}`);
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        const j = await res.json();
-        const raw = Array.isArray(j?.data) ? j.data : [];
-        const mapped = raw.map(mapRow);
+        const mapped = await fetchList(view, today);
         if (alive) setList(mapped);
-        // ช่วยไล่บั๊กได้: ดูหลัง map แล้วค่ามาครบไหม
-        // console.log('mapped timeline sample:', mapped[0]);
       } catch (e: any) {
         if (alive) setErr(e?.message || 'โหลดข้อมูลไม่สำเร็จ');
       } finally {
@@ -176,18 +187,25 @@ export default function NotificationsPage() {
       }
     })();
     return () => { alive = false; };
-  }, [today]);
+  }, [today, view]);
 
   const sorted = useMemo(() => {
+    if (view === 'overdue') {
+      return [...list].sort((a, b) => {
+        const da = a.days_overdue ?? 0, db = b.days_overdue ?? 0;
+        if (db !== da) return db - da;               // ค้างมากก่อน
+        const as = a.start ?? '', bs = b.start ?? '';
+        return as.localeCompare(bs);
+      });
+    }
     return [...list].sort((a, b) => {
-      const as = a.start ?? '';
-      const bs = b.start ?? '';
+      const as = a.start ?? '', bs = b.start ?? '';
       if (as && bs) return as.localeCompare(bs);
       if (as && !bs) return -1;
       if (!as && bs) return 1;
       return 0;
     });
-  }, [list]);
+  }, [list, view]);
 
   const stats = useMemo(() => ({
     total: sorted.length,
@@ -231,36 +249,65 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-indigo-100 flex-shrink-0">
         <div className="px-6 py-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl shadow-lg">
-              <Bell className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between">
+            {/* Left: title */}
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl shadow-lg">
+                <Bell className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  การแจ้งเตือนนัดหมาย
+                </h1>
+                <p className="text-gray-500 flex items-center mt-1">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  {formatThaiDate(today)}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                การแจ้งเตือนนัดหมาย
-              </h1>
-              <p className="text-gray-500 flex items-center mt-1">
-                <Calendar className="w-4 h-4 mr-2" />
-                {formatThaiDate(today)}
-              </p>
+
+            {/* Right: toolbar */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setView('today')}
+                className={`px-3 py-2 rounded-lg border text-sm ${
+                  view==='today'
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                วันนี้
+              </button>
+              <button
+                onClick={() => setView('overdue')}
+                className={`px-3 py-2 rounded-lg border text-sm ${
+                  view==='overdue'
+                    ? 'bg-rose-600 text-white border-rose-600'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                ค้างเกินกำหนด
+              </button>
+              
             </div>
           </div>
         </div>
       </div>
 
+      {/* Body */}
       <div className="flex-1 overflow-y-auto px-6 py-8">
         {sorted.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <div className="w-24 h-24 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
               <Bell className="w-12 h-12 text-indigo-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">ไม่มีนัดหมายวันนี้</h3>
-            <p className="text-gray-500">วันนี้คุณไม่มีการนัดหมายใดๆ</p>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">ไม่มีนัดหมาย{view==='overdue' ? 'ค้างเกินกำหนด' : 'วันนี้'}</h3>
+            <p className="text-gray-500">{view==='overdue' ? 'ไม่มีนัดหมายที่ค้างเกิน 7 วันในสถานะรอดำเนินการ' : 'วันนี้คุณไม่มีการนัดหมายใดๆ'}</p>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* สถิติย่อ */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
               <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-indigo-100">
                 <div className="flex items-center justify-between">
                   <div>
@@ -270,56 +317,74 @@ export default function NotificationsPage() {
                   <Calendar className="w-8 h-8 text-indigo-400" />
                 </div>
               </div>
-              <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-green-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">เสร็จสิ้น</p>
-                    <p className="text-2xl font-bold text-green-600">{stats.done}</p>
+
+              {view !== 'overdue' && (
+                <>
+                  <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-green-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">เสร็จสิ้น</p>
+                        <p className="text-2xl font-bold text-green-600">{stats.done}</p>
+                      </div>
+                      <CheckCircle className="w-8 h-8 text-green-400" />
+                    </div>
                   </div>
-                  <CheckCircle className="w-8 h-8 text-green-400" />
-                </div>
-              </div>
-              <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-amber-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">รอดำเนินการ</p>
-                    <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+                  <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-amber-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">รอดำเนินการ</p>
+                        <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+                      </div>
+                      <Clock className="w-8 h-8 text-amber-400" />
+                    </div>
                   </div>
-                  <Clock className="w-8 h-8 text-amber-400" />
-                </div>
-              </div>
-              <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-red-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">ยกเลิก</p>
-                    <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
+                  <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-red-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">ยกเลิก</p>
+                        <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
+                      </div>
+                      <Clock className="w-8 h-8 text-red-400" />
+                    </div>
                   </div>
-                  <Clock className="w-8 h-8 text-red-400" />
+                </>
+              )}
+
+              {view === 'overdue' && (
+                <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-rose-100 md:col-span-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">ค้างเกินกำหนด (ยังรอดำเนินการ)</p>
+                      <p className="text-2xl font-bold text-rose-600">{sorted.length}</p>
+                    </div>
+                    <Bell className="w-8 h-8 text-rose-400" />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Timeline */}
             <div className="relative">
               <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 via-purple-200 to-cyan-200"></div>
-              
+
               <div className="space-y-6">
                 {sorted.map((appointment, index) => {
-                  const fullName = `${appointment.pname ?? ''}${appointment.first_name ?? ''} ${appointment.last_name ?? ''}`.trim() || 'ไม่ระบุชื่อ';
+                  const fullName =
+                    `${appointment.pname ?? ''}${appointment.first_name ?? ''} ${appointment.last_name ?? ''}`
+                      .trim() || 'ไม่ระบุชื่อ';
                   const statusConfig = getStatusConfig(appointment.status ?? '');
                   const StatusIcon = statusConfig.icon;
-
                   const locationText = getLocationText(appointment);
 
                   return (
-                    <div 
-                      key={`${appointment.appointment_id}-${appointment.start ?? ''}`} 
+                    <div
+                      key={`${appointment.appointment_id}-${appointment.start ?? ''}`}
                       className="relative group"
                       style={{ animation: `slideInUp 0.6s ease-out ${index * 0.1}s both` }}
                     >
                       {/* Timeline dot */}
                       <div className={`absolute left-6 w-4 h-4 ${statusConfig.dotColor} rounded-full border-4 border-white shadow-lg group-hover:scale-110 transition-transform duration-200`}></div>
-                      
+
                       {/* Card */}
                       <div className="ml-16 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-6 group-hover:shadow-xl group-hover:bg-white/90 transition-all duration-300">
                         <div className="flex justify-between items-start mb-4">
@@ -332,10 +397,17 @@ export default function NotificationsPage() {
                               <p className="text-sm text-gray-500">{TYPE_LABEL_TH(appointment.type)}</p>
                             </div>
                           </div>
-                          
-                          <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${statusConfig.className}`}>
-                            <StatusIcon className="w-4 h-4 mr-1.5" />
-                            {statusConfig.text}
+
+                          <div className="flex items-center">
+                            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${statusConfig.className}`}>
+                              <StatusIcon className="w-4 h-4 mr-1.5" />
+                              {statusConfig.text}
+                            </div>
+                            {view==='overdue' && typeof appointment.days_overdue === 'number' && (
+                              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                                ค้าง {appointment.days_overdue} วัน
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -346,14 +418,13 @@ export default function NotificationsPage() {
                               {appointment.start ?? '—'}{appointment.end ? ` - ${appointment.end}` : ''} น.
                             </span>
                           </div>
-                          
+
                           <div className="flex items-center text-gray-600">
                             <MapPin className="w-4 h-4 mr-2 text-purple-400" />
                             <span>{locationText}</span>
                           </div>
                         </div>
 
-                        {/* Hover effect overlay */}
                         <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                       </div>
                     </div>
@@ -367,3 +438,10 @@ export default function NotificationsPage() {
     </div>
   );
 }
+
+/* แนะนำ: เพิ่ม keyframes ต่อไปนี้ใน notifications.module.css ของคุณ (ถ้ายังไม่มี)
+@keyframes slideInUp {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+*/

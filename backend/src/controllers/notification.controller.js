@@ -89,6 +89,18 @@ function buildExprs(cols) {
   };
 }
 
+function buildDateOnlyExpr(cols) {
+  const dateCol = pick(cols, 'appointment_date', 'date', 'start_at', 'start');
+  if (!dateCol) throw new Error('appointment table missing date column (appointment_date/date/start_at/start)');
+  return `
+    CASE
+      WHEN pg_typeof(a.${dateCol}) = 'timestamptz'::regtype THEN (a.${dateCol} AT TIME ZONE 'Asia/Bangkok')::date
+      WHEN pg_typeof(a.${dateCol}) = 'timestamp'::regtype  THEN (a.${dateCol})::date
+      ELSE a.${dateCol}::date
+    END
+  `;
+}
+
 /* ---------- นัดหมาย "วันนี้" ---------- */
 // GET /api/notification/today
 exports.getTodayAppointments = async (req, res, next) => {
@@ -124,6 +136,114 @@ exports.getTodayAppointments = async (req, res, next) => {
     res.json({ date: new Date().toLocaleDateString('th-TH'), data: rows });
   } catch (err) { next(err); }
 };
+
+/* ---------- นัดที่เลยวัน (ยัง pending) ---------- */
+// GET /api/notification/overdue
+exports.getOverdueAppointments = async (req, res, next) => {
+  try {
+    const cols = await getAppointmentColumns();
+    const {
+      idExpr, timeExpr, endTimeExpr,
+      placeExpr, hospitalExpr, departmentExpr,
+      statusExpr, typeExpr, orderBy
+    } = buildExprs(cols);
+
+    const dateOnlyExpr = buildDateOnlyExpr(cols);
+
+    // เงื่อนไขสถานะ pending (รองรับทั้งอังกฤษ/ไทย)
+    const pendingCond = statusExpr
+      ? `(lower(${statusExpr}) LIKE '%pending%' OR ${statusExpr} LIKE '%รอ%')`
+      : `TRUE`; // ถ้าไม่มีคอลัมน์สถานะ ถือว่า pending
+
+    // ไม่เอาที่ "เสร็จ/ยกเลิก"
+    const notDoneOrCancelled = statusExpr
+      ? `NOT (lower(${statusExpr}) LIKE '%done%' OR lower(${statusExpr}) LIKE '%complete%' OR lower(${statusExpr}) LIKE '%cancel%') 
+         AND ${pendingCond}`
+      : `TRUE`;
+
+    const sql = `
+      WITH tz AS (
+        SELECT (current_timestamp AT TIME ZONE 'Asia/Bangkok')::date AS today
+      )
+      SELECT
+        ${idExpr} AS appointment_id,
+        p.pname, p.first_name, p.last_name,
+        to_char(${dateOnlyExpr}, 'YYYY-MM-DD') AS date,
+        ${timeExpr}    AS start,
+        ${endTimeExpr} AS "end",
+        ${placeExpr      ? placeExpr      : `NULL::text`} AS place,
+        ${hospitalExpr   ? hospitalExpr   : `NULL::text`} AS hospital_address,
+        ${departmentExpr ? departmentExpr : `NULL::text`} AS department,
+        ${statusExpr ? `COALESCE(${statusExpr}, 'pending'::text)` : `'pending'::text`} AS status,
+        ${typeExpr   ? typeExpr   : `NULL::text`}  AS appointment_type,
+        ((SELECT today FROM tz) - ${dateOnlyExpr})::int AS days_overdue
+      FROM appointment a
+      LEFT JOIN patients p ON p.patients_id = a.patients_id
+      WHERE ${dateOnlyExpr} < (SELECT today FROM tz)
+        AND ${notDoneOrCancelled}
+      ORDER BY ${orderBy}
+    `;
+    const { rows } = await pool.query(sql);
+    res.json({ data: rows });
+  } catch (err) { next(err); }
+};
+
+/* ---------- งานยกเลิกนัดอัตโนมัติเมื่อเกิน 7 วัน (ยัง pending) ---------- */
+// เรียกใช้ได้ทั้งจาก cron และ route
+exports.autoCancelOverdueTask = async () => {
+  const cols = await getAppointmentColumns();
+  const statusCol = pick(cols, 'status', 'appointment_status');
+  if (!statusCol) throw new Error('appointment table missing status column');
+
+  const dateOnlyExpr = buildDateOnlyExpr(cols);
+
+  // เงื่อนไข pending (รองรับอังกฤษ/ไทย)
+  const pendingCond = `(lower(a.${statusCol}::text) LIKE '%pending%' OR a.${statusCol}::text LIKE '%รอ%')`;
+
+  const sql = `
+    WITH tz AS (
+      SELECT (current_timestamp AT TIME ZONE 'Asia/Bangkok')::date AS today
+    )
+    UPDATE appointment a
+    SET ${statusCol} = 'cancelled'
+    WHERE ${dateOnlyExpr} < ((SELECT today FROM tz) - INTERVAL '7 days')
+      AND ${pendingCond}
+    RETURNING 1
+  `;
+  const { rowCount } = await pool.query(sql);
+  return { updated: rowCount || 0 };
+};
+
+// POST /api/notification/auto-cancel-overdue?dry=1  (dry run = นับเฉย ๆ)
+exports.autoCancelOverdue = async (req, res, next) => {
+  try {
+    const dry = String(req.query.dry || '').trim() === '1';
+    const cols = await getAppointmentColumns();
+    const statusCol = pick(cols, 'status', 'appointment_status');
+    if (!statusCol) return res.status(500).json({ error: 'appointment table missing status column' });
+
+    const dateOnlyExpr = buildDateOnlyExpr(cols);
+    const pendingCond = `(lower(a.${statusCol}::text) LIKE '%pending%' OR a.${statusCol}::text LIKE '%รอ%')`;
+
+    if (dry) {
+      const sql = `
+        WITH tz AS (
+          SELECT (current_timestamp AT TIME ZONE 'Asia/Bangkok')::date AS today
+        )
+        SELECT COUNT(*)::int AS would_update
+        FROM appointment a
+        WHERE ${dateOnlyExpr} < ((SELECT today FROM tz) - INTERVAL '7 days')
+          AND ${pendingCond}
+      `;
+      const { rows } = await pool.query(sql);
+      return res.json({ dry: true, would_update: rows[0]?.would_update ?? 0 });
+    }
+
+    const { updated } = await exports.autoCancelOverdueTask();
+    res.json({ updated });
+  } catch (err) { next(err); }
+};
+
 
 /* ---------- นัดหมายแบบ Timeline (ช่วงวัน) ---------- */
 // GET /api/notification/timeline?from=YYYY-MM-DD&to=YYYY-MM-DD
