@@ -246,15 +246,15 @@ const fetchSettings = async () => {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-[calc(100vh-2rem)] rounded-[15px] overflow-clip bg-slate-50 ring-1 ring-slate-200 shadow-sm">
       {/* Hero */}
       <div className="sticky top-0 z-10 bg-white border-b border-slate-200">
-        <div className="px-6 py-4 flex items-center gap-3">
-          <FileText className="text-sky-700" />
+        <div className="px-6 py-6 flex items-center gap-3">
+          <FileText className="text-green-700" />
           <h1 className="font-bold text-slate-900 text-xl">ตั้งค่า: เอกสารผู้ป่วย</h1>
           <div className="ml-auto flex items-center gap-2">
             {dirty && <span className="text-xs text-amber-600">มีการแก้ไขที่ยังไม่บันทึก</span>}
-            <Link href="/settings/patient" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+            <Link href="/settings" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
               <ArrowLeft size={16} /> กลับหน้าผู้ป่วย
             </Link>
             <button onClick={resetAll} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
@@ -351,6 +351,6 @@ const fetchSettings = async () => {
           )}
         </div>
       </div>
-    </div>
+      </div>
   );
 }

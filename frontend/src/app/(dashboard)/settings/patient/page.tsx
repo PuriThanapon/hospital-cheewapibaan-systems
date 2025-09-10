@@ -25,12 +25,6 @@ const items: Item[] = [
     href: '/settings/patient/columns',
     icon: <Table size={22} />,
   },
-  {
-    title: 'ตัวกรอง (Filters)',
-    desc: 'ตั้งค่าตัวกรองที่ใช้ค้นหา/แยกดูผู้ป่วย (กำหนดในหน้าถัดไป)',
-    href: '/settings/patient/list-filters',
-    icon: <Filter size={22} />,
-  },
 ];
 
 export default function PatientSettingsPage() {

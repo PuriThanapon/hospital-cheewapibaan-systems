@@ -419,7 +419,7 @@ export default function BedStaysPage() {
                         </div>
                         <div>
                             <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">จัดการเตียง</h1>
-                            <p className="text-sm text-gray-500">รายการนัดหมายทั้งหมดในแผนก</p>
+                            <p className="text-sm text-gray-500">เพิ่ม แก้ไข ย้าย การครองเตียง</p>
                         </div>
                     </div>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">

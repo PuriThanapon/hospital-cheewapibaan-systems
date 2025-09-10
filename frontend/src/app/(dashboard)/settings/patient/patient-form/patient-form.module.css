@@ -1,23 +1,95 @@
-.page { min-height: 100vh; background: #f8fafc; padding: 20px; }
+.page { min-height: 100vh; background: #f8fafc; padding: 20px; border-radius: 15px; }
 
 /* Hero & tabs */
 .hero {
-  position: sticky; top: 0; z-index: 10;
-  background: #f8fafc; padding-bottom: 10px;
+  position: sticky;
+  top: max(0px, env(safe-area-inset-top));  /* รองรับ safe area */
+  z-index: 10;
+  background: #f8fafc;
+  padding-bottom: 10px;
 }
+
 .heroInner {
-  background: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px;
-  padding: 14px 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 15px;                      /* ⬅️ ปรับเป็น 15px */
+  padding: 14px 16px;
+  box-shadow: 0 1px 2px rgba(15,23,42,.05);
+
+  /* ⬇️ ใช้ Grid แบบเดียวกับที่ส่งก่อนหน้า */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;  /* ซ้ายยืด, ขวาพอดี */
+  align-items: center;
+  gap: 6px 16px;
+
+  /* โปร่งนิด ๆ ตอน sticky (ถ้าไม่ต้องการ ลบบรรทัดนี้ได้) */
+  backdrop-filter: saturate(1.05) blur(6px);
 }
-.heroTitleWrap { display: flex; align-items: center; gap: 10px; color: #0f172a; }
-.heroTitle { margin: 0; font-size: 18px; font-weight: 700; }
-.heroSub { margin: 4px 0 0; font-size: 12px; color: #64748b; }
-.heroActions { margin-top: 8px; }
+
+/* ซ้าย: ชื่อ + คำอธิบาย ให้ยุบตัวได้และตัดคำ */
+.heroTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #0f172a;
+  min-width: 0;                              /* ✅ สำคัญสำหรับ ellipsis */
+}
+.heroTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;                    /* … ถ้ายาวเกิน */
+}
+.heroSub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #64748b;
+  overflow-wrap: anywhere;                    /* ไทยไม่มีช่องว่าง ตัดได้ */
+}
+
+/* ขวา: โซนปุ่ม/แอ็กชัน */
+.heroActions {
+  grid-column: 2;            /* อยู่คอลัมน์ขวา */
+  grid-row: 1 / span 2;      /* กินสูง 2 แถว (พาดระดับ title+sub) */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;            /* ✅ wrap ได้เป็นระเบียบ */
+  justify-content: flex-end;  /* ชิดขวา */
+  margin: 0;                  /* ล้าง margin เดิม */
+}
+
+/* ปุ่มย้อนกลับ (ยังใช้โทนเดิม) */
 .backBtn {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 8px 12px; border-radius: 10px; text-decoration: none;
-  background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  min-width: max-content;      /* ป้องกันปุ่มหดจนแตกบรรทัด */
 }
+
+/* 📱 มือถือ: สลับเป็น 1 คอลัมน์ ปุ่มลงล่าง */
+@media (max-width: 640px) {
+  .heroInner {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .heroActions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;  /* บนมือถือปุ่มชิดซ้ายอ่านง่าย */
+    row-gap: 6px;
+    margin-top: 6px;
+  }
+}
+
 
 /* Tabs */
 .tabs {

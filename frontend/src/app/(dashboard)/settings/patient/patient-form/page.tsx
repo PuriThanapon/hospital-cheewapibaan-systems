@@ -354,6 +354,7 @@ export default function PatientFormSettingsPage() {
             </Link>
           </div>
         </div>
+        
 
         {/* Tabs */}
         <div className={s.tabs}>

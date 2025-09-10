@@ -33,7 +33,7 @@ const sections: Section[] = [
   },
   {
     key: 'documents',
-    title: 'เอกสาร',
+    title: 'เอกสารผุ้ป่วย',
     desc: 'ประเภทเอกสาร บังคับ/ไม่บังคับ และการอัปโหลด',
     href: '/settings/patient/documents',
     icon: <FolderOpen size={22} />,
