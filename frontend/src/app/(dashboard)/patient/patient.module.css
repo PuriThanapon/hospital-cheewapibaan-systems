@@ -8,13 +8,14 @@
 .wrapper {
     display: grid;
     gap: 24px;
-    padding: 20px;
+    padding: 25px;
     color: #111827;
-    background-color: #F4f4f4;
+    background-color: #F7f7fb;
     border-radius: 15px;
 }
 
 .header {
+    margin-top: 5px;
     display: flex;
     align-items: flex-end;
     justify-content: space-between;

@@ -5,7 +5,7 @@ import {
   Zap, Stethoscope, Filter, Search, CalendarDays, X,
   LayoutList, LayoutGrid, Clock, User, ClipboardList,
   BadgeInfo, RefreshCw, CheckCircle, Trash2, Eye, AlertCircle, 
-  Calendar, Droplets, Shield, Heart, Edit3, ChevronLeft, ChevronRight
+  Calendar, Droplets, Shield, Heart, Edit3, ChevronLeft, ChevronRight, ClipboardClock
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import styles from '../treatment.module.css';
@@ -971,10 +971,13 @@ export default function TreatmentsListPage() {
     <div className={styles.wrapper}>
       {/* Header */}
       <div className={styles.header}>
-        <div>
-          <div className={styles.title}>รายการการรักษา</div>
-          <div className={styles.subtitle}>
-            {patientIdFromUrl ? `ประวัติของผู้ป่วย: ${patientIdFromUrl}` : 'รายการรักษาทั้งหมดในแผนก'}
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-[#005A50] rounded-lg">
+            <Stethoscope className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">บันทึกการรักษา (ประจำ/ฉุกเฉิน)</h1>
+            <p className="text-sm text-gray-500">จัดการรายการรักษาแบบประจำ และทำครั้งเดียว (เคสฉุกเฉิน) — ค้นหา ดูรายละเอียด เพิ่ม/แก้ไข ทำเครื่องหมายเสร็จสิ้น</p>
           </div>
         </div>
         <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>

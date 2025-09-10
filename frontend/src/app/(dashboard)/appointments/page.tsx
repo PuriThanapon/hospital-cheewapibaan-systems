@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import styles from './page.module.css';
-import { CalendarPlus, User, X, Edit3, ClipboardList, Eye, Pencil, CheckCircle, Archive } from 'lucide-react';
+import { CalendarPlus, User, X, Edit3, ClipboardList, Eye, Pencil, CheckCircle, Archive, CalendarDays} from 'lucide-react';
 import Modal from '@/app/components/ui/Modal';
 import AppointmentForm, { type AppointmentFormValue } from '@/app/components/forms/AppointmentForm';
 import DatePickerField from '@/app/components/DatePicker';
@@ -666,10 +666,13 @@ export default function AppointmentsPage() {
     <div className={styles.page}>
       {/* Header */}
       <div className={styles.header}>
-        <div>
-          <div className={styles.title}>การนัดหมาย</div>
-          <div className={styles.subtitle}>
-            รายการนัดหมายทั้งหมดในแผนก
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-[#005A50] rounded-lg">
+            <CalendarDays className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">การนัดหมาย</h1>
+            <p className="text-sm text-gray-500">รายการนัดหมายทั้งหมดในแผนก</p>
           </div>
         </div>
         <div className={styles.actions}>

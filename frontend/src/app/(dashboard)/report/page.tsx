@@ -205,23 +205,23 @@ async function fetchDeaths(params: { from?: string; to?: string; limit?: number 
 
 /*********************** REPORT DEFINITIONS ************************/
 const REPORTS = [
-  { id: 'pt-register',   label: 'ทะเบียนผู้ป่วยทั้งหมด' },
-  { id: 'pt-new',        label: 'สถิติผู้ป่วยเข้าใหม่ (รายเดือน)' },
-  { id: 'pt-demographic',label: 'สถิติตามเพศ/อายุ/กรุ๊ปเลือด/ประเภท' },
-  { id: 'pt-diseases',   label: 'โรคประจำตัวที่พบบ่อย' },
-  { id: 'tx-logs',       label: 'บันทึกการรักษา' },
-  { id: 'tx-types',      label: 'ประเภทการรักษา' },
-  { id: 'tx-freq',       label: 'สถิติความถี่การรักษา (รายเดือน)' },
-  { id: 'ap-detail',     label: 'สรุปรายละเอียดการนัดหมายทั้งหมด' },
-  { id: 'ap-mth',        label: 'จำนวนนัดหมายรวม (รายเดือน)' },
-  { id: 'ap-by-type',    label: 'นัดหมายตามประเภท' },
-  { id: 'ap-by-place',   label: 'นัดหมายตามสถานที่' },
-  { id: 'ap-noshow',     label: 'อัตรามา/ไม่มาตามนัด' },
-  { id: 'ap-status',     label: 'สรุปสถานะนัดหมาย' },
-  { id: 'death-count',   label: 'จำนวนผู้ป่วยเสียชีวิต (รายเดือน)' },
-  { id: 'death-causes',  label: 'สาเหตุการเสียชีวิต (Top)' },
-  { id: 'death-age',     label: 'ช่วงอายุของผู้เสียชีวิต' },
-  { id: 'death-mgmt',    label: 'การจัดการศพ (management)' },
+  { id: 'pt-register',   label: 'ทะเบียนผู้ป่วยทั้งหมด', category: 'ผู้ป่วย', icon: '👥' },
+  { id: 'pt-new',        label: 'สถิติผู้ป่วยเข้าใหม่ (รายเดือน)', category: 'ผู้ป่วย', icon: '📈' },
+  { id: 'pt-demographic',label: 'สถิติตามเพศ/อายุ/กรุ๊ปเลือด/ประเภท', category: 'ผู้ป่วย', icon: '📊' },
+  { id: 'pt-diseases',   label: 'โรคประจำตัวที่พบบ่อย', category: 'ผู้ป่วย', icon: '🏥' },
+  { id: 'tx-logs',       label: 'บันทึกการรักษา', category: 'การรักษา', icon: '📝' },
+  { id: 'tx-types',      label: 'ประเภทการรักษา', category: 'การรักษา', icon: '⚕️' },
+  { id: 'tx-freq',       label: 'สถิติความถี่การรักษา (รายเดือน)', category: 'การรักษา', icon: '📋' },
+  { id: 'ap-detail',     label: 'สรุปรายละเอียดการนัดหมายทั้งหมด', category: 'นัดหมาย', icon: '📅' },
+  { id: 'ap-mth',        label: 'จำนวนนัดหมายรวม (รายเดือน)', category: 'นัดหมาย', icon: '📊' },
+  { id: 'ap-by-type',    label: 'นัดหมายตามประเภท', category: 'นัดหมาย', icon: '🏷️' },
+  { id: 'ap-by-place',   label: 'นัดหมายตามสถานที่', category: 'นัดหมาย', icon: '📍' },
+  { id: 'ap-noshow',     label: 'อัตรามา/ไม่มาตามนัด', category: 'นัดหมาย', icon: '📊' },
+  { id: 'ap-status',     label: 'สรุปสถานะนัดหมาย', category: 'นัดหมาย', icon: '⚡' },
+  { id: 'death-count',   label: 'จำนวนผู้ป่วยเสียชีวิต (รายเดือน)', category: 'สถิติเสียชีวิต', icon: '⚰️' },
+  { id: 'death-causes',  label: 'สาเหตุการเสียชีวิต (Top)', category: 'สถิติเสียชีวิต', icon: '📈' },
+  { id: 'death-age',     label: 'ช่วงอายุของผู้เสียชีวิต', category: 'สถิติเสียชีวิต', icon: '👴' },
+  { id: 'death-mgmt',    label: 'การจัดการศพ (management)', category: 'สถิติเสียชีวิต', icon: '🏛️' },
 ] as const
 
 type ReportId = typeof REPORTS[number]['id']
@@ -241,25 +241,39 @@ const normalizeHN = (id = '') => {
 function FilterControls({ report, filters, setFilters }: { report: ReportId; filters: any; setFilters: (f: any) => void }) {
   const common = (
     <>
-      <div className="flex flex-col">
-        <label className="text-xs text-gray-600">จากวันที่</label>
-        <input type="date" className="border rounded px-2 py-1" value={filters.from || ''} onChange={(e) => setFilters({ ...filters, from: e.target.value })} />
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-gray-700">จากวันที่</label>
+        <input 
+          type="date" 
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005A50] focus:border-[#005A50] transition-colors" 
+          value={filters.from || ''} 
+          onChange={(e) => setFilters({ ...filters, from: e.target.value })} 
+        />
       </div>
-      <div className="flex flex-col">
-        <label className="text-xs text-gray-600">ถึงวันที่</label>
-        <input type="date" className="border rounded px-2 py-1" value={filters.to || ''} onChange={(e) => setFilters({ ...filters, to: e.target.value })} />
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-gray-700">ถึงวันที่</label>
+        <input 
+          type="date" 
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005A50] focus:border-[#005A50] transition-colors" 
+          value={filters.to || ''} 
+          onChange={(e) => setFilters({ ...filters, to: e.target.value })} 
+        />
       </div>
     </>
   )
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {common}
 
       {report === 'pt-register' && (
-        <div className="flex flex-col">
-          <label className="text-xs text-gray-600">สถานะผู้ป่วย</label>
-          <select className="border rounded px-2 py-1" value={filters.ptStatus || ''} onChange={(e) => setFilters({ ...filters, ptStatus: e.target.value })}>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">สถานะผู้ป่วย</label>
+          <select 
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005A50] focus:border-[#005A50] transition-colors" 
+            value={filters.ptStatus || ''} 
+            onChange={(e) => setFilters({ ...filters, ptStatus: e.target.value })}
+          >
             <option value="">ทั้งหมด</option>
             <option value="มีชีวิต">มีชีวิต</option>
             <option value="เสียชีวิต">เสียชีวิต</option>
@@ -269,19 +283,23 @@ function FilterControls({ report, filters, setFilters }: { report: ReportId; fil
 
       {report === 'tx-logs' && (
         <>
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600">HN</label>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">HN</label>
             <input
-              className="border rounded px-2 py-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005A50] focus:border-[#005A50] transition-colors"
               value={filters.hn || ''}
               onChange={(e) => setFilters({ ...filters, hn: e.target.value })}
               onBlur={(e) => setFilters({ ...filters, hn: normalizeHN(e.target.value) })}
               placeholder="เช่น HN-00000001 / 1"
             />
           </div>
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600">ประเภทการรักษา</label>
-            <select className="border rounded px-2 py-1" value={filters.txType || ''} onChange={(e) => setFilters({ ...filters, txType: e.target.value })}>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">ประเภทการรักษา</label>
+            <select 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005A50] focus:border-[#005A50] transition-colors" 
+              value={filters.txType || ''} 
+              onChange={(e) => setFilters({ ...filters, txType: e.target.value })}
+            >
               <option value="">ทั้งหมด</option>
               <option value="ประจำ">ประจำ</option>
               <option value="ทำครั้งเดียว">ทำครั้งเดียว</option>
@@ -291,17 +309,19 @@ function FilterControls({ report, filters, setFilters }: { report: ReportId; fil
       )}
 
       {(['ap-detail','ap-mth','ap-by-type','ap-by-place','ap-noshow','ap-status'] as ReportId[]).includes(report) && (
-        <>
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600">สถานะนัด</label>
-            <select className="border rounded px-2 py-1" value={filters.apStatus || 'all'} onChange={(e) => setFilters({ ...filters, apStatus: e.target.value })}>
-              <option value="all">ทั้งหมด</option>
-              <option value="pending">รอดำเนินการ</option>
-              <option value="done">เสร็จสิ้น</option>
-              <option value="cancelled">ยกเลิก</option>
-            </select>
-          </div>
-        </>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">สถานะนัด</label>
+          <select 
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#005A50] focus:border-[#005A50] transition-colors" 
+            value={filters.apStatus || 'all'} 
+            onChange={(e) => setFilters({ ...filters, apStatus: e.target.value })}
+          >
+            <option value="all">ทั้งหมด</option>
+            <option value="pending">รอดำเนินการ</option>
+            <option value="done">เสร็จสิ้น</option>
+            <option value="cancelled">ยกเลิก</option>
+          </select>
+        </div>
       )}
     </div>
   )
@@ -644,6 +664,7 @@ export default function ReportsNoChartsFixed() {
   const [rawRows, setRawRows] = useState<any[]>([])
 
   const title = useMemo(() => REPORTS.find((r) => r.id === report)?.label || 'รายงาน', [report])
+  const currentReport = useMemo(() => REPORTS.find((r) => r.id === report), [report])
 
   const load = async () => {
     setLoading(true); setError('')
@@ -776,86 +797,291 @@ export default function ReportsNoChartsFixed() {
 
   const clearFilters = () => setFilters({ from: '', to: '' })
 
+  // จัดกลุ่มรายงานตามประเภท
+  const reportsByCategory = useMemo(() => {
+    const groups: Record<string, typeof REPORTS[number][]> = {}
+    REPORTS.forEach(report => {
+      if (!groups[report.category]) {
+        groups[report.category] = []
+      }
+      groups[report.category].push(report)
+    })
+    return groups
+  }, [])
+
   return (
-    <div className="p-4 space-y-4 bg-[#F7F7Fb] rounded-[15px]">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[28px] font-bold text-gray-800">รายงาน (ส่งออก PDF/CSV)</h1>
-          <p className="text-sm text-gray-500">ฟอร์แมตวันที่แบบไทย • ไม่มีกราฟ • รองรับฟอนต์ไทย</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            className="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-            onClick={() => handleExportPDF(columns, rows, title)}
-            disabled={!columns.length || !rows.length || loading}
-          >
-            ส่งออก PDF
-          </button>
-          <button
-            className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-            onClick={() => handleExportCSV(columns, rows, title)}
-            disabled={!columns.length || !rows.length || loading}
-          >
-            ส่งออก CSV
-          </button>
-        </div>
-      </div>
-
-      <div className="rounded-xl border bg-white p-3 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600">เลือกรายงาน</label>
-            <select className="border rounded px-2 py-2" value={report} onChange={(e) => setReport(e.target.value as ReportId)}>
-              {REPORTS.map((r) => (<option key={r.id} value={r.id}>{r.label}</option>))}
-            </select>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 lg:p-8 rounded-2xl">
+      <div className="max-w-full mx-auto space-y-6">
+        
+        {/* Header Section */}
+        <div className="bg-white rounded-2xl shadow-lg border-0 p-6 lg:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#005A50] rounded-lg">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">ออกรายงาน</h1>
+                  <p className="text-sm text-gray-500">{HOSPITAL_NAME} • {DEPARTMENT_NAME}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full">📄 PDF Export</span>
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">📊 CSV Export</span>
+                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full">🇹🇭 Thai Format</span>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all duration-200 flex items-center justify-center gap-2 min-w-[120px]"
+                onClick={() => handleExportPDF(columns, rows, title)}
+                disabled={!columns.length || !rows.length || loading}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                ส่งออก PDF
+              </button>
+              <button
+                className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all duration-200 flex items-center justify-center gap-2 min-w-[120px]"
+                onClick={() => handleExportCSV(columns, rows, title)}
+                disabled={!columns.length || !rows.length || loading}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                ส่งออก CSV
+              </button>
+            </div>
           </div>
-          <div className="md:col-span-2 text-right flex gap-2 md:justify-end">
-            <button className="px-3 py-2 rounded border text-gray-700 hover:bg-gray-50" onClick={clearFilters}>ล้างตัวกรอง</button>
-            <button className="px-3 py-2 rounded bg-gray-800 text-white hover:bg-black" onClick={load} disabled={loading}>
-              {loading ? 'กำลังโหลด...' : 'ดึงข้อมูล'}
-            </button>
-          </div>
         </div>
 
-        <div className="mt-3">
-          <FilterControls report={report} filters={filters} setFilters={setFilters} />
-        </div>
-      </div>
-
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 p-3">{error}</div>
-      )}
-
-      <div className="rounded-xl border bg-white p-0 shadow-sm overflow-hidden">
-        <div className="px-3 py-2 text-sm text-gray-600 border-b flex items-center justify-between">
-          <span>ผลการค้นหา: <b>{rows.length}</b> แถว</span>
-          <span className="text-gray-400">ช่วงวันที่: {filters.from || '-'} ถึง {filters.to || '-'}</span>
-        </div>
-        <div className="overflow-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-[#005A50] text-white">
-              <tr>
-                {columns.length === 0 ? (
-                  <th className="text-left px-3 py-2">ไม่มีคอลัมน์</th>
-                ) : (
-                  columns.map((c) => (
-                    <th key={c.dataKey} className="text-left px-3 py-2 whitespace-nowrap">{c.header}</th>
-                  ))
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td className="px-3 py-3 text-gray-500" colSpan={Math.max(columns.length, 1)}>ไม่มีข้อมูล</td></tr>
-              ) : rows.map((r, idx) => (
-                <tr key={idx} className={idx % 2 ? 'bg-gray-50' : ''}>
-                  {columns.map((c) => (
-                    <td key={c.dataKey} className="px-3 py-2 align-top whitespace-pre-wrap">{String(r[c.dataKey] ?? '')}</td>
-                  ))}
-                </tr>
+        {/* Report Selection */}
+        <div className="bg-white rounded-2xl shadow-lg border-0 p-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              เลือกประเภทรายงาน
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Object.entries(reportsByCategory).map(([category, reports]) => (
+                <div key={category} className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-600 border-b border-gray-200 pb-1">{category}</h4>
+                  <div className="space-y-1">
+                    {reports.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => setReport(r.id)}
+                        className={`w-full text-left p-3 rounded-lg text-sm transition-all duration-200 ${
+                          report === r.id
+                            ? 'bg-[#005A50] text-white shadow-lg'
+                            : 'bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-base flex-shrink-0">{r.icon}</span>
+                          <span className="leading-tight">{r.label}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters Section */}
+        <div className="bg-white rounded-2xl shadow-lg border-0 p-6">
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#005A50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                ตัวกรองข้อมูล
+              </h3>
+              
+              <div className="flex gap-2">
+                <button 
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 flex items-center gap-2 text-sm"
+                  onClick={clearFilters}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  ล้างตัวกรอง
+                </button>
+                <button 
+                  className="px-4 py-2 bg-gradient-to-r from-[#005A50] to-[#004A40] hover:from-[#004A40] hover:to-[#003A30] text-white rounded-lg transition-all duration-200 flex items-center gap-2 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed" 
+                  onClick={load} 
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      กำลังโหลด...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      ดึงข้อมูล
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <FilterControls report={report} filters={filters} setFilters={setFilters} />
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h4 className="text-red-800 font-medium">เกิดข้อผิดพลาด</h4>
+                <p className="text-red-700 text-sm mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Results Section */}
+        <div className="bg-white rounded-2xl shadow-lg border-0 overflow-hidden">
+          {/* Results Header */}
+          <div className="bg-gradient-to-r from-[#005A50] to-[#004A40] px-6 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="text-white">
+                <h3 className="text-xl font-semibold flex items-center gap-2">
+                  <span className="text-2xl">{currentReport?.icon}</span>
+                  {title}
+                </h3>
+                <p className="text-emerald-100 text-sm mt-1">
+                  ช่วงวันที่: {thDate(filters.from)} ถึง {thDate(filters.to)}
+                </p>
+              </div>
+              <div className="flex items-center gap-4 text-white">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{rows.length.toLocaleString()}</div>
+                  <div className="text-xs text-emerald-100">รายการ</div>
+                </div>
+                {loading && (
+                  <div className="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-2">
+                    <svg className="animate-spin w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span className="text-sm">กำลังประมวลผล...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Data Table */}
+          <div className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {columns.length === 0 ? (
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">ไม่มีคอลัมน์</th>
+                    ) : (
+                      columns.map((c, idx) => (
+                        <th 
+                          key={c.dataKey} 
+                          className="px-6 py-4 text-left text-sm font-semibold text-gray-600 whitespace-nowrap"
+                        >
+                          <div className="flex items-center gap-2">
+                            {idx === 0 && (
+                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a1.994 1.994 0 01-1.414.586H7a4 4 0 01-4-4V7a4 4 0 014-4z" />
+                              </svg>
+                            )}
+                            {c.header}
+                          </div>
+                        </th>
+                      ))
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td className="px-6 py-12 text-center text-gray-500" colSpan={Math.max(columns.length, 1)}>
+                        <div className="flex flex-col items-center justify-center space-y-3">
+                          <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <div>
+                            <p className="text-lg font-medium">ไม่มีข้อมูล</p>
+                            <p className="text-sm">ลองปรับเปลี่ยนตัวกรองหรือช่วงวันที่</p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((r, idx) => (
+                      <tr 
+                        key={idx} 
+                        className={`hover:bg-gray-50 transition-colors duration-150 ${
+                          idx % 2 === 1 ? 'bg-gray-25' : 'bg-white'
+                        }`}
+                      >
+                        {columns.map((c, colIdx) => (
+                          <td key={c.dataKey} className="px-6 py-4 align-top">
+                            <div className={`text-sm ${colIdx === 0 ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+                              {colIdx === 0 && (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 bg-[#005A50] rounded-full flex-shrink-0"></div>
+                                  <span className="whitespace-pre-wrap">{String(r[c.dataKey] ?? '')}</span>
+                                </div>
+                              )}
+                              {colIdx !== 0 && (
+                                <span className="whitespace-pre-wrap">{String(r[c.dataKey] ?? '')}</span>
+                              )}
+                            </div>
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Footer Summary */}
+          {rows.length > 0 && (
+            <div className="bg-gray-50 border-t border-gray-200 px-6 py-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-4">
+                  <span>แสดง {rows.length.toLocaleString()} รายการ</span>
+                  {columns.length > 0 && (
+                    <span>• {columns.length} คอลัมน์</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>อัปเดตล่าสุด: {new Date().toLocaleString('th-TH')}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

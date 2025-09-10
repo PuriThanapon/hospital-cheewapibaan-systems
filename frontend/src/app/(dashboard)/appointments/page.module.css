@@ -23,7 +23,7 @@
   LAYOUT & HEADER
 ────────────────────────────────────────────────────────── */
 .page {
-  padding: 20px;
+  padding: 25px;
   border-radius: 15px;
   background: var(--bg);
   min-height: 100%;
@@ -34,13 +34,14 @@
 }
 
 .header {
+  margin-top: 5px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
 }
-.header h1 { font-size: 22px; font-weight: 700; }
+
 
 .actions { display: flex; gap: 12px; align-items: center; }
 

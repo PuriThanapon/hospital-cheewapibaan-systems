@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './routine.module.css'
 import Swal from 'sweetalert2'
+import {ClipboardClock} from 'lucide-react'
 
 /* ---------- Types ---------- */
 type RoutineItem = {
@@ -446,10 +447,15 @@ export default function DailyRoutinePage() {
     <div className={styles.page}>
       <div className={styles.container}>
         <div className={styles.header}>
-          <div>
-            <h1 className={styles.title}>กิจวัตรประจำวัน (Daily Routine)</h1>
-            <p className={styles.subtitle}>เลือกวัน แล้วดูรายการเรียงเวลาตั้งแต่เช้าจนถึง 24 ชม.</p>
+          <div className="flex items-center gap-3">
+          <div className="p-2 bg-[#005A50] rounded-lg">
+            <ClipboardClock className="w-6 h-6 text-white" />
           </div>
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">กิจวัตรประจำวัน</h1>
+            <p className="text-sm text-gray-500">เลือกวัน แล้วดูรายการเรียงเวลาตั้งแต่เช้าจนถึง 24 ชม.</p>
+          </div>
+        </div>
           <div className={styles.headerBtns}>
             <button
               onClick={() => setView('list')}

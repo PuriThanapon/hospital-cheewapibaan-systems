@@ -6,7 +6,7 @@ import {
   Search, X, Plus, Pencil, Eye, CalendarPlus, Skull, RefreshCw,
   User, Calendar, FileText, CheckCircle, AlertCircle,
   Phone, MapPin, Droplets,
-  MapPinPlusInside,
+  MapPinPlusInside, 
   Trash2, // ⬅️ ปุ่มลบ
 } from 'lucide-react';
 import makeAnimated from 'react-select/animated';
@@ -104,8 +104,8 @@ type ColKey =
   | 'verify' | 'edit' | 'add_appt' | 'history' | 'allergies' | 'diagnosis' | 'deceased' | 'delete';
 
 const ALL_COL_KEYS: ColKey[] = [
-  'hn','name','gender','age','blood','type','treat_at','status',
-  'verify','edit','add_appt','history','allergies','diagnosis','deceased','delete',
+  'hn', 'name', 'gender', 'age', 'blood', 'type', 'treat_at', 'status',
+  'verify', 'edit', 'add_appt', 'history', 'allergies', 'diagnosis', 'deceased', 'delete',
 ];
 
 const HEADER_LABELS: Record<ColKey, string> = {
@@ -719,7 +719,7 @@ export default function PatientsPage() {
 
     try {
       const formValues = (addFormRef.current as any).getValues();
-      
+
       if (formValues.card_id) {
         const dup = await http(`/api/patients/exists?card_id=${encodeURIComponent(formValues.card_id)}`);
         if (dup?.exists) {
@@ -1063,7 +1063,7 @@ export default function PatientsPage() {
   }, [rows]);
 
   const isActionCol = (k: ColKey) =>
-    ['verify','edit','add_appt','history','allergies','diagnosis','deceased','delete'].includes(k);
+    ['verify', 'edit', 'add_appt', 'history', 'allergies', 'diagnosis', 'deceased', 'delete'].includes(k);
 
   function renderCell(key: ColKey, r: any) {
     const allergyCount = Number((r as any).allergy_count ?? (r as any).allergies_count ?? 0);
@@ -1084,18 +1084,18 @@ export default function PatientsPage() {
             {hasAllergy && (
               <span
                 title={`แพ้ยา ${allergyCount} รายการ`}
-                style={{ display:'inline-block', width:8, height:8, marginLeft:6, verticalAlign:'middle', borderRadius:9999, background:'#ef4444' }}
+                style={{ display: 'inline-block', width: 8, height: 8, marginLeft: 6, verticalAlign: 'middle', borderRadius: 9999, background: '#ef4444' }}
               />
             )}
           </>
         );
 
-      case 'gender':   return r.gender || '-';
-      case 'age':      return calculateAgeFromBirthdate(r.birthdate || '-');
-      case 'blood':    return <>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</>;
-      case 'type':     return r.patients_type || '-';
+      case 'gender': return r.gender || '-';
+      case 'age': return calculateAgeFromBirthdate(r.birthdate || '-');
+      case 'blood': return <>{r.blood_group || '-'} {r.bloodgroup_rh || ''}</>;
+      case 'type': return r.patients_type || '-';
       case 'treat_at': return r.treat_at || '-';
-      case 'status':   return <Pill alive={r.status !== 'เสียชีวิต'} />;
+      case 'status': return <Pill alive={r.status !== 'เสียชีวิต'} />;
 
       case 'verify':
         return (
@@ -1167,10 +1167,15 @@ export default function PatientsPage() {
     <div className={styles.wrapper}>
       {/* Header */}
       <div className={styles.header}>
-        <div>
-          <div className={styles.title}>จัดการข้อมูลผู้ป่วย</div>
-          <div className={styles.subtitle}>เพิ่ม • ตรวจสอบ • แก้ไข • นัดหมาย • เปลี่ยนสถานะเป็นเสียชีวิต</div>
-        </div>
+        <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#005A50] rounded-lg">
+                  <User className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">รายชื่อผู้ป่วย</h1>
+                  <p className="text-sm text-gray-500">เพิ่ม • ตรวจสอบ • แก้ไข • นัดหมาย • เปลี่ยนสถานะเป็นเสียชีวิต</p>
+                </div>
+              </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className={styles.btn} onClick={() => { setQuery(''); clearFilters(); }}>
             <RefreshCw size={16} /> เคลียร์

@@ -23,14 +23,16 @@
 
 /* ===== Page & container ===== */
 .page {
+  border-radius: 15px;
   min-height: 100vh;
-  padding: 24px;
+  padding: 25px;
   background: linear-gradient(180deg, var(--bg-grad-from) 0%, var(--bg-grad-to) 100%);
 }
-.container { max-width: 80rem; margin: 0 auto; }
+.container { margin: 0 auto;}
 
 /* ===== Header ===== */
 .header {
+  margin-top: 5px;
   display: flex; gap: 16px; align-items: flex-end; justify-content: space-between;
   flex-wrap: wrap; margin-bottom: 24px;
 }

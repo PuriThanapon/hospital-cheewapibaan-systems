@@ -122,7 +122,7 @@ export default function TreatmentPlansListPage() {
   return (
     <div className="min-h-screen w-full bg-[#f7f7fb] rounded-2xl">
       {/* ใช้ padding แบบเต็มกว้าง ไม่มี max-width */}
-      <div className="w-full px-3 sm:px-6 lg:px-8 py-6">
+      <div className="w-full px-3 sm:px-6 lg:px-10 py-8">
 
         {/* Header */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4 w-full">

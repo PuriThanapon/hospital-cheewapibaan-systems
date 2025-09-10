@@ -166,14 +166,14 @@ export default function BedStaysPage() {
 
     // fetch
 
-   async function fetchCurrent() {
-    try {
-        const data = await http<{ data: Occupancy[] }>('/api/bed_stays/current');
-        setOccupancy(data.data || []);
-    } catch (e) {
-        console.error('fetchCurrent error:', e);
-        setOccupancy([]);
-    }
+    async function fetchCurrent() {
+        try {
+            const data = await http<{ data: Occupancy[] }>('/api/bed_stays/current');
+            setOccupancy(data.data || []);
+        } catch (e) {
+            console.error('fetchCurrent error:', e);
+            setOccupancy([]);
+        }
     }
 
     async function fetchBedsMaybe() {
@@ -185,7 +185,7 @@ export default function BedStaysPage() {
                 code: String(b.code),
                 service_type: (b.service_type ?? b.care_side) === 'LTC' ? 'LTC' : 'PC',
             })).filter((b: Bed) => Number.isFinite(b.id));
-             // Debug: ดูรายการเตียง
+            // Debug: ดูรายการเตียง
             setBeds(list);
             setHasBedsApi(true);
         } catch (e: any) {
@@ -312,10 +312,10 @@ export default function BedStaysPage() {
         setOpenAssign(true);
     }
     async function saveAssign() {
-    if (!assign.verified) { toast.fire({ icon: 'warning', title: 'กรุณาตรวจสอบ HN ก่อน' }); return; }
-    if (!assign.bed_id) { toast.fire({ icon: 'warning', title: 'กรุณาเลือก/กรอกเตียง' }); return; }
+        if (!assign.verified) { toast.fire({ icon: 'warning', title: 'กรุณาตรวจสอบ HN ก่อน' }); return; }
+        if (!assign.bed_id) { toast.fire({ icon: 'warning', title: 'กรุณาเลือก/กรอกเตียง' }); return; }
 
-    setAssign(a => ({ ...a, saving: true }));
+        setAssign(a => ({ ...a, saving: true }));
         try {
             await http('/api/bed_stays', {
                 method: 'POST',
@@ -344,26 +344,26 @@ export default function BedStaysPage() {
         if (!openEnd.stay) return;
         const stayId = (openEnd.stay as any).id ?? (openEnd.stay as any).stay_id;
         if (!stayId) {
-            toast.fire({ icon:'error', title:'ไม่พบรหัสการครองเตียง (stay_id)' });
+            toast.fire({ icon: 'error', title: 'ไม่พบรหัสการครองเตียง (stay_id)' });
             return;
         }
-        setOpenEnd(s => ({ ...s, saving:true }));
+        setOpenEnd(s => ({ ...s, saving: true }));
         try {
             await http(`/api/bed_stays/${stayId}/end`, {
-            method: 'PATCH',
-            body: JSON.stringify({
-                at: `${openEnd.date} ${openEnd.time}`,
-                reason: openEnd.reason || null, // ส่งมาเป็น string/null ชัดๆ
-            }),
+                method: 'PATCH',
+                body: JSON.stringify({
+                    at: `${openEnd.date} ${openEnd.time}`,
+                    reason: openEnd.reason || null, // ส่งมาเป็น string/null ชัดๆ
+                }),
             });
-            toast.fire({ icon:'success', title:'สิ้นสุดการครองเตียงแล้ว' });
-            setOpenEnd({ open:false, stay:null, date:YMD(), time:HM(), reason:'discharge', saving:false });
+            toast.fire({ icon: 'success', title: 'สิ้นสุดการครองเตียงแล้ว' });
+            setOpenEnd({ open: false, stay: null, date: YMD(), time: HM(), reason: 'discharge', saving: false });
             await fetchCurrent();
-        } catch (e:any) {
-            toast.fire({ icon:'error', title: e?.message || 'ไม่สำเร็จ' });
-            setOpenEnd(s => ({ ...s, saving:false }));
+        } catch (e: any) {
+            toast.fire({ icon: 'error', title: e?.message || 'ไม่สำเร็จ' });
+            setOpenEnd(s => ({ ...s, saving: false }));
         }
-        }
+    }
 
     /* ---------------- Transfer ---------------- */
     function openTransferModal(stay: Occupancy) {
@@ -408,14 +408,19 @@ export default function BedStaysPage() {
         }
     }
     return (
-        <div className="bg-gray-100 min-h-screen p-6 md:p-10 font-sans bg-[#f7f7fb] rounded-2xl">
+        <div className="bg-gray-100 min-h-screen p-6 md:p-[25px] font-sans bg-[#f7f7fb] rounded-2xl">
             <div className="w-full mx-auto bg-[#f7f7fb]">
 
                 {/* Header and Controls */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <div className="flex items-center gap-4">
-                        <BedDouble className="w-10 h-10 text-purple-600" />
-                        <h1 className="text-3xl font-bold text-gray-800">การจัดการเตียงผู้ป่วย</h1>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 mx-2 my-1">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-600 rounded-lg">
+                            <BedDouble className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">จัดการเตียง</h1>
+                            <p className="text-sm text-gray-500">รายการนัดหมายทั้งหมดในแผนก</p>
+                        </div>
                     </div>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                         {/* Tab Switcher */}
@@ -555,13 +560,13 @@ export default function BedStaysPage() {
                                 </div>
                                 {assign.patient && <div className="mt-2 text-sm text-gray-600">ผู้ป่วย: <span className="font-bold">{assign.patient}</span></div>}
                                 <div className="mt-2">
-                                <button
-                                    type="button"
-                                    className="text-sm text-blue-600 hover:text-blue-700 underline"
-                                    onClick={() => setLookupOpen(true)}
-                                >
-                                    ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
-                                </button>
+                                    <button
+                                        type="button"
+                                        className="text-sm text-blue-600 hover:text-blue-700 underline"
+                                        onClick={() => setLookupOpen(true)}
+                                    >
+                                        ลืมรหัส (ค้นหาด้วยข้อมูลอื่น)
+                                    </button>
                                 </div>
                             </label>
 
@@ -795,19 +800,19 @@ export default function BedStaysPage() {
                 onClose={() => setLookupOpen(false)}
                 onSelect={(p) => {
                     const name = `${p.pname ?? ''}${p.first_name ?? ''} ${p.last_name ?? ''}`
-                    .replace(/\s+/g, ' ')
-                    .trim();
+                        .replace(/\s+/g, ' ')
+                        .trim();
                     setAssign(a => ({
-                    ...a,
-                    hn: normalizeHN(p.patients_id),
-                    patient: name || normalizeHN(p.patients_id),
-                    verified: true,          // ✅ ถือว่าตรวจสอบแล้วเพราะเลือกจากระบบ
+                        ...a,
+                        hn: normalizeHN(p.patients_id),
+                        patient: name || normalizeHN(p.patients_id),
+                        verified: true,          // ✅ ถือว่าตรวจสอบแล้วเพราะเลือกจากระบบ
                     }));
                     setLookupOpen(false);
                     toast.fire({ icon: 'success', title: `เลือกผู้ป่วย: ${name || normalizeHN(p.patients_id)}` });
                 }}
-                />
+            />
         </div>
-        
+
     );
 }
