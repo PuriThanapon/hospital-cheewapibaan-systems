@@ -563,11 +563,6 @@ export default function DailyRoutinePage() {
             </div>
           </section>
         )}
-
-        <div className={styles.tip}>
-          เคล็ดลับ: ถ้ากิจวัตรใดทำทุกวัน ให้ไม่ต้องกำหนด <code>days_of_week</code> ก็ได้
-          ระบบจะแสดงทุกวันอัตโนมัติ
-        </div>
       </div>
 
       {isOpen && (
