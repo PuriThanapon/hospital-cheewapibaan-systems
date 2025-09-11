@@ -23,8 +23,8 @@ const rsx = {
     backgroundColor: '#ffffff',
   }),
   menuPortal: (base) => ({ ...base, color: '#1e293b', zIndex: 12050 }),
-  menu: (base) => ({ 
-    ...base, 
+  menu: (base) => ({
+    ...base,
     zIndex: 12050,
     borderRadius: 12,
     border: '2px solid #e2e8f0',
@@ -84,7 +84,7 @@ async function http(url: string, options: RequestInit = {}) {
     try {
       const j = await res.json();
       msg = (j as any).message || (j as any).error || msg;
-    } catch {}
+    } catch { }
     const err: any = new Error(msg);
     (err as any).status = res.status;
     throw err;
@@ -213,9 +213,33 @@ const TreatmentForm = forwardRef<TreatmentFormHandle, Props>(
         <div className={`space-y-8 bg-slate-50 p-8 ${className}`}>
           {/* Header Section */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">แบบฟอร์มบันทึกการรักษา</h1>
-            <p className="text-slate-600">Treatment Record Form</p>
-            <div className="w-32 h-1 bg-gradient-to-r from-blue-500 to-cyan-500 mx-auto mt-4 rounded-full"></div>
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4 shadow-lg">
+              <svg
+                className="w-8 h-8 text-white"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {/* หูฟังซ้าย/ขวา */}
+                <path d="M6 2v4M18 2v4" />
+                {/* ท่อยูของหูฟัง */}
+                <path d="M6 6v3a6 6 0 0 0 12 0V6" />
+                {/* สายต่อไปที่หัวฟังตรวจ */}
+                <path d="M12 15v2a5 5 0 0 0 5 5h1" />
+                {/* หัวฟังตรวจ */}
+                <circle cx="20" cy="18" r="2" />
+              </svg>
+
+            </div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+              เพิ่มข้อมูลการรักษาผู้ป่วย
+            </h1>
+            <p className="text-gray-600 text-lg">Add Patient Treatment</p>
+            <div className="w-24 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 mx-auto mt-4 rounded-full"></div>
           </div>
 
           {/* ข้อมูลผู้ป่วย */}
@@ -323,7 +347,7 @@ const TreatmentForm = forwardRef<TreatmentFormHandle, Props>(
                         </div>
                         <div className="text-slate-900 font-semibold text-lg">{fullname}</div>
                       </div>
-                      
+
                       <div className="bg-white p-5 rounded-xl border-2 border-slate-200 shadow-sm">
                         <div className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider flex items-center gap-2">
                           <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
@@ -507,7 +531,7 @@ const TreatmentForm = forwardRef<TreatmentFormHandle, Props>(
                 </span>
               </div>
             </div>
-            
+
             {/* แสดงข้อมูลที่กรอกแล้ว */}
             {(value.diagnosis_summary || value.note) && (
               <div className="mt-4 p-4 bg-white rounded-lg border border-blue-200">

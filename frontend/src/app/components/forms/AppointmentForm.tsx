@@ -281,9 +281,9 @@ export default function AppointmentForm({
           </svg>
         </div>
         <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
-          ระบบนัดหมายผู้ป่วย
+          เพิ่มนัดหมายผู้ป่วย
         </h1>
-        <p className="text-gray-600 text-lg">Patient Appointment System</p>
+        <p className="text-gray-600 text-lg">Add Patient Appointment</p>
         <div className="w-24 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 mx-auto mt-4 rounded-full"></div>
       </div>
 
